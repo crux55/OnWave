@@ -3,7 +3,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Search, Wand2, UserCircle2, X } from 'lucide-react';
+import { Home, Search, Wand2, UserCircle2, X, ListMusic } from 'lucide-react';
 import React from 'react';
 
 import { AppLogo } from '@/components/AppLogo';
@@ -17,6 +17,7 @@ const navItems = [
   { href: '/', label: 'Home', icon: Home },
   { href: '/search', label: 'Search', icon: Search },
   { href: '/recommendations', label: 'Explore', icon: Wand2 },
+  { href: '/winamp', label: 'Winamp', icon: ListMusic },
   { href: '/profile', label: 'Profile', icon: UserCircle2 },
 ];
 
