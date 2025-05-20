@@ -1,12 +1,13 @@
+
 import type { Metadata } from 'next';
 import { GeistSans } from 'geist/font/sans';
-import { GeistMono } from 'geist/font/mono';
+// import { GeistMono } from 'geist/font/mono'; // Removed as per previous fix if geist/font/mono is not installed. Re-add if installed.
 import './globals.css';
-import { SidebarProvider } from '@/components/ui/sidebar';
+import { PlayerProvider } from '@/contexts/PlayerContext'; // Changed
 import { Toaster } from '@/components/ui/toaster';
 
 const geistSans = GeistSans;
-const geistMono = GeistMono;
+// const geistMono = GeistMono; // Removed as per previous fix
 
 export const metadata: Metadata = {
   title: 'OnWave - Your Radio Companion',
@@ -20,10 +21,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${geistSans.variable} ${geistMono.variable} font-sans antialiased`}>
-        <SidebarProvider defaultOpen={true}>
+      <body className={`${geistSans.variable} font-sans antialiased`}> {/* Removed geistMono.variable if not used/installed */}
+        <PlayerProvider>
           {children}
-        </SidebarProvider>
+        </PlayerProvider>
         <Toaster />
       </body>
     </html>

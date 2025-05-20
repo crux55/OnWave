@@ -1,82 +1,95 @@
+
 'use client';
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Radio, Wand2, Settings, Home } from 'lucide-react';
+import { Home, Search, Wand2, UserCircle2, X } from 'lucide-react';
+import React from 'react';
 
 import { AppLogo } from '@/components/AppLogo';
 import { UserAvatar } from '@/components/UserAvatar';
-import {
-  Sidebar,
-  SidebarContent,
-  SidebarFooter,
-  SidebarHeader,
-  SidebarInset,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  SidebarTrigger,
-  useSidebar,
-} from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
+import { RadioPlayer } from '@/components/RadioPlayer';
+import { usePlayer } from '@/contexts/PlayerContext';
 import { cn } from '@/lib/utils';
 
 const navItems = [
-  { href: '/', label: 'Browse Stations', icon: Home },
-  { href: '/recommendations', label: 'AI Recommendations', icon: Wand2 },
+  { href: '/', label: 'Home', icon: Home },
+  { href: '/search', label: 'Search', icon: Search },
+  { href: '/recommendations', label: 'Explore', icon: Wand2 },
+  { href: '/profile', label: 'Profile', icon: UserCircle2 },
 ];
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { state: sidebarState } = useSidebar();
+  const player = usePlayer();
 
   return (
-    <>
-      <Sidebar variant="sidebar" collapsible="icon" side="left">
-        <SidebarHeader className="p-0">
-            <div className="flex items-center justify-between p-2">
-              <AppLogo iconOnly={sidebarState === 'collapsed'} />
-              <SidebarTrigger className="md:hidden" />
-            </div>
-        </SidebarHeader>
-        <Separator />
-        <SidebarContent className="p-2">
-          <SidebarMenu>
-            {navItems.map((item) => (
-              <SidebarMenuItem key={item.href}>
-                <Link href={item.href} passHref legacyBehavior>
-                  <SidebarMenuButton
-                    isActive={pathname === item.href}
-                    tooltip={item.label}
-                    className={cn(
-                      sidebarState === 'collapsed' && "justify-center"
-                    )}
-                  >
-                    <item.icon />
-                    <span className={cn(sidebarState === 'collapsed' && "sr-only")}>{item.label}</span>
-                  </SidebarMenuButton>
-                </Link>
-              </SidebarMenuItem>
-            ))}
-          </SidebarMenu>
-        </SidebarContent>
-        <Separator />
-        <SidebarFooter>
+    <div className="flex flex-col min-h-screen">
+      <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b bg-background px-4 sm:px-6">
+        <div className="flex items-center gap-4">
+          <AppLogo iconOnly={false} />
+        </div>
+        <nav className="hidden sm:flex items-center gap-2">
+          {navItems.map((item) => (
+            <Button
+              key={item.href}
+              variant={pathname === item.href ? 'secondary' : 'ghost'}
+              asChild
+              className="text-sm"
+            >
+              <Link href={item.href}>
+                <item.icon className="mr-2 h-4 w-4" />
+                {item.label}
+              </Link>
+            </Button>
+          ))}
+        </nav>
+        <div className="flex items-center gap-4">
           <UserAvatar />
-        </SidebarFooter>
-      </Sidebar>
-      <SidebarInset className="flex flex-col">
-        <header className="sticky top-0 z-10 flex h-14 items-center justify-between border-b bg-background/80 px-4 backdrop-blur-md md:justify-end">
-           <div className="md:hidden">
-             <AppLogo iconOnly={true} />
-           </div>
-           <SidebarTrigger />
-        </header>
-        <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
-          {children}
-        </main>
-      </SidebarInset>
-    </>
+        </div>
+      </header>
+
+      {/* Mobile Bottom Navigation */}
+      <nav className="sm:hidden fixed bottom-0 left-0 right-0 z-30 flex justify-around border-t bg-background p-2">
+        {navItems.map((item) => (
+          <Button
+            key={item.href}
+            variant={pathname === item.href ? 'secondary' : 'ghost'}
+            asChild
+            className="flex flex-col items-center h-auto p-1 text-xs"
+          >
+            <Link href={item.href}>
+              <item.icon className="h-5 w-5 mb-0.5" />
+              {item.label}
+            </Link>
+          </Button>
+        ))}
+      </nav>
+
+      <main className={cn("flex-1 overflow-y-auto p-4 md:p-6 lg:p-8", player.isPlayerBarOpen && "pb-28 sm:pb-24")}> {/* Add padding-bottom when player is open */}
+        {children}
+      </main>
+
+      {player.isPlayerBarOpen && player.currentStation && (
+        <div className="fixed bottom-0 left-0 right-0 z-40 bg-card shadow-lg border-t sm:mb-0 mb-16"> {/* Adjust margin-bottom for mobile nav */}
+          <div className="container mx-auto p-3 max-w-screen-xl">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex-grow">
+                <RadioPlayer station={player.currentStation} />
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={player.closePlayerBar}
+                aria-label="Close player"
+              >
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

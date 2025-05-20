@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -5,16 +6,15 @@ import { mockStations } from '@/lib/mock-data';
 import type { RadioStation } from '@/lib/types';
 import { RadioStationCard } from '@/components/RadioStationCard';
 import { StationSearchInput } from '@/components/StationSearchInput';
-import { RadioPlayerDialog } from '@/components/RadioPlayerDialog';
-import { AlertCircle, Music2 } from 'lucide-react';
+import { Music2 } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { usePlayer } from '@/contexts/PlayerContext'; // Import usePlayer
 
 export default function BrowseStationsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [stations, setStations] = useState<RadioStation[]>([]);
-  const [selectedStation, setSelectedStation] = useState<RadioStation | null>(null);
-  const [isPlayerOpen, setIsPlayerOpen] = useState(false);
-  
+  const player = usePlayer(); // Get player context
+
   // Simulate fetching stations
   useEffect(() => {
     setStations(mockStations);
@@ -32,8 +32,7 @@ export default function BrowseStationsPage() {
   }, [stations, searchTerm]);
 
   const handlePlayStation = (station: RadioStation) => {
-    setSelectedStation(station);
-    setIsPlayerOpen(true);
+    player.playStation(station); // Use player context to play station
   };
 
   return (
@@ -72,19 +71,7 @@ export default function BrowseStationsPage() {
           </AlertDescription>
         </Alert>
       )}
-
-      <RadioPlayerDialog
-        station={selectedStation}
-        isOpen={isPlayerOpen}
-        onOpenChange={(open) => {
-          setIsPlayerOpen(open);
-          if (!open) {
-            // Optionally stop the player or clear selected station when dialog closes
-            // This depends on whether RadioPlayer itself handles cleanup on unmount/station change
-            // setSelectedStation(null); // Uncomment if you want to reset fully
-          }
-        }}
-      />
+      {/* RadioPlayerDialog is removed as player is now a persistent bar */}
     </div>
   );
 }
