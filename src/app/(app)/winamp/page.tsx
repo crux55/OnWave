@@ -1,147 +1,86 @@
 
 'use client';
 
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { mockStations } from '@/lib/mock-data';
+import React, { useState, useCallback } from 'react';
 import type { RadioStation } from '@/lib/types';
 import { usePlayer } from '@/contexts/PlayerContext';
 import { Button } from '@/components/ui/button';
-import {
-  Table,
-  TableHeader,
-  TableBody,
-  TableRow,
-  TableHead,
-  TableCell,
-} from '@/components/ui/table';
-import { Card } from '@/components/ui/card';
-import { StationSearchInput } from '@/components/StationSearchInput';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Checkbox } from '@/components/ui/checkbox';
-import { ListMusic, PlayCircle, ArrowUpDown, ArrowUp, ArrowDown, Search, ChevronsUpDown, CheckIcon, Filter, XIcon } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ListMusic, PlayCircle, Search as SearchIcon, AlertTriangle } from 'lucide-react';
 import Image from 'next/image';
-import { cn } from '@/lib/utils';
-import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
-
-type SortKey = keyof Pick<RadioStation, 'name' | 'genre' | 'country'>;
-type SortDirection = 'asc' | 'desc';
-
-interface SortConfig {
-  key: SortKey;
-  direction: SortDirection;
+// Define the expected shape of station data from the API
+interface ApiRadioStation {
+  id?: string; // Optional, but good for React keys if available
+  name: string;
+  bitrate: number;
+  country: string;
+  votes: number;
+  lastcheckok: boolean | number; // API might send 0/1 or true/false
+  lastcheckoktime: string; // ISO date string
+  lastchecktime: string; // ISO date string
+  url: string;
+  url_resolved: string;
+  homepage: string;
+  favicon: string;
+  tags: string; // Comma-separated
+  codec: string;
+  clickcount: number;
+  clicktrend: number;
+  // language: string;
+  // state: string; // Region/State
+  // countrycode: string;
+  // ... any other fields the API might return
 }
 
 export default function WinampPage() {
-  const [stations, setStations] = useState<RadioStation[]>([]);
-  const [sortConfig, setSortConfig] = useState<SortConfig | null>(null);
-  const [generalSearchTerm, setGeneralSearchTerm] = useState('');
-  const [selectedGenres, setSelectedGenres] = useState<Set<string>>(new Set());
-  const [statusFilter, setStatusFilter] = useState<string>('all'); // 'all', 'followed', 'online'
-  const [genrePopoverOpen, setGenrePopoverOpen] = useState(false);
-
+  const [searchTerm, setSearchTerm] = useState('');
+  const [stations, setStations] = useState<ApiRadioStation[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const player = usePlayer();
 
-  useEffect(() => {
-    setStations(mockStations);
-  }, []);
-
-  const uniqueGenres = useMemo(() => {
-    const genres = new Set<string>();
-    stations.forEach(station => genres.add(station.genre));
-    return Array.from(genres).sort();
-  }, [stations]);
-
-  const filteredAndSortedStations = useMemo(() => {
-    let processedStations = [...stations];
-
-    // Apply general text search
-    if (generalSearchTerm) {
-      processedStations = processedStations.filter(station =>
-        station.name.toLowerCase().includes(generalSearchTerm.toLowerCase()) ||
-        station.genre.toLowerCase().includes(generalSearchTerm.toLowerCase()) ||
-        station.country.toLowerCase().includes(generalSearchTerm.toLowerCase())
-      );
+  const handleSearchStations = async () => {
+    if (!searchTerm.trim()) {
+      setStations([]);
+      setError(null);
+      return;
     }
+    setIsLoading(true);
+    setError(null);
+    setStations([]);
 
-    // Apply genre filter
-    if (selectedGenres.size > 0) {
-      processedStations = processedStations.filter(station =>
-        selectedGenres.has(station.genre)
-      );
-    }
-
-    // Apply status filter (conceptual for now)
-    if (statusFilter === 'followed') {
-      // Conceptual: filter for followed stations (needs data model update)
-      // For now, it might show all or none if no station has a 'followed' property
-    } else if (statusFilter === 'online') {
-      // Conceptual: filter for online stations (needs real-time data)
-    }
-
-    // Apply sort
-    if (sortConfig !== null) {
-      processedStations.sort((a, b) => {
-        if (a[sortConfig.key] < b[sortConfig.key]) {
-          return sortConfig.direction === 'asc' ? -1 : 1;
-        }
-        if (a[sortConfig.key] > b[sortConfig.key]) {
-          return sortConfig.direction === 'asc' ? 1 : -1;
-        }
-        return 0;
-      });
-    }
-    return processedStations;
-  }, [stations, sortConfig, generalSearchTerm, selectedGenres, statusFilter]);
-
-  const requestSort = (key: SortKey) => {
-    let direction: SortDirection = 'asc';
-    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
-      direction = 'desc';
-    }
-    setSortConfig({ key, direction });
-  };
-
-  const getSortIcon = (key: SortKey) => {
-    if (!sortConfig || sortConfig.key !== key) {
-      return <ArrowUpDown className="ml-2 h-3 w-3 text-muted-foreground/70" />;
-    }
-    return sortConfig.direction === 'asc' ? (
-      <ArrowUp className="ml-2 h-3 w-3 text-accent" />
-    ) : (
-      <ArrowDown className="ml-2 h-3 w-3 text-accent" />
-    );
-  };
-
-  const handlePlayStation = (station: RadioStation) => {
-    player.playStation(station);
-  };
-
-  const toggleGenre = (genre: string) => {
-    setSelectedGenres(prev => {
-      const newSelectedGenres = new Set(prev);
-      if (newSelectedGenres.has(genre)) {
-        newSelectedGenres.delete(genre);
-      } else {
-        newSelectedGenres.add(genre);
+    try {
+      const response = await fetch(`/webradio/search?term=${encodeURIComponent(searchTerm)}`);
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to fetch stations: ${response.status} ${errorText || response.statusText}`);
       }
-      return newSelectedGenres;
-    });
+      const data: ApiRadioStation[] = await response.json();
+      // Add a simple client-side ID if not provided by API, for React keys
+      setStations(data.map((s, index) => ({ ...s, id: s.id || `${s.name}-${index}` })));
+    } catch (e: any) {
+      console.error('Search stations error:', e);
+      setError(e.message || 'An unexpected error occurred while searching.');
+      setStations([]);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const getSelectedGenresText = () => {
-    if (selectedGenres.size === 0) return "Filter by Genre";
-    if (selectedGenres.size === 1) return `${Array.from(selectedGenres)[0]}`;
-    if (selectedGenres.size > 1) return `${selectedGenres.size} genres selected`;
-    return "Filter by Genre";
-  }
-
-  const clearGenreFilters = () => {
-    setSelectedGenres(new Set());
-  }
-
+  const handlePlayStation = (station: ApiRadioStation) => {
+    const playerStation: RadioStation = {
+      id: station.id || station.name, // Use API ID or fallback
+      name: station.name,
+      streamUrl: station.url_resolved,
+      genre: station.tags?.split(',')[0]?.trim() || 'Unknown', // Use first tag as genre
+      country: station.country,
+      faviconUrl: station.favicon || `https://placehold.co/64x64.png`,
+    };
+    player.playStation(playerStation);
+  };
 
   return (
     <div className="container mx-auto">
@@ -149,182 +88,148 @@ export default function WinampPage() {
         <div className="flex items-center gap-3 mb-3">
           <ListMusic className="h-8 w-8 text-accent" />
           <h1 className="text-3xl font-bold tracking-tight text-foreground">
-            Winamp Stations
+            Search Web Radio
           </h1>
         </div>
         <p className="text-md text-muted-foreground">
-          Browse, filter, and sort your favorite classic radio stations.
+          Enter a term to search for radio stations via the Radio Browser API.
         </p>
       </header>
 
-      <div className="mb-6 flex flex-col sm:flex-row gap-4">
-        <StationSearchInput
-          value={generalSearchTerm}
-          onChange={setGeneralSearchTerm}
-          placeholder="Search stations..."
-          className="flex-grow"
-        />
-        <div className="flex gap-2 items-center">
-          <Popover open={genrePopoverOpen} onOpenChange={setGenrePopoverOpen}>
-            <PopoverTrigger asChild>
-              <Button variant="outline" role="combobox" aria-expanded={genrePopoverOpen} className="w-full sm:w-[200px] justify-between">
-                <span className="truncate">{getSelectedGenresText()}</span>
-                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-[250px] p-0">
-              <Command>
-                <CommandInput placeholder="Search genres..." />
-                <CommandList>
-                  <CommandEmpty>No genre found.</CommandEmpty>
-                  <CommandGroup>
-                    {uniqueGenres.map((genre) => (
-                      <CommandItem
-                        key={genre}
-                        value={genre}
-                        onSelect={() => {
-                          toggleGenre(genre);
-                        }}
-                        className="flex items-center justify-between"
-                      >
-                        <div className="flex items-center">
-                           <Checkbox
-                            id={`genre-${genre}`}
-                            checked={selectedGenres.has(genre)}
-                            onCheckedChange={() => toggleGenre(genre)}
-                            className="mr-2"
-                          />
-                          <label htmlFor={`genre-${genre}`} className="cursor-pointer flex-grow">{genre}</label>
-                        </div>
-                      </CommandItem>
-                    ))}
-                  </CommandGroup>
-                </CommandList>
-                 {selectedGenres.size > 0 && (
-                  <div className="p-2 border-t">
-                    <Button variant="ghost" size="sm" onClick={clearGenreFilters} className="w-full justify-start text-destructive hover:text-destructive-foreground">
-                      <XIcon className="mr-2 h-4 w-4" /> Clear genre filters
-                    </Button>
-                  </div>
-                )}
-              </Command>
-            </PopoverContent>
-          </Popover>
+      <Card className="shadow-lg mb-8">
+        <CardHeader>
+          <CardTitle>Station Search</CardTitle>
+        </CardHeader>
+        <CardContent className="flex gap-2">
+          <Input
+            type="search"
+            id="searchInput"
+            placeholder="Search for stations (e.g., jazz, techno, country name)"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleSearchStations()}
+            className="flex-grow h-11 text-base"
+          />
+          <Button onClick={handleSearchStations} disabled={isLoading} className="h-11">
+            {isLoading ? (
+              <>
+                <SearchIcon className="mr-2 h-4 w-4 animate-spin" /> Searching...
+              </>
+            ) : (
+              <>
+                <SearchIcon className="mr-2 h-4 w-4" /> Search
+              </>
+            )}
+          </Button>
+        </CardContent>
+      </Card>
 
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-full sm:w-[180px]">
-              <SelectValue placeholder="View" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Stations</SelectItem>
-              <SelectItem value="followed" disabled>Followed (soon)</SelectItem>
-              <SelectItem value="online" disabled>Online (soon)</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-      
-      {selectedGenres.size > 0 && (
-        <div className="mb-4 flex items-center gap-2 flex-wrap">
-          <span className="text-sm text-muted-foreground">Active genre filters:</span>
-          {Array.from(selectedGenres).map(genre => (
-            <Badge key={genre} variant="secondary" className="flex items-center gap-1">
-              {genre}
-              <button onClick={() => toggleGenre(genre)} aria-label={`Remove ${genre} filter`} className="rounded-full hover:bg-muted/50 p-0.5">
-                <XIcon className="h-3 w-3" />
-              </button>
-            </Badge>
-          ))}
+      {error && (
+        <Alert variant="destructive" className="mb-6">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
+      {isLoading && stations.length === 0 && (
+        <div className="text-center py-10 text-muted-foreground">
+          <SearchIcon className="mx-auto h-12 w-12 animate-pulse mb-2" />
+          Searching for stations...
         </div>
       )}
 
+      {!isLoading && !error && stations.length === 0 && searchTerm && (
+         <div className="text-center py-10 text-muted-foreground">
+          No stations found for "{searchTerm}". Try a different search.
+        </div>
+      )}
 
-      <Card className="shadow-lg bg-[hsl(0,0%,12%)] border-[hsl(0,0%,20%)]">
-        <div className="overflow-hidden rounded-lg">
-          <Table>
-            <TableHeader>
-              <TableRow className="border-b-[hsl(0,0%,25%)] hover:bg-[hsl(0,0%,15%)]">
-                <TableHead className="w-[50px] hidden sm:table-cell py-2 px-3 text-xs text-muted-foreground"></TableHead>
-                <TableHead
-                  className="cursor-pointer hover:bg-[hsl(0,0%,15%)] transition-colors py-2 px-3 text-xs text-muted-foreground h-10"
-                  onClick={() => requestSort('name')}
-                >
-                  <div className="flex items-center text-foreground/90">
-                    Name {getSortIcon('name')}
-                  </div>
-                </TableHead>
-                <TableHead
-                  className="cursor-pointer hover:bg-[hsl(0,0%,15%)] transition-colors py-2 px-3 text-xs text-muted-foreground h-10"
-                  onClick={() => requestSort('genre')}
-                >
-                  <div className="flex items-center text-foreground/90">
-                    Genre {getSortIcon('genre')}
-                  </div>
-                </TableHead>
-                <TableHead
-                  className="cursor-pointer hover:bg-[hsl(0,0%,15%)] transition-colors hidden md:table-cell py-2 px-3 text-xs text-muted-foreground h-10"
-                  onClick={() => requestSort('country')}
-                >
-                  <div className="flex items-center text-foreground/90">
-                    Country {getSortIcon('country')}
-                  </div>
-                </TableHead>
-                <TableHead className="text-right py-2 px-3 text-xs text-muted-foreground h-10">
-                    <span className="text-foreground/90">Actions</span>
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredAndSortedStations.length > 0 ? (
-                filteredAndSortedStations.map((station) => (
-                  <TableRow key={station.id} className="border-b-[hsl(0,0%,16%)] hover:bg-[hsl(0,0%,15%)]">
-                    <TableCell className="hidden sm:table-cell py-1.5 px-3">
-                      <Image
-                        src={station.faviconUrl || `https://placehold.co/32x32.png`}
-                        alt={`${station.name} logo`}
-                        width={30} // Reduced size
-                        height={30} // Reduced size
-                        className="rounded-sm border border-[hsl(0,0%,25%)]"
-                        data-ai-hint="radio logo"
-                      />
-                    </TableCell>
-                    <TableCell className="font-medium text-foreground/90 py-1.5 px-3 text-sm">{station.name}</TableCell>
-                    <TableCell className="text-muted-foreground py-1.5 px-3 text-sm">{station.genre}</TableCell>
-                    <TableCell className="text-muted-foreground hidden md:table-cell py-1.5 px-3 text-sm">{station.country}</TableCell>
-                    <TableCell className="text-right py-1.5 px-3">
+      {stations.length > 0 && (
+        <div className="overflow-x-auto bg-card p-1 rounded-lg shadow-md">
+          <table className="min-w-full w-full border border-border border-collapse text-sm">
+            <thead className="bg-muted/30">
+              <tr>
+                <th className="p-2 border border-border text-left font-semibold text-foreground">Station Name</th>
+                <th className="p-2 border border-border text-left font-semibold text-foreground">Bitrate</th>
+                <th className="p-2 border border-border text-left font-semibold text-foreground">Country</th>
+                <th className="p-2 border border-border text-left font-semibold text-foreground">Votes</th>
+                <th className="p-2 border border-border text-left font-semibold text-foreground">Last OK</th>
+                <th className="p-2 border border-border text-left font-semibold text-foreground">OK Time</th>
+                <th className="p-2 border border-border text-left font-semibold text-foreground">Check Time</th>
+                <th className="p-2 border border-border text-left font-semibold text-foreground">Stream</th>
+                <th className="p-2 border border-border text-left font-semibold text-foreground">Resolved</th>
+                <th className="p-2 border border-border text-left font-semibold text-foreground">Homepage</th>
+                <th className="p-2 border border-border text-left font-semibold text-foreground">Icon</th>
+                <th className="p-2 border border-border text-left font-semibold text-foreground">Tags</th>
+                <th className="p-2 border border-border text-left font-semibold text-foreground">Clicks</th>
+                <th className="p-2 border border-border text-left font-semibold text-foreground">Trend</th>
+                <th className="p-2 border border-border text-left font-semibold text-foreground">Status</th>
+                <th className="p-2 border border-border text-left font-semibold text-foreground">Play</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {stations.map((station) => {
+                const lastCheckOKTime = new Date(station.lastcheckoktime);
+                const lastCheckTime = new Date(station.lastchecktime);
+                const isOnline = station.lastcheckok && lastCheckOKTime >= lastCheckTime;
+
+                return (
+                  <tr key={station.id || station.name} className="hover:bg-muted/20">
+                    <td className="p-2 border border-border text-foreground whitespace-nowrap">{station.name}</td>
+                    <td className="p-2 border border-border text-muted-foreground">{station.bitrate} kbps</td>
+                    <td className="p-2 border border-border text-muted-foreground">{station.country}</td>
+                    <td className="p-2 border border-border text-muted-foreground">{station.votes}</td>
+                    <td className="p-2 border border-border text-muted-foreground">{station.lastcheckok ? 'Yes' : 'No'}</td>
+                    <td className="p-2 border border-border text-muted-foreground whitespace-nowrap">{station.lastcheckoktime?.substring(0,19).replace('T', ' ')}</td>
+                    <td className="p-2 border border-border text-muted-foreground whitespace-nowrap">{station.lastchecktime?.substring(0,19).replace('T', ' ')}</td>
+                    <td className="p-2 border border-border">
+                      <a href={station.url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                        Stream
+                      </a>
+                    </td>
+                    <td className="p-2 border border-border">
+                      <a href={station.url_resolved} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                        Resolved
+                      </a>
+                    </td>
+                    <td className="p-2 border border-border">
+                      <a href={station.homepage} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                        Homepage
+                      </a>
+                    </td>
+                    <td className="p-2 border border-border">
+                      {station.favicon ? (
+                        <Image src={station.favicon} alt="Favicon" width={16} height={16} className="object-contain" data-ai-hint="radio logo" onError={(e) => e.currentTarget.style.display='none'}/>
+                      ) : (
+                        '-'
+                      )}
+                    </td>
+                    <td className="p-2 border border-border text-muted-foreground truncate max-w-xs">{station.tags}</td>
+                    <td className="p-2 border border-border text-muted-foreground">{station.clickcount}</td>
+                    <td className="p-2 border border-border text-muted-foreground">{station.clicktrend}</td>
+                    <td className="p-2 border border-border text-center text-xl" title={isOnline ? 'Online' : 'Offline'}>
+                      {isOnline ? '💚' : '🚫'}
+                    </td>
+                    <td className="p-2 border border-border text-center">
                       <Button
                         variant="ghost"
                         size="sm"
                         onClick={() => handlePlayStation(station)}
-                        className="text-accent hover:text-accent-foreground hover:bg-accent/90 h-7 px-2" // Reduced height
+                        className="text-accent hover:text-accent-foreground hover:bg-accent/90 h-7 px-2"
                       >
                         <PlayCircle className="mr-1.5 h-4 w-4" />
                         Play
                       </Button>
-                    </TableCell>
-                  </TableRow>
-                ))
-              ) : (
-                <TableRow>
-                  <TableCell colSpan={5} className="text-center py-10 text-muted-foreground">
-                    <div className="flex flex-col items-center justify-center">
-                      <Filter className="h-10 w-10 mb-3 text-muted-foreground/50" />
-                      <p className="font-semibold">No stations match your current filters.</p>
-                      <p className="text-sm">Try adjusting your search or filter criteria.</p>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
-       {filteredAndSortedStations.length === 0 && stations.length > 0 && !generalSearchTerm && selectedGenres.size === 0 && (
-         <p className="text-muted-foreground text-center py-6">No stations available with current filters.</p>
-       )}
-      </Card>
+      )}
     </div>
   );
 }
-
 
     
