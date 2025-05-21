@@ -4,10 +4,14 @@
 import type { RadioStation } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
-import { Play, Pause, Volume2, VolumeX, ExternalLink, Loader2 } from 'lucide-react';
+import {
+  Play, Pause, Volume2, VolumeX, ExternalLink, Loader2,
+  SkipForward, SkipBack, PanelBottomClose, PanelBottomOpen, Music2, X
+} from 'lucide-react';
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import Image from 'next/image';
-import { usePlayer } from '@/contexts/PlayerContext'; // Import usePlayer
+import { usePlayer } from '@/contexts/PlayerContext';
+import { cn } from '@/lib/utils';
 
 interface RadioPlayerProps {
   station: RadioStation | null;
@@ -15,21 +19,19 @@ interface RadioPlayerProps {
 
 export function RadioPlayer({ station }: RadioPlayerProps) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const player = usePlayer(); // Access player context
+  const player = usePlayer();
 
-  // Local state for volume, mute, loading, error specific to this instance
   const [volume, setVolume] = useState(0.5);
   const [isMuted, setIsMuted] = useState(false);
   const [lastVolume, setLastVolume] = useState(0.5);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Effect to manage audio source and playback when station changes or player bar opens/closes
   useEffect(() => {
     if (!station || !player.isPlayerBarOpen) {
       if (audioRef.current) {
         audioRef.current.pause();
-        audioRef.current.src = ''; // Detach source
+        audioRef.current.src = '';
       }
       player.setIsPlaying(false);
       setIsLoading(false);
@@ -37,18 +39,16 @@ export function RadioPlayer({ station }: RadioPlayerProps) {
       return;
     }
 
-    // Initialize or update audio element
     if (!audioRef.current) {
       audioRef.current = new Audio();
     }
     
     if (audioRef.current.src !== station.streamUrl) {
         audioRef.current.src = station.streamUrl;
-        audioRef.current.load(); // Important to load new source
+        audioRef.current.load();
     }
     audioRef.current.volume = isMuted ? 0 : volume;
 
-    // Attempt to play
     const playAudio = async () => {
       if (audioRef.current && station.streamUrl) {
         try {
@@ -58,7 +58,7 @@ export function RadioPlayer({ station }: RadioPlayerProps) {
           player.setIsPlaying(true);
         } catch (e: any) {
           console.error('Error playing station:', e);
-          setError(`Stream error: ${e.message}`);
+          setError(`Stream error`);
           player.setIsPlaying(false);
         } finally {
           setIsLoading(false);
@@ -67,34 +67,15 @@ export function RadioPlayer({ station }: RadioPlayerProps) {
     };
 
     playAudio();
-
-    const currentAudio = audioRef.current; // Capture current audio element for cleanup
+    const currentAudio = audioRef.current;
 
     const handleAudioError = (e: Event) => {
-      console.error('Audio error event:', e);
-      let message = 'An unknown error occurred with the audio stream.';
-      if (currentAudio?.error) {
-          switch (currentAudio.error.code) {
-              case MediaError.MEDIA_ERR_ABORTED: message = 'Playback aborted.'; break;
-              case MediaError.MEDIA_ERR_NETWORK: message = 'Network error.'; break;
-              case MediaError.MEDIA_ERR_DECODE: message = 'Audio decoding error.'; break;
-              case MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED: message = 'Audio format not supported.'; break;
-              default: message = 'Unknown audio error.';
-          }
-      }
-      setError(message);
+      setError('Stream error.');
       player.setIsPlaying(false);
       setIsLoading(false);
     };
     
-    const handleCanPlay = () => {
-      setIsLoading(false);
-      // If it was intended to play, play now
-      // This can help with autoplay policies if play() was called before stream was ready
-      if(player.isPlayerBarOpen && station && audioRef.current && !player.isPlaying) {
-         audioRef.current.play().then(() => player.setIsPlaying(true)).catch(() => {/* ignore if still fails */});
-      }
-    };
+    const handleCanPlay = () => setIsLoading(false);
 
     if (currentAudio) {
       currentAudio.addEventListener('error', handleAudioError);
@@ -111,11 +92,9 @@ export function RadioPlayer({ station }: RadioPlayerProps) {
         currentAudio.removeEventListener('waiting', () => setIsLoading(true));
         currentAudio.removeEventListener('pause', () => player.setIsPlaying(false));
         currentAudio.removeEventListener('canplay', handleCanPlay);
-        // Do not pause or change src here if we want sound to persist across navigations
-        // unless the station itself changes or the bar is explicitly closed.
       }
     };
-  }, [station, player.isPlayerBarOpen, volume, isMuted, player.setIsPlaying]); // player.setIsPlaying is stable
+  }, [station, player.isPlayerBarOpen, player.setIsPlaying]); // Removed volume and isMuted, they don't gatekeep audio logic
 
   const togglePlayPause = useCallback(async () => {
     if (!audioRef.current) return;
@@ -127,9 +106,8 @@ export function RadioPlayer({ station }: RadioPlayerProps) {
       try {
         await audioRef.current.play();
       } catch (e: any) {
-        console.error("Error on toggle play:", e);
-        setError(`Failed to play: ${e.message}`);
-        player.setIsPlaying(false); // Ensure context is updated
+        setError(`Failed to play`);
+        player.setIsPlaying(false);
       } finally {
         setIsLoading(false);
       }
@@ -139,18 +117,16 @@ export function RadioPlayer({ station }: RadioPlayerProps) {
   const handleVolumeChange = useCallback((newVolume: number[]) => {
     const vol = newVolume[0];
     setVolume(vol);
-    setLastVolume(vol); // Save for unmuting
+    setLastVolume(vol);
     setIsMuted(vol === 0);
-    if (audioRef.current) {
-      audioRef.current.volume = vol;
-    }
+    if (audioRef.current) audioRef.current.volume = vol;
   }, []);
 
   const toggleMute = useCallback(() => {
     const newMuted = !isMuted;
     setIsMuted(newMuted);
     if (newMuted) {
-      setLastVolume(volume); // Save current volume before muting
+      setLastVolume(volume);
       setVolume(0);
       if (audioRef.current) audioRef.current.volume = 0;
     } else {
@@ -160,59 +136,85 @@ export function RadioPlayer({ station }: RadioPlayerProps) {
     }
   }, [isMuted, volume, lastVolume]);
 
+  if (!station) return null;
 
-  if (!station) {
-    return null; // No station, render nothing or a placeholder
+  if (player.isPlayerMinimized) {
+    return (
+      <div className="flex items-center gap-2 w-full">
+        <Image
+          src={station.faviconUrl || `https://placehold.co/32x32.png`}
+          alt={station.name}
+          width={32}
+          height={32}
+          className="rounded border"
+          data-ai-hint="radio logo"
+        />
+        <div className="flex-grow overflow-hidden">
+          <h4 className="text-xs font-semibold truncate text-foreground">{station.name}</h4>
+          {error && <p className="text-xs text-destructive truncate">{error}</p>}
+        </div>
+        <Button onClick={togglePlayPause} variant="ghost" size="icon" className="w-8 h-8" disabled={isLoading || !station.streamUrl}>
+          {isLoading ? <Loader2 className="h-4 w-4 animate-spin text-primary" /> : player.isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+        </Button>
+        {/* Placeholder Next/Prev - non-functional for radio */}
+        <Button variant="ghost" size="icon" className="w-8 h-8" disabled> <SkipBack className="h-4 w-4 text-muted-foreground/50" /> </Button>
+        <Button variant="ghost" size="icon" className="w-8 h-8" disabled> <SkipForward className="h-4 w-4 text-muted-foreground/50" /> </Button>
+        <Button onClick={player.togglePlayerSize} variant="ghost" size="icon" className="w-8 h-8">
+          <PanelBottomOpen className="h-4 w-4" /> <span className="sr-only">Maximize</span>
+        </Button>
+         <Button onClick={player.closePlayerBar} variant="ghost" size="icon" className="w-8 h-8">
+          <X className="h-4 w-4" /> <span className="sr-only">Close</span>
+        </Button>
+      </div>
+    );
   }
 
+  // Maximized View
   return (
-    <div className="flex items-center gap-3 w-full">
+    <div className="flex items-center gap-3 md:gap-4 w-full">
       <Image
-        src={station.faviconUrl || `https://placehold.co/48x48.png`}
+        src={station.faviconUrl || `https://placehold.co/64x64.png`}
         alt={station.name}
-        width={48}
-        height={48}
-        className="rounded-md border hidden sm:block"
-        data-ai-hint="radio logo"
+        width={64}
+        height={64}
+        className="rounded-md border hidden sm:block aspect-square"
+        data-ai-hint="radio station art"
       />
-      <div className="flex-grow overflow-hidden">
-        <h4 className="text-sm font-semibold truncate text-foreground">{station.name}</h4>
-        <p className="text-xs text-muted-foreground truncate">{station.genre} - {station.country}</p>
-        {error && (
-          <p className="text-xs text-destructive truncate mt-0.5">{error}</p>
-        )}
+      <div className="flex-grow overflow-hidden space-y-1">
+        <div className="flex items-baseline gap-2">
+            <h3 className="text-base font-semibold truncate text-foreground">{station.name}</h3>
+            <p className="text-xs text-muted-foreground truncate hidden md:block">{station.genre} - {station.country}</p>
+        </div>
+        {/* Placeholder for Song Title & Artist */}
+        <div className="flex items-center gap-2">
+          <Music2 className="h-4 w-4 text-primary flex-shrink-0" />
+          <div className="overflow-hidden">
+            <p className="text-sm text-primary truncate">Current Song Title Placeholder</p>
+            <p className="text-xs text-muted-foreground truncate">Artist Name Placeholder</p>
+          </div>
+        </div>
+        {error && <p className="text-xs text-destructive truncate mt-0.5">{error}</p>}
       </div>
 
-      <Button onClick={togglePlayPause} variant="ghost" size="icon" className="w-10 h-10" disabled={isLoading || !station.streamUrl}>
-        {isLoading ? (
-          <Loader2 className="h-5 w-5 animate-spin text-primary" />
-        ) : player.isPlaying ? (
-          <Pause className="h-5 w-5" />
-        ) : (
-          <Play className="h-5 w-5" />
-        )}
-        <span className="sr-only">{player.isPlaying ? 'Pause' : 'Play'}</span>
-      </Button>
-
-      <div className="flex items-center gap-2 w-24 sm:w-32">
-        <Button onClick={toggleMute} variant="ghost" size="icon" className="w-8 h-8 sm:w-10 sm:h-10">
-          {isMuted || volume === 0 ? <VolumeX className="h-4 w-4 sm:h-5 sm:w-5" /> : <Volume2 className="h-4 w-4 sm:h-5 sm:w-5" />}
-          <span className="sr-only">{isMuted ? 'Unmute' : 'Mute'}</span>
+      <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
+        <Button onClick={player.togglePlayerSize} variant="ghost" size="icon" className="w-9 h-9 hidden md:inline-flex">
+          <PanelBottomClose className="h-4 w-4" /> <span className="sr-only">Minimize</span>
         </Button>
-        <Slider
-          value={[volume]}
-          max={1}
-          step={0.01}
-          onValueChange={handleVolumeChange}
-          className="flex-grow"
-          aria-label="Volume control"
-        />
+        <Button onClick={togglePlayPause} variant="ghost" size="icon" className="w-10 h-10" disabled={isLoading || !station.streamUrl}>
+          {isLoading ? <Loader2 className="h-5 w-5 animate-spin text-primary" /> : player.isPlaying ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
+        </Button>
+        <div className="items-center gap-2 w-24 sm:w-28 hidden md:flex">
+          <Button onClick={toggleMute} variant="ghost" size="icon" className="w-9 h-9">
+            {isMuted || volume === 0 ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+          </Button>
+          <Slider value={[volume]} max={1} step={0.01} onValueChange={handleVolumeChange} className="flex-grow" aria-label="Volume control" />
+        </div>
+        <Button variant="ghost" size="icon" asChild className="w-9 h-9 hidden md:inline-flex">
+          <a href={station.streamUrl} target="_blank" rel="noopener noreferrer" aria-label="Open stream URL">
+            <ExternalLink className="h-4 w-4" />
+          </a>
+        </Button>
       </div>
-      <Button variant="ghost" size="icon" asChild className="hidden md:inline-flex w-10 h-10">
-        <a href={station.streamUrl} target="_blank" rel="noopener noreferrer" aria-label="Open stream URL">
-          <ExternalLink className="h-4 w-4" />
-        </a>
-      </Button>
     </div>
   );
 }

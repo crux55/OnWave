@@ -25,6 +25,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const player = usePlayer();
 
+  const mainContentPadding = player.isPlayerBarOpen
+    ? player.isPlayerMinimized
+      ? "pb-24 sm:pb-20" // Padding for minimized player
+      : "pb-32 sm:pb-28" // Padding for maximized player
+    : "pb-16 sm:pb-6"; // Padding when player is closed (mobile nav still there)
+
+
   return (
     <div className="flex flex-col min-h-screen">
       <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b bg-background px-4 sm:px-6">
@@ -68,25 +75,39 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         ))}
       </nav>
 
-      <main className={cn("flex-1 overflow-y-auto p-4 md:p-6 lg:p-8", player.isPlayerBarOpen && "pb-28 sm:pb-24")}> {/* Add padding-bottom when player is open */}
+      <main className={cn("flex-1 overflow-y-auto p-4 md:p-6 lg:p-8", mainContentPadding)}>
         {children}
       </main>
 
       {player.isPlayerBarOpen && player.currentStation && (
-        <div className="fixed bottom-0 left-0 right-0 z-40 bg-card shadow-lg border-t sm:mb-0 mb-16"> {/* Adjust margin-bottom for mobile nav */}
-          <div className="container mx-auto p-3 max-w-screen-xl">
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex-grow">
+        <div
+          className={cn(
+            "fixed z-40 bg-card shadow-lg border-t transition-all duration-300 ease-in-out",
+            player.isPlayerMinimized
+              ? "bottom-4 right-4 w-72 rounded-lg sm:mb-0 mb-16" // Minimized state: bottom-right corner, smaller
+              : "bottom-0 left-0 right-0 sm:mb-0 mb-16" // Maximized state: full width at bottom
+          )}
+        >
+          <div
+            className={cn(
+              "mx-auto",
+              player.isPlayerMinimized ? "p-2" : "container p-3 max-w-screen-xl"
+            )}
+          >
+            <div className={cn("flex items-center justify-between gap-2", player.isPlayerMinimized ? "flex-col items-stretch" : "gap-4")}>
+              <div className={cn(player.isPlayerMinimized ? "w-full" : "flex-grow")}>
                 <RadioPlayer station={player.currentStation} />
               </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={player.closePlayerBar}
-                aria-label="Close player"
-              >
-                <X className="h-5 w-5" />
-              </Button>
+              {!player.isPlayerMinimized && ( // Show close button only when maximized
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={player.closePlayerBar}
+                  aria-label="Close player"
+                >
+                  <X className="h-5 w-5" />
+                </Button>
+              )}
             </div>
           </div>
         </div>

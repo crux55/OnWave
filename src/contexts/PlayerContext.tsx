@@ -10,6 +10,8 @@ interface PlayerContextType {
   closePlayerBar: () => void;
   isPlaying: boolean;
   setIsPlaying: (playing: boolean) => void;
+  isPlayerMinimized: boolean;
+  togglePlayerSize: () => void;
 }
 
 const PlayerContext = createContext<PlayerContextType | undefined>(undefined);
@@ -18,26 +20,34 @@ export const PlayerProvider = ({ children }: { children: ReactNode }) => {
   const [currentStation, setCurrentStation] = useState<RadioStation | null>(null);
   const [isPlayerBarOpen, setIsPlayerBarOpen] = useState(false);
   const [isPlaying, setIsPlayingState] = useState(false);
+  const [isPlayerMinimized, setIsPlayerMinimized] = useState(false);
 
   const playStation = useCallback((station: RadioStation) => {
     setCurrentStation(station);
     setIsPlayerBarOpen(true);
+    setIsPlayerMinimized(false); // Always open maximized initially
     // setIsPlayingState(true); // Player component will handle actual play state
   }, []);
 
   const closePlayerBar = useCallback(() => {
     setIsPlayerBarOpen(false);
     setIsPlayingState(false);
-    // setCurrentStation(null); // Keep station so player can fade out or stop gracefully if needed. Player component should handle its audio source.
+    // setCurrentStation(null); // Keep station so player can fade out or stop gracefully
   }, []);
 
   const setIsPlaying = useCallback((playing: boolean) => {
     setIsPlayingState(playing);
   }, []);
 
+  const togglePlayerSize = useCallback(() => {
+    if (isPlayerBarOpen) { // Only allow toggling size if player is open
+      setIsPlayerMinimized(prev => !prev);
+    }
+  }, [isPlayerBarOpen]);
+
 
   return (
-    <PlayerContext.Provider value={{ currentStation, isPlayerBarOpen, playStation, closePlayerBar, isPlaying, setIsPlaying }}>
+    <PlayerContext.Provider value={{ currentStation, isPlayerBarOpen, playStation, closePlayerBar, isPlaying, setIsPlaying, isPlayerMinimized, togglePlayerSize }}>
       {children}
     </PlayerContext.Provider>
   );
