@@ -1,5 +1,6 @@
 import { Waves } from 'lucide-react';
 import type { SVGProps } from 'react';
+import { cn } from '@/lib/utils'; // Ensure cn is imported
 
 interface AppLogoProps extends SVGProps<SVGSVGElement> {
   iconOnly?: boolean;
@@ -15,6 +16,3 @@ export function AppLogo({ iconOnly = false, className, ...props }: AppLogoProps)
     </div>
   );
 }
-
-// Helper cn function if not globally available (though it should be from utils)
-const cn = (...classes: (string | undefined | null | false)[]) => classes.filter(Boolean).join(' ');
