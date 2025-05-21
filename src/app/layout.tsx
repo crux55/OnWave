@@ -1,5 +1,5 @@
 
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { GeistSans } from 'geist/font/sans';
 // import { GeistMono } from 'geist/font/mono'; // Removed as per previous fix if geist/font/mono is not installed. Re-add if installed.
 import './globals.css';
@@ -12,7 +12,26 @@ const geistSans = GeistSans;
 export const metadata: Metadata = {
   title: 'OnWave - Your Radio Companion',
   description: 'Discover and listen to radio stations from around the world.',
+  manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'OnWave',
+    // startupImage: [], // You can add startup images for iOS
+  },
+  formatDetection: {
+    telephone: false,
+  },
 };
+
+export const viewport: Viewport = {
+  themeColor: '#7000A8', // Corresponds to accent color from globals.css (Deep Purple)
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false, // Or true if you want users to be able to zoom
+};
+
 
 export default function RootLayout({
   children,
