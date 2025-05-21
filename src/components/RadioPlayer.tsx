@@ -55,8 +55,9 @@ export function RadioPlayer({ station }: RadioPlayerProps) {
           await audioRef.current.play();
           player.setIsPlaying(true);
         } catch (e: any) {
-          console.error('Error playing station:', e);
-          setError(`Stream error`);
+          // This catch is for issues with the play() promise itself, not typically stream errors after play starts
+          console.error('Error initiating station play:', e);
+          setError(`Stream init error`);
           player.setIsPlaying(false);
         } finally {
           setIsLoading(false);
@@ -64,8 +65,6 @@ export function RadioPlayer({ station }: RadioPlayerProps) {
       }
     };
 
-    // Only attempt to play if player bar is open and not in maximized view (audio handled by dialog potentially)
-    // Or if the intention is to play immediately. For now, let's assume play when station is set.
     if (player.isPlayerBarOpen) {
         playAudio();
     }
@@ -73,28 +72,45 @@ export function RadioPlayer({ station }: RadioPlayerProps) {
     const currentAudio = audioRef.current;
 
     const handleAudioError = (e: Event) => {
-      console.error("Audio Error:", e);
-      const mediaError = (e.target as HTMLAudioElement).error;
-      let errorMessage = 'Stream error.';
-      if (mediaError) {
-        switch (mediaError.code) {
-          case mediaError.MEDIA_ERR_ABORTED:
-            errorMessage = 'Playback aborted.';
-            break;
-          case mediaError.MEDIA_ERR_NETWORK:
-            errorMessage = 'Network error.';
-            break;
-          case mediaError.MEDIA_ERR_DECODE:
-            errorMessage = 'Decode error.';
-            break;
-          case mediaError.MEDIA_ERR_SRC_NOT_SUPPORTED:
-            errorMessage = 'Format not supported.';
-            break;
-          default:
-            errorMessage = 'Unknown stream error.';
-        }
+      const audioElement = e.target as HTMLAudioElement;
+      const mediaError = audioElement.error;
+      
+      let uiErrorMessage = 'Stream error'; // For UI display
+      let detailedConsoleMessage = 'Stream error occurred.'; // For console
+
+      if (!mediaError) {
+        detailedConsoleMessage = "Audio event triggered on RadioPlayer, but no MediaError object found.";
+        console.error(detailedConsoleMessage, "Event:", e, "Station URL:", audioElement.src);
+        setError(uiErrorMessage); // Set a generic error for UI
+        player.setIsPlaying(false);
+        setIsLoading(false);
+        return;
       }
-      setError(errorMessage);
+      
+      switch (mediaError.code) {
+        case mediaError.MEDIA_ERR_ABORTED:
+          uiErrorMessage = 'Playback aborted.';
+          detailedConsoleMessage = 'Playback aborted by user or script.';
+          break;
+        case mediaError.MEDIA_ERR_NETWORK:
+          uiErrorMessage = 'Network error.';
+          detailedConsoleMessage = 'A network error caused the audio download to fail.';
+          break;
+        case mediaError.MEDIA_ERR_DECODE:
+          uiErrorMessage = 'Decode error.';
+          detailedConsoleMessage = 'The audio playback was aborted due to a corruption problem or because the audio used features your browser did not support.';
+          break;
+        case mediaError.MEDIA_ERR_SRC_NOT_SUPPORTED:
+          uiErrorMessage = 'Format not supported.';
+          detailedConsoleMessage = 'The audio could not be loaded, either because the server or network failed or because the format is not supported.';
+          break;
+        default:
+          uiErrorMessage = 'Unknown stream error.';
+          detailedConsoleMessage = `An unknown error occurred (Code: ${mediaError.code}).`;
+      }
+      
+      console.error(`RadioPlayer Audio Error: ${detailedConsoleMessage}`, "MediaError Details:", mediaError, "Station URL:", audioElement.src);
+      setError(uiErrorMessage); // Use the shorter message for the UI
       player.setIsPlaying(false);
       setIsLoading(false);
     };
@@ -122,8 +138,6 @@ export function RadioPlayer({ station }: RadioPlayerProps) {
         currentAudio.removeEventListener('canplay', handleCanPlay);
       }
     };
-  // player.isMaximizedViewOpen is intentionally not a dependency here, 
-  // as this component instance manages the core audio lifecycle.
   }, [station, player.isPlayerBarOpen, player.setIsPlaying]);
 
 
@@ -142,15 +156,15 @@ export function RadioPlayer({ station }: RadioPlayerProps) {
       setIsLoading(true);
       setError(null);
       try {
-        // Ensure src is set, especially if it was cleared or changed
         if (audioRef.current.src !== station.streamUrl) {
             audioRef.current.src = station.streamUrl;
             audioRef.current.load();
         }
         await audioRef.current.play();
       } catch (e: any) {
+        console.error('Error in togglePlayPause:', e);
         setError(`Failed to play`);
-        player.setIsPlaying(false); // Ensure context is updated
+        player.setIsPlaying(false); 
       } finally {
         setIsLoading(false);
       }
@@ -171,22 +185,21 @@ export function RadioPlayer({ station }: RadioPlayerProps) {
     const newMuted = !player.isMuted;
     player.setIsMuted(newMuted);
     if (newMuted) {
-      setLastVolumeBeforeMute(player.volume); // Save current volume before muting
-      player.setVolume(0); // Set volume to 0, context will update audioRef
+      setLastVolumeBeforeMute(player.volume); 
+      // player.setVolume(0); // Context updates audioRef via useEffect on player.volume/isMuted
     } else {
-      // Restore to lastVolumeBeforeMute or a small default if lastVolume was 0
-      player.setVolume(lastVolumeBeforeMute > 0 ? lastVolumeBeforeMute : 0.1);
+      // player.setVolume(lastVolumeBeforeMute > 0 ? lastVolumeBeforeMute : 0.1); // Context updates audioRef
     }
   }, [player.isMuted, player.volume, player.setIsMuted, player.setVolume, lastVolumeBeforeMute]);
 
 
-  if (!station || !player.isPlayerBarOpen) return null; // This component shouldn't render if bar is closed
+  if (!station || !player.isPlayerBarOpen) return null; 
 
   const playerRootClasses = cn(
     "fixed z-40 bg-card shadow-lg border-t transition-all duration-300 ease-in-out",
     player.isPlayerMinimized
-      ? "bottom-4 right-4 w-72 rounded-lg sm:mb-0 mb-16" // Minimized state
-      : "bottom-0 left-0 right-0 sm:mb-0 mb-16" // Standard bar state
+      ? "bottom-4 right-4 w-72 rounded-lg sm:mb-0 mb-16" 
+      : "bottom-0 left-0 right-0 sm:mb-0 mb-16" 
   );
 
   const playerContainerClasses = cn(
@@ -243,7 +256,7 @@ export function RadioPlayer({ station }: RadioPlayerProps) {
                         alt={station.name}
                         width={64}
                         height={64}
-                        className="rounded-md border hidden sm:block aspect-square"
+                        className="rounded-md border hidden sm:block aspect-square object-cover"
                         data-ai-hint="radio station art"
                     />
                     <div className="flex-grow overflow-hidden space-y-1">
