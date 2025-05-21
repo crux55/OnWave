@@ -1,51 +1,185 @@
 
 'use client';
 
-import { UserCircle2 } from 'lucide-react';
+import { UserCircle2, ListMusic, Radio, Podcast, Users, FileText, Edit3, LogOut } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
+import { Separator } from '@/components/ui/separator';
+
+// Placeholder data - in a real app, this would come from an API
+const userProfile = {
+  name: 'Jane Doe',
+  email: 'premium.user@example.com',
+  avatarUrl: 'https://placehold.co/100x100.png',
+  bio: 'Lover of synthwave, lo-fi beats, and discovering new radio waves. Always on the hunt for the next great tune!',
+  subscription: 'Premium',
+  memberSince: 'January 1, 2023',
+  favoriteGenre: 'Synthwave',
+  theme: 'Dark Mode (App Default)', // Assuming the app is dark themed
+  playlists: [
+    { id: 'pl1', name: 'Late Night Coding Vibes' },
+    { id: 'pl2', name: "Retro Drive '86" },
+  ],
+  followedStations: [
+    { id: 'st1', name: 'Synthwave FM' },
+    { id: 'st2', name: 'Chillhop Raccoon' },
+  ],
+  followedShows: [
+    { id: 'sh1', name: 'Future Beats Show' },
+  ],
+  followedDJs: [
+    { id: 'dj1', name: 'DJ Starlight' },
+    { id: 'dj2', name: 'The Lofi Guru' },
+  ],
+};
+
+interface ListItemProps {
+  items: { id: string; name: string }[];
+  emptyMessage: string;
+  icon: React.ElementType;
+}
+
+const ProfileListSection: React.FC<ListItemProps> = ({ items, emptyMessage, icon: Icon }) => (
+  <div className="space-y-3">
+    {items.length > 0 ? (
+      <ul className="space-y-2">
+        {items.map(item => (
+          <li key={item.id} className="flex items-center gap-3 p-2 bg-muted/30 rounded-md hover:bg-muted/60 transition-colors">
+            <Icon className="h-5 w-5 text-accent flex-shrink-0" />
+            <span className="text-sm text-foreground">{item.name}</span>
+          </li>
+        ))}
+      </ul>
+    ) : (
+      <p className="flex items-center gap-3 p-2 text-sm text-muted-foreground">
+        <Icon className="h-5 w-5 text-muted-foreground/70 flex-shrink-0" />
+        {emptyMessage}
+      </p>
+    )}
+  </div>
+);
+
 
 export default function ProfilePage() {
   return (
-    <div className="container mx-auto py-8 max-w-2xl">
+    <div className="container mx-auto py-8 max-w-3xl">
       <header className="mb-10 text-center">
         <UserCircle2 className="mx-auto h-20 w-20 text-accent mb-4" />
         <h1 className="text-5xl font-bold tracking-tight text-foreground">Your Profile</h1>
         <p className="text-xl text-muted-foreground mt-3">
-          Manage your OnWave account and preferences.
+          Manage your OnWave account, preferences, and activity.
         </p>
       </header>
       
       <Card className="shadow-xl">
-        <CardHeader className="items-center text-center">
-            <Avatar className="h-24 w-24 border-4 border-primary mb-4">
-                <AvatarImage src="https://placehold.co/100x100.png" alt="User Avatar" data-ai-hint="user profile"/>
+        <CardHeader className="items-center text-center border-b pb-6">
+            <Avatar className="h-28 w-28 border-4 border-primary mb-4 shadow-md">
+                <AvatarImage src={userProfile.avatarUrl} alt="User Avatar" data-ai-hint="user profile picture" />
                 <AvatarFallback>
-                    <UserCircle2 className="h-16 w-16 text-muted-foreground" />
+                    <UserCircle2 className="h-20 w-20 text-muted-foreground" />
                 </AvatarFallback>
             </Avatar>
-          <CardTitle className="text-3xl">Jane Doe</CardTitle>
-          <CardDescription className="text-base">premium.user@example.com</CardDescription>
+          <CardTitle className="text-3xl">{userProfile.name}</CardTitle>
+          <CardDescription className="text-base">{userProfile.email}</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6 p-8">
-          <div className="space-y-2">
-            <h3 className="text-lg font-semibold text-foreground">Account Details</h3>
-            <p className="text-muted-foreground">Subscription: <span className="text-primary font-medium">Premium</span></p>
-            <p className="text-muted-foreground">Member since: January 1, 2023</p>
-          </div>
+        <CardContent className="p-6 md:p-8 space-y-8">
           
-          <div className="space-y-2">
-            <h3 className="text-lg font-semibold text-foreground">Preferences</h3>
-            <p className="text-muted-foreground">Favorite Genre: Synthwave</p>
-            <p className="text-muted-foreground">Theme: Light Mode (App Default)</p>
-          </div>
+          <section>
+            <div className="flex justify-between items-center mb-3">
+              <h3 className="text-xl font-semibold text-foreground flex items-center gap-2">
+                <FileText className="h-5 w-5 text-primary" /> Bio
+              </h3>
+              <Button variant="ghost" size="sm" className="text-xs">
+                <Edit3 className="mr-1.5 h-3.5 w-3.5" /> Edit Bio
+              </Button>
+            </div>
+            <p className="text-sm text-muted-foreground leading-relaxed pl-2 border-l-2 border-primary/50">
+              {userProfile.bio || "You haven't added a bio yet."}
+            </p>
+          </section>
 
-          <div className="border-t pt-6">
-            <Button variant="destructive" className="w-full sm:w-auto">Log Out</Button>
+          <Separator />
+
+          <section>
+            <h3 className="text-xl font-semibold text-foreground mb-4 flex items-center gap-2">
+              <ListMusic className="h-5 w-5 text-primary" /> My Playlists
+            </h3>
+            <ProfileListSection 
+              items={userProfile.playlists}
+              emptyMessage="No playlists created yet. Start curating!"
+              icon={ListMusic}
+            />
+          </section>
+
+          <Separator />
+          
+          <section>
+            <h3 className="text-xl font-semibold text-foreground mb-3">Following</h3>
+            <div className="space-y-6">
+              <div>
+                <h4 className="text-md font-medium text-muted-foreground mb-2 flex items-center gap-2">
+                  <Radio className="h-4 w-4" /> Stations
+                </h4>
+                <ProfileListSection 
+                  items={userProfile.followedStations}
+                  emptyMessage="You're not following any stations yet."
+                  icon={Radio}
+                />
+              </div>
+              <div>
+                <h4 className="text-md font-medium text-muted-foreground mb-2 flex items-center gap-2">
+                  <Podcast className="h-4 w-4" /> Shows
+                </h4>
+                <ProfileListSection 
+                  items={userProfile.followedShows}
+                  emptyMessage="No shows followed yet. Explore and find some!"
+                  icon={Podcast}
+                />
+              </div>
+              <div>
+                <h4 className="text-md font-medium text-muted-foreground mb-2 flex items-center gap-2">
+                  <Users className="h-4 w-4" /> DJs
+                </h4>
+                <ProfileListSection 
+                  items={userProfile.followedDJs}
+                  emptyMessage="Not following any DJs. Discover talent!"
+                  icon={Users}
+                />
+              </div>
+            </div>
+          </section>
+          
+          <Separator />
+
+          <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <h3 className="text-xl font-semibold text-foreground mb-3">Account Details</h3>
+              <div className="space-y-1 text-sm">
+                <p className="text-muted-foreground">Subscription: <span className="text-primary font-medium">{userProfile.subscription}</span></p>
+                <p className="text-muted-foreground">Member since: {userProfile.memberSince}</p>
+              </div>
+            </div>
+            
+            <div>
+              <h3 className="text-xl font-semibold text-foreground mb-3">Preferences</h3>
+              <div className="space-y-1 text-sm">
+                <p className="text-muted-foreground">Favorite Genre: {userProfile.favoriteGenre}</p>
+                <p className="text-muted-foreground">Theme: {userProfile.theme}</p>
+              </div>
+            </div>
+          </section>
+
+          <Separator />
+
+          <div className="pt-2">
+            <Button variant="destructive" className="w-full sm:w-auto">
+              <LogOut className="mr-2 h-4 w-4" /> Log Out
+            </Button>
           </div>
         </CardContent>
       </Card>
     </div>
   );
 }
+
