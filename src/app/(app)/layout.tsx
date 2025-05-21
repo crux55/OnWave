@@ -3,13 +3,14 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Search, Wand2, UserCircle2, X, ListMusic } from 'lucide-react';
+import { Home, Search, Wand2, UserCircle2, ListMusic } from 'lucide-react';
 import React from 'react';
 
 import { AppLogo } from '@/components/AppLogo';
 import { UserAvatar } from '@/components/UserAvatar';
 import { Button } from '@/components/ui/button';
 import { RadioPlayer } from '@/components/RadioPlayer';
+import { MaximizedPlayerDialog } from '@/components/MaximizedPlayerDialog';
 import { usePlayer } from '@/contexts/PlayerContext';
 import { cn } from '@/lib/utils';
 
@@ -25,12 +26,17 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const player = usePlayer();
 
-  const mainContentPadding = player.isPlayerBarOpen
-    ? player.isPlayerMinimized
-      ? "pb-24 sm:pb-20" // Padding for minimized player
-      : "pb-32 sm:pb-28" // Padding for maximized player
-    : "pb-16 sm:pb-6"; // Padding when player is closed (mobile nav still there)
-
+  const getBottomPadding = () => {
+    if (!player.isPlayerBarOpen || player.isMaximizedViewOpen) {
+      return "pb-16 sm:pb-6"; // Padding when player is closed or maximized dialog is open
+    }
+    if (player.isPlayerMinimized) {
+      return "pb-24 sm:pb-20"; // Padding for minimized player
+    }
+    return "pb-32 sm:pb-28"; // Padding for standard player bar
+  };
+  
+  const mainContentPadding = getBottomPadding();
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -79,38 +85,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         {children}
       </main>
 
-      {player.isPlayerBarOpen && player.currentStation && (
-        <div
-          className={cn(
-            "fixed z-40 bg-card shadow-lg border-t transition-all duration-300 ease-in-out",
-            player.isPlayerMinimized
-              ? "bottom-4 right-4 w-72 rounded-lg sm:mb-0 mb-16" // Minimized state: bottom-right corner, smaller
-              : "bottom-0 left-0 right-0 sm:mb-0 mb-16" // Maximized state: full width at bottom
-          )}
-        >
-          <div
-            className={cn(
-              "mx-auto",
-              player.isPlayerMinimized ? "p-2" : "container p-3 max-w-screen-xl"
-            )}
-          >
-            <div className={cn("flex items-center justify-between gap-2", player.isPlayerMinimized ? "flex-col items-stretch" : "gap-4")}>
-              <div className={cn(player.isPlayerMinimized ? "w-full" : "flex-grow")}>
-                <RadioPlayer station={player.currentStation} />
-              </div>
-              {!player.isPlayerMinimized && ( // Show close button only when maximized
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={player.closePlayerBar}
-                  aria-label="Close player"
-                >
-                  <X className="h-5 w-5" />
-                </Button>
-              )}
-            </div>
-          </div>
-        </div>
+      {player.isPlayerBarOpen && player.currentStation && !player.isMaximizedViewOpen && (
+        <RadioPlayer station={player.currentStation} />
+      )}
+      
+      {player.isPlayerBarOpen && player.currentStation && player.isMaximizedViewOpen && (
+        <MaximizedPlayerDialog station={player.currentStation} />
       )}
     </div>
   );
