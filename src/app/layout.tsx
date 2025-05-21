@@ -1,13 +1,13 @@
 
 import type { Metadata, Viewport } from 'next';
 import { GeistSans } from 'geist/font/sans';
-// import { GeistMono } from 'geist/font/mono'; // Removed as per previous fix if geist/font/mono is not installed. Re-add if installed.
+import { GeistMono } from 'geist/font/mono';
 import './globals.css';
 import { PlayerProvider } from '@/contexts/PlayerContext'; // Changed
 import { Toaster } from '@/components/ui/toaster';
 
 const geistSans = GeistSans;
-// const geistMono = GeistMono; // Removed as per previous fix
+const geistMono = GeistMono;
 
 export const metadata: Metadata = {
   title: 'OnWave - Your Radio Companion',
@@ -25,11 +25,11 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: '#7000A8', // Corresponds to accent color from globals.css (Deep Purple)
+  themeColor: 'hsl(270 30% 12%)', // Corresponds to background from globals.css
   width: 'device-width',
   initialScale: 1,
   maximumScale: 1,
-  userScalable: false, // Or true if you want users to be able to zoom
+  userScalable: false, 
 };
 
 
@@ -40,7 +40,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${geistSans.variable} font-sans antialiased`}> {/* Removed geistMono.variable if not used/installed */}
+      <body className={`${geistSans.variable} ${geistMono.variable} font-sans antialiased`}>
         <PlayerProvider>
           {children}
         </PlayerProvider>
