@@ -94,7 +94,7 @@ export function RadioPlayer({ station }: RadioPlayerProps) {
         currentAudio.removeEventListener('canplay', handleCanPlay);
       }
     };
-  }, [station, player.isPlayerBarOpen, player.setIsPlaying]); // Removed volume and isMuted, they don't gatekeep audio logic
+  }, [station, player.isPlayerBarOpen, player.setIsPlaying]);
 
   const togglePlayPause = useCallback(async () => {
     if (!audioRef.current) return;
@@ -105,7 +105,8 @@ export function RadioPlayer({ station }: RadioPlayerProps) {
       setError(null);
       try {
         await audioRef.current.play();
-      } catch (e: any) {
+      } catch (e: any)
+{
         setError(`Failed to play`);
         player.setIsPlaying(false);
       } finally {
@@ -162,9 +163,7 @@ export function RadioPlayer({ station }: RadioPlayerProps) {
         <Button onClick={player.togglePlayerSize} variant="ghost" size="icon" className="w-8 h-8">
           <PanelBottomOpen className="h-4 w-4" /> <span className="sr-only">Maximize</span>
         </Button>
-         <Button onClick={player.closePlayerBar} variant="ghost" size="icon" className="w-8 h-8">
-          <X className="h-4 w-4" /> <span className="sr-only">Close</span>
-        </Button>
+         {/* X button to close player removed from minimized view. Close is available when maximized via layout. */}
       </div>
     );
   }
