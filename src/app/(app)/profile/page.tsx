@@ -79,7 +79,9 @@ export default function ProfilePage() {
       if (user) {
         setCurrentUser(user);
       } else {
-        router.push('/auth/login'); // Redirect if not logged in
+        // If not logged in and trying to access /profile, replace current history entry
+        // to avoid back-button loops.
+        router.replace('/auth/login'); 
       }
       setIsLoading(false);
     });
@@ -116,9 +118,11 @@ export default function ProfilePage() {
     );
   }
 
+  // This check now happens *after* isLoading is false.
+  // If currentUser is still null at this point (and not loading),
+  // it means the redirect from useEffect should have already occurred or is in process.
+  // This section acts as a fallback UI or for states where redirect might be pending/failed.
   if (!currentUser) {
-    // This case should ideally be handled by the redirect in useEffect,
-    // but as a fallback or if redirect hasn't completed:
     return (
        <div className="flex flex-col items-center justify-center min-h-[calc(100vh-10rem)] text-center p-4">
         <ShieldAlert className="h-16 w-16 text-destructive mb-4" />
@@ -276,3 +280,4 @@ export default function ProfilePage() {
     </div>
   );
 }
+
