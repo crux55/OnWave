@@ -3,7 +3,7 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { UserCircle2, LogIn } from 'lucide-react';
+import { UserCircle2, LogIn } from 'lucide-react'; // LogIn might be removed if not used elsewhere
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { getAuth, onAuthStateChanged, type User } from 'firebase/auth';
 import { initializeAppIfNeeded } from '@/lib/firebase/client';
@@ -64,8 +64,9 @@ export function UserAvatar() {
   return (
     <Link href="/auth/login" className="flex items-center gap-3 p-2 rounded-md hover:bg-accent/10 transition-colors">
       <Avatar className="h-10 w-10 border-2 border-transparent">
-        <AvatarFallback className="bg-transparent">
-          <LogIn className="h-7 w-7 text-accent" />
+        {/* Default AvatarFallback uses bg-muted, which is good */}
+        <AvatarFallback> 
+          <UserCircle2 className="h-8 w-8 text-muted-foreground" />
         </AvatarFallback>
       </Avatar>
       <div>
