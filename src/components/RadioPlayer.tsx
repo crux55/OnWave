@@ -75,42 +75,57 @@ export function RadioPlayer({ station }: RadioPlayerProps) {
       const audioElement = e.target as HTMLAudioElement;
       const mediaError = audioElement.error;
       
-      let uiErrorMessage = 'Stream error'; // For UI display
-      let detailedConsoleMessage = 'Stream error occurred.'; // For console
+      let uiErrorMessage = 'Stream error'; 
+      let detailedConsoleMessage = 'Stream error occurred.'; 
 
       if (!mediaError) {
         detailedConsoleMessage = "Audio event triggered on RadioPlayer, but no MediaError object found.";
         console.error(detailedConsoleMessage, "Event:", e, "Station URL:", audioElement.src);
-        setError(uiErrorMessage); // Set a generic error for UI
+        setError(uiErrorMessage); 
         player.setIsPlaying(false);
         setIsLoading(false);
         return;
       }
       
+      // Ensure MediaError constants are available (they are on window.MediaError in browsers)
+      // Fallback to numeric codes if MediaError is not found, though unlikely.
+      const MEDIA_ERR_ABORTED = (window.MediaError && window.MediaError.MEDIA_ERR_ABORTED) || 1;
+      const MEDIA_ERR_NETWORK = (window.MediaError && window.MediaError.MEDIA_ERR_NETWORK) || 2;
+      const MEDIA_ERR_DECODE = (window.MediaError && window.MediaError.MEDIA_ERR_DECODE) || 3;
+      const MEDIA_ERR_SRC_NOT_SUPPORTED = (window.MediaError && window.MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED) || 4;
+
       switch (mediaError.code) {
-        case mediaError.MEDIA_ERR_ABORTED:
+        case MEDIA_ERR_ABORTED:
           uiErrorMessage = 'Playback aborted.';
-          detailedConsoleMessage = 'Playback aborted by user or script.';
+          detailedConsoleMessage = `Playback aborted by user or script. Code: ${mediaError.code}.`;
           break;
-        case mediaError.MEDIA_ERR_NETWORK:
+        case MEDIA_ERR_NETWORK:
           uiErrorMessage = 'Network error.';
-          detailedConsoleMessage = 'A network error caused the audio download to fail.';
+          detailedConsoleMessage = `A network error caused the audio download to fail. Code: ${mediaError.code}.`;
           break;
-        case mediaError.MEDIA_ERR_DECODE:
+        case MEDIA_ERR_DECODE:
           uiErrorMessage = 'Decode error.';
-          detailedConsoleMessage = 'The audio playback was aborted due to a corruption problem or because the audio used features your browser did not support.';
+          detailedConsoleMessage = `The audio playback was aborted due to a corruption problem or because the audio used features your browser did not support. Code: ${mediaError.code}.`;
           break;
-        case mediaError.MEDIA_ERR_SRC_NOT_SUPPORTED:
+        case MEDIA_ERR_SRC_NOT_SUPPORTED:
           uiErrorMessage = 'Format not supported.';
-          detailedConsoleMessage = 'The audio could not be loaded, either because the server or network failed or because the format is not supported.';
+          detailedConsoleMessage = `The audio could not be loaded, either because the server or network failed or because the format is not supported. Code: ${mediaError.code}.`;
           break;
         default:
           uiErrorMessage = 'Unknown stream error.';
-          detailedConsoleMessage = `An unknown error occurred (Code: ${mediaError.code}).`;
+          detailedConsoleMessage = `An unknown error occurred (Code: ${mediaError.code}, Message: ${mediaError.message || 'N/A'}).`;
       }
       
-      console.error(`RadioPlayer Audio Error: ${detailedConsoleMessage}`, "MediaError Details:", mediaError, "Station URL:", audioElement.src);
-      setError(uiErrorMessage); // Use the shorter message for the UI
+      console.error(
+        `RadioPlayer Audio Error: ${detailedConsoleMessage}`,
+        { 
+          code: mediaError.code, 
+          messageFromErrorObject: mediaError.message || "No message property in MediaError object."
+        },
+        "Station URL:", audioElement.src,
+        "Full MediaError (original):", mediaError
+      );
+      setError(uiErrorMessage); 
       player.setIsPlaying(false);
       setIsLoading(false);
     };
@@ -312,3 +327,4 @@ export function RadioPlayer({ station }: RadioPlayerProps) {
     </div>
   );
 }
+

@@ -1,3 +1,4 @@
+
 import type { RadioStation } from '@/lib/types';
 
 export const mockStations: RadioStation[] = [
@@ -19,10 +20,10 @@ export const mockStations: RadioStation[] = [
   },
   {
     id: '3',
-    name: 'Jazz Groove',
-    streamUrl: 'http://hestia2.cdnstream.com/1279_128', // Example, might not be a real stream
+    name: 'Jazz Radio FR', // Updated name
+    streamUrl: 'https://jazzradio.ice.infomaniak.ch/jazzradio-high.mp3', // Updated to a working HTTPS MP3 stream
     genre: 'Jazz',
-    country: 'USA',
+    country: 'France', // Updated country
     faviconUrl: 'https://placehold.co/100x100.png',
   },
   {
@@ -66,3 +67,4 @@ export const mockStations: RadioStation[] = [
     faviconUrl: 'https://placehold.co/100x100.png',
   },
 ];
+
