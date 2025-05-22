@@ -36,6 +36,18 @@ const nextConfig: NextConfig = {
         port: '',
         pathname: '/**',
       },
+      {
+        protocol: 'https',
+        hostname: 'jazzgumboradio.com',
+        port: '',
+        pathname: '/**',
+      },
+      {
+        protocol: 'http',
+        hostname: 'jazzgumboradio.com',
+        port: '',
+        pathname: '/**',
+      }
     ],
   },
 };
