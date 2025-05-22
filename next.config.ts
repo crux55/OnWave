@@ -1,3 +1,4 @@
+
 import type {NextConfig} from 'next';
 import PWA from '@ducanh2912/next-pwa';
 
@@ -20,6 +21,7 @@ const withPWA = PWA({
 
 const nextConfig: NextConfig = {
   /* config options here */
+  output: 'standalone',
   typescript: {
     ignoreBuildErrors: true,
   },
@@ -38,4 +40,6 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default withPWA(nextConfig);
+// Temporarily export without PWA for local development troubleshooting
+// To re-enable PWA, change this back to: export default withPWA(nextConfig);
+export default nextConfig;
