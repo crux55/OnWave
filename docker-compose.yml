@@ -1,0 +1,57 @@
+version: '3.8'
+
+services:
+  frontend:
+    build:
+      context: ./
+      dockerfile: Dockerfile
+    ports:
+      - "80:3000"
+      - "9002:9002"
+    environment:
+      - NODE_ENV=production
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ../Go/project_r
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - DATABASE_URL=root:s.o.a.d.@tcp(mysql:3306)/radio
+      - LOG_LEVEL=debug
+      - PORT=8080
+      - REDIS_ADDR=redis:6379
+      - REDIS_PASSWORD=s.o.a.d.
+      - FORCE_CACHE=true
+    depends_on:
+      - mysql
+      - redis
+    restart: unless-stopped
+    entrypoint: ["sh", "-c", "until nc -z mysql 3306; do sleep 1; done; until nc -z redis 6379; do sleep 1; done; exec ./server"]
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: s.o.a.d.
+      MYSQL_DATABASE: radio
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+  redis:
+    image: redis:7.2
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    environment:
+      - REDIS_PASSWORD=s.o.a.d.
+    command: ["redis-server", "--requirepass", "s.o.a.d."]
+    volumes:
+      - redis_data:/data
+
+volumes:
+  mysql_data:
+  redis_data:
