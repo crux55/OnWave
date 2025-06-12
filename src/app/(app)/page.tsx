@@ -1,12 +1,13 @@
-
 'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
-import { mockStations } from '@/lib/mock-data';
-import type { RadioStation } from '@/lib/types';
+import React, { useState, useEffect } from 'react';
+import { fetchTopTags } from '@/lib/api';
+import type { RadioStation, TopTag } from '@/lib/types';
 import { RadioStationCard } from '@/components/RadioStationCard';
 import { usePlayer } from '@/contexts/PlayerContext';
 import { Music, Disc3, Radio, Coffee } from 'lucide-react'; // Example icons
+import { sortStationsByClickTrend, fetchStationByBitRate, sortStationsByListeners, fetchStationByRandom } from '@/lib/api';
+import Link from 'next/link';
 
 interface StationSectionProps {
   title: string;
@@ -38,7 +39,7 @@ const StationSection: React.FC<StationSectionProps> = ({ title, stations, onPlay
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
         {stations.map(station => (
           <RadioStationCard
-            key={station.id}
+            key={station.stationuuid}
             station={station}
             onPlay={onPlay}
           />
@@ -49,32 +50,43 @@ const StationSection: React.FC<StationSectionProps> = ({ title, stations, onPlay
 };
 
 export default function HomePage() {
-  const [allStations, setAllStations] = useState<RadioStation[]>([]);
+  const [featuredStations, setFeaturedStations] = useState<RadioStation[]>([]);
+  const [mostListens, setMostListens] = useState<RadioStation[]>([]);
+  const [trending, setTrending] = useState<RadioStation[]>([]);
+  const [randomiser, setRandomiser] = useState<RadioStation[]>([]);
+  const [topTags, setTopTags] = useState<TopTag[]>([]);
   const player = usePlayer();
 
   useEffect(() => {
-    setAllStations(mockStations);
+
+    // Fetch and set featured stations
+    fetchStationByBitRate({ term: 'LoFi' })
+      .then((stations) => setFeaturedStations(stations.slice(0, 4)))
+      .catch((error) => console.error('Error fetching featured stations:', error));
+
+    // Fetch and set most listened stations
+    sortStationsByListeners({ term: 'LoFi' })
+      .then((stations) => setMostListens(stations.slice(0, 4)))
+      .catch((error) => console.error('Error fetching most listened stations:', error));
+
+    // Fetch and set trending stations
+    sortStationsByClickTrend({ term: 'LoFi' })
+      .then((stations) => setTrending(stations.slice(0, 4)))
+      .catch((error) => console.error('Error fetching trending stations:', error));
+
+    // Fetch and set random stations
+    fetchStationByRandom({ term: 'LoFi' })
+      .then((stations) => setRandomiser(stations.slice(0, 4)))
+      .catch((error) => console.error('Error fetching random stations:', error));
+
+    fetchTopTags()
+      .then(setTopTags)
+      .catch((error) => console.error('Error fetching tags:', error));
   }, []);
 
   const handlePlayStation = (station: RadioStation) => {
     player.playStation(station);
   };
-
-  const featuredStations = useMemo(() => {
-    return allStations.slice(0, 4);
-  }, [allStations]);
-
-  const synthwaveStations = useMemo(() => {
-    return allStations.filter(s => s.genre.toLowerCase().includes('synthwave')).slice(0, 4);
-  }, [allStations]);
-
-  const lofiStations = useMemo(() => {
-    return allStations.filter(s => s.genre.toLowerCase().includes('lo-fi hip hop')).slice(0, 4);
-  }, [allStations]);
-
-  const jazzStations = useMemo(() => {
-    return allStations.filter(s => s.genre.toLowerCase().includes('jazz')).slice(0, 4);
-  }, [allStations]);
 
   return (
     <div className="container mx-auto">
@@ -88,6 +100,23 @@ export default function HomePage() {
         </p>
       </header>
 
+      {topTags.length > 0 && (
+        <section className="mb-10">
+          <h2 className="text-2xl font-semibold mb-3 text-foreground">Top Tags</h2>
+          <div className="flex flex-wrap gap-2">
+            {topTags.slice(0, 30).map(tagObj => (
+              <Link
+                key={tagObj.name}
+                href={`/winamp?search=${encodeURIComponent(tagObj.name)}`}
+                className="inline-block bg-muted text-foreground px-3 py-1 rounded-full text-sm font-medium"
+              >
+                {tagObj.name} <span className="text-xs text-muted-foreground">({tagObj.stationcount})</span>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+
       <StationSection
         title="Featured Stations"
         stations={featuredStations}
@@ -96,27 +125,27 @@ export default function HomePage() {
       />
 
       <StationSection
-        title="Synthwave Vibes"
-        stations={synthwaveStations}
+        title="Popular Stations"
+        stations={mostListens}
         onPlay={handlePlayStation}
         icon={Disc3}
-        emptyMessage="No synthwave stations found at the moment. Explore other genres!"
+        emptyMessage="No popular stations available right now. Chill to something else?"
       />
 
       <StationSection
-        title="Lo-Fi Beats"
-        stations={lofiStations}
+        title="Trending Stations"
+        stations={trending}
         onPlay={handlePlayStation}
         icon={Music}
-        emptyMessage="No lo-fi stations available right now. Chill to something else?"
+        emptyMessage="No trending stations available right now. Chill to something else?"
       />
       
       <StationSection
-        title="Jazz Cafe"
-        stations={jazzStations}
+        title="Random Stations"
+        stations={randomiser}
         onPlay={handlePlayStation}
         icon={Coffee}
-        emptyMessage="The Jazz Cafe is quiet today. Try another section."
+        emptyMessage="The randomizer is taking a break. Check back later for more stations!"
       />
     </div>
   );

@@ -14,7 +14,7 @@ export function RadioStationCard({ station, onPlay }: RadioStationCardProps) {
     <Card className="flex flex-col overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300 h-full">
       <CardHeader className="flex flex-row items-start gap-4 p-4">
         <Image
-          src={station.faviconUrl || 'https://placehold.co/64x64.png'}
+          src={station.favicon || 'https://placehold.co/64x64.png'}
           alt={`${station.name} logo`}
           width={64}
           height={64}
@@ -24,7 +24,7 @@ export function RadioStationCard({ station, onPlay }: RadioStationCardProps) {
         <div className="flex-1">
           <CardTitle className="text-lg mb-1 leading-tight">{station.name}</CardTitle>
           <CardDescription className="text-xs text-muted-foreground line-clamp-2">
-            {station.genre} &bull; {station.country}
+            {station.tags} &bull; {station.country}
           </CardDescription>
         </div>
       </CardHeader>

@@ -1,15 +1,41 @@
-
-export type RadioStation = {
-  id: string;
+export interface RadioStation {
+  stationuuid: string;
   name: string;
-  streamUrl: string;
-  genre: string;
+  url: string;
+  url_resolved: string;
+  homepage: string;
+  favicon: string;
+  tags: string;
   country: string;
-  faviconUrl?: string; // Optional: URL to the station's favicon or logo
+  countrycode: string;
+  state: string;
+  language: string;
+  languagecodes: string;
+  bitrate: number;
+  codec: string;
+  votes: number;
+  clickcount: number;
+  clicktrend: number;
+  lastchangetime: string;
+  lastchangetime_iso8601: string;
+  lastchecktime: string;
+  lastchecktime_iso8601: string;
+  lastcheckok: number;
+  lastcheckoktime: string;
+  lastcheckoktime_iso8601: string;
+  lastlocalchecktime: string;
+  lastlocalchecktime_iso8601: string;
+  ssl_error: number;
+  geo_lat?: number | null;
+  geo_long?: number | null;
+  has_extended_info: boolean;
+  serveruuid: string;
+  changeuuid: string;
+  iso_3166_2: string;
+  hls: number;
 };
 
-export type AIRecommendation = {
-  id: string;
+export type TopTag = {
   name: string;
-  reason?: string; // Optional: Why this station is recommended
+  stationcount: number;
 };

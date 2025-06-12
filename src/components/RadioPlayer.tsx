@@ -23,6 +23,7 @@ export function RadioPlayer({ station }: RadioPlayerProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastVolumeBeforeMute, setLastVolumeBeforeMute] = useState(player.volume);
+  const streamUrl = station?.urlResolved || station?.url;
 
 
   useEffect(() => {
@@ -41,14 +42,14 @@ export function RadioPlayer({ station }: RadioPlayerProps) {
       audioRef.current = new Audio();
     }
     
-    if (audioRef.current.src !== station.streamUrl) {
-        audioRef.current.src = station.streamUrl;
+    if (streamUrl && audioRef.current.src !== streamUrl) {
+        audioRef.current.src = streamUrl;
         audioRef.current.load(); // Ensure stream is loaded
     }
     // audioRef.current.volume set by volume effect
 
     const playAudio = async () => {
-      if (audioRef.current && station.streamUrl) {
+      if (audioRef.current && streamUrl) {
         try {
           setIsLoading(true);
           setError(null);
@@ -164,15 +165,15 @@ export function RadioPlayer({ station }: RadioPlayerProps) {
 
 
   const togglePlayPause = useCallback(async () => {
-    if (!audioRef.current || !station?.streamUrl) return;
+    if (!audioRef.current || !station?.url) return;
     if (player.isPlaying) {
       audioRef.current.pause();
     } else {
       setIsLoading(true);
       setError(null);
       try {
-        if (audioRef.current.src !== station.streamUrl) {
-            audioRef.current.src = station.streamUrl;
+        if (streamUrl && audioRef.current.src !== streamUrl) {
+            audioRef.current.src = streamUrl;
             audioRef.current.load();
         }
         await audioRef.current.play();
@@ -233,19 +234,19 @@ export function RadioPlayer({ station }: RadioPlayerProps) {
         <div className={playerContainerClasses}>
           <div className={playerFlexClasses}>
             <div className="flex items-center gap-2 w-full">
-              <Image
+              {/* <Image
                 src={station.faviconUrl || `https://placehold.co/32x32.png`}
                 alt={station.name}
                 width={32}
                 height={32}
                 className="rounded border"
                 data-ai-hint="radio logo"
-              />
+              /> */}
               <div className="flex-grow overflow-hidden">
                 <h4 className="text-xs font-semibold truncate text-foreground">{station.name}</h4>
                 {error && <p className="text-xs text-destructive truncate">{error}</p>}
               </div>
-              <Button onClick={togglePlayPause} variant="ghost" size="icon" className="w-8 h-8" disabled={isLoading || !station.streamUrl}>
+              <Button onClick={togglePlayPause} variant="ghost" size="icon" className="w-8 h-8" disabled={isLoading || !streamUrl}>
                 {isLoading ? <Loader2 className="h-4 w-4 animate-spin text-primary" /> : player.isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
               </Button>
               <Button variant="ghost" size="icon" className="w-8 h-8" disabled> <SkipBack className="h-4 w-4 text-muted-foreground/50" /> </Button>
@@ -266,19 +267,20 @@ export function RadioPlayer({ station }: RadioPlayerProps) {
         <div className={playerContainerClasses}>
             <div className={playerFlexClasses}>
                 <div className="flex items-center gap-3 md:gap-4 flex-grow overflow-hidden">
-                    <Image
+                    {/* <Image
                         src={station.faviconUrl || `https://placehold.co/64x64.png`}
                         alt={station.name}
                         width={64}
                         height={64}
                         className="rounded-md border hidden sm:block aspect-square object-cover"
                         data-ai-hint="radio station art"
-                    />
+                    /> */}
                     <div className="flex-grow overflow-hidden space-y-1">
                         <div className="flex items-baseline gap-2">
                             <h3 className="text-base font-semibold truncate text-foreground">{station.name}</h3>
-                            <p className="text-xs text-muted-foreground truncate hidden md:block">{station.genre} - {station.country}</p>
-                        </div>
+                            <p className="text-xs text-muted-foreground truncate hidden md:block">
+                              {(station.tags?.split(',')[0]?.trim() || 'Unknown')} - {station.country || 'Unknown'}
+                            </p>                        </div>
                         <div className="flex items-center gap-2">
                         <Music2 className="h-4 w-4 text-primary flex-shrink-0" />
                         <div className="overflow-hidden">
@@ -297,7 +299,7 @@ export function RadioPlayer({ station }: RadioPlayerProps) {
                      <Button onClick={player.openMaximizedPlayer} variant="ghost" size="icon" className="w-9 h-9" title="Open maximized player view">
                         <Expand className="h-4 w-4" /> <span className="sr-only">Maximize View</span>
                     </Button>
-                    <Button onClick={togglePlayPause} variant="ghost" size="icon" className="w-10 h-10" disabled={isLoading || !station.streamUrl}>
+                    <Button onClick={togglePlayPause} variant="ghost" size="icon" className="w-10 h-10" disabled={isLoading || !streamUrl}>
                         {isLoading ? <Loader2 className="h-5 w-5 animate-spin text-primary" /> : player.isPlaying ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
                     </Button>
                     <div className="items-center gap-2 w-24 sm:w-28 hidden md:flex">
@@ -307,7 +309,7 @@ export function RadioPlayer({ station }: RadioPlayerProps) {
                         <Slider value={[player.isMuted ? 0 : player.volume]} max={1} step={0.01} onValueChange={handleVolumeChange} className="flex-grow" aria-label="Volume control" />
                     </div>
                      <Button variant="ghost" size="icon" asChild className="w-9 h-9 hidden md:inline-flex" title="Open stream in new tab">
-                        <a href={station.streamUrl} target="_blank" rel="noopener noreferrer" aria-label="Open stream URL">
+                        <a href={streamUrl} target="_blank" rel="noopener noreferrer" aria-label="Open stream URL">
                             <ExternalLink className="h-4 w-4" />
                         </a>
                     </Button>
