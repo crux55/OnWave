@@ -7,6 +7,8 @@ import { initializeApp, getApps, type FirebaseApp } from 'firebase/app';
 // Your web app's Firebase configuration
 // IMPORTANT: Replace these with your actual Firebase project config values
 // It's best practice to store these in environment variables
+// Crucially, these NEXT_PUBLIC_ environment variables MUST be set in your
+// Firebase App Hosting (or other deployment) environment settings.
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
   authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
@@ -40,3 +42,4 @@ export function initializeAppIfNeeded(): FirebaseApp {
 // For this example, we'll call it in the LoginPage.
 
 export { firebaseApp }; // Exporting the app instance might be useful
+
