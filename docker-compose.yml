@@ -14,7 +14,7 @@ services:
 
   backend:
     build:
-      context: ../Go/project_r
+      context: ../../Go/project_r
       dockerfile: Dockerfile
     ports:
       - "8080:8080"
@@ -24,7 +24,7 @@ services:
       - PORT=8080
       - REDIS_ADDR=redis:6379
       - REDIS_PASSWORD=s.o.a.d.
-      - FORCE_CACHE=true
+      - FORCE_CACHE=false
     depends_on:
       - mysql
       - redis

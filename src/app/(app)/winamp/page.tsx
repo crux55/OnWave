@@ -268,7 +268,7 @@ function WinampPageContent() {
 
                 return (
                   <tr key={uuid()} className="hover:bg-muted/20">
-                    <td className="p-2 border border-border text-foreground whitespace-nowrap">{station.name}</td>
+                    <td className="p-2 border border-border text-foreground break-words whitespace-normal max-w-xs">{station.name}</td>
                     <td className="p-2 border border-border text-muted-foreground">{station.bitrate} kbps</td>
                     <td className="p-2 border border-border text-muted-foreground">{station.country}</td>
                     <td className="p-2 border border-border text-muted-foreground">{station.votes}</td>
