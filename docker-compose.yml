@@ -25,6 +25,7 @@ services:
       - REDIS_ADDR=redis:6379
       - REDIS_PASSWORD=s.o.a.d.
       - FORCE_CACHE=false
+      - CACHE_EXPIRE_HOURS=0
     depends_on:
       - mysql
       - redis

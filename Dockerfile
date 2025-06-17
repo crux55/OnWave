@@ -17,6 +17,6 @@ COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/next.config.ts ./next.config.ts
 
-ENV NODE_ENV=production
+ENV NODE_ENV=dev
 EXPOSE 3000
 CMD ["npm", "start"]

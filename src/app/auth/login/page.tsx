@@ -14,15 +14,9 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AppLogo } from '@/components/AppLogo';
 import { Loader2, LogIn } from 'lucide-react';
-import { initializeAppIfNeeded } from '@/lib/firebase/client';
-import { getAuth, GoogleAuthProvider, signInWithPopup, createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
-// Initialize Firebase
-const firebaseApp = initializeAppIfNeeded();
-const auth = getAuth(firebaseApp);
-const googleProvider = new GoogleAuthProvider();
 
 const commonPasswordSchema = z.string().min(6, { message: "Password must be at least 6 characters." });
 
@@ -36,6 +30,7 @@ const registerFormSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email address." }),
   password: commonPasswordSchema,
   confirmPassword: commonPasswordSchema,
+  username: z.string().min(3, { message: "Username must be at least 3 characters." }),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match.",
   path: ["confirmPassword"], // Path of error
@@ -49,43 +44,96 @@ export default function LoginPage() {
   const [isLoadingGoogle, setIsLoadingGoogle] = useState(false);
   const [isLoadingEmail, setIsLoadingEmail] = useState(false);
   const [activeTab, setActiveTab] = useState("signin");
+  const [registerData, setRegisterData] = useState<RegisterFormValues>({ confirmPassword: "", email: "", password: "", username: "" });
+  const [loginData, setLoginData] = useState<SignInFormValues>({ email: "", password: "", username: "" });
+  const [registerMessage, setRegisterMessage] = useState("");
+  const [loginMessage, setLoginMessage] = useState("");
+
 
   const signInForm = useForm<SignInFormValues>({
     resolver: zodResolver(signInFormSchema),
-    defaultValues: { email: '', password: '' },
+    defaultValues: { email: '', password: ''},
   });
 
   const registerForm = useForm<RegisterFormValues>({
     resolver: zodResolver(registerFormSchema),
-    defaultValues: { email: '', password: '', confirmPassword: '' },
+    defaultValues: { email: '', password: '', confirmPassword: '', username: '' },
   });
 
-  const handleGoogleSignIn = async () => {
-    setIsLoadingGoogle(true);
+  // const handleGoogleSignIn = async () => {
+  //   setIsLoadingGoogle(true);
+  //   try {
+  //     const result = await signInWithPopup(auth, googleProvider);
+  //     const user = result.user;
+  //     toast({
+  //       title: 'Sign In Successful!',
+  //       description: `Welcome back, ${user.displayName || user.email}!`,
+  //     });
+  //     router.push('/');
+  //   } catch (error: any) {
+  //     console.error('Google Sign-In Error:', error);
+  //     toast({
+  //       title: 'Sign In Failed',
+  //       description: error.message || 'An unexpected error occurred. Please try again.',
+  //       variant: 'destructive',
+  //     });
+  //   } finally {
+  //     setIsLoadingGoogle(false);
+  //   }
+  // };
+
+    const handleRegister = async (data: RegisterFormValues) => {
+    setRegisterMessage("");
     try {
-      const result = await signInWithPopup(auth, googleProvider);
-      const user = result.user;
-      toast({
-        title: 'Sign In Successful!',
-        description: `Welcome back, ${user.displayName || user.email}!`,
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/users`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
       });
-      router.push('/');
-    } catch (error: any) {
-      console.error('Google Sign-In Error:', error);
-      toast({
-        title: 'Sign In Failed',
-        description: error.message || 'An unexpected error occurred. Please try again.',
-        variant: 'destructive',
+      if (res.ok) {
+        setRegisterMessage("Registration successful!");
+        const result = await res.json();
+        return { user: result };
+      } else {
+        const err = await res.text();
+        setRegisterMessage(`Registration failed: ${err}`);
+        throw new Error(err);
+      }
+    } catch (err) {
+      setRegisterMessage("Registration failed: Network error");
+      throw err;
+    }
+  };
+
+  // Login handler
+  const handleLogin = async (data: SignInFormValues) => {
+    setLoginMessage("");
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/users/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
       });
-    } finally {
-      setIsLoadingGoogle(false);
+      if (res.ok) {
+        const result = await res.json();
+        setLoginMessage(`Login successful! User ID: ${result.userId}`);
+        return { user: result }; // mimic userCredential for onSignInSubmit
+      } else {
+        const err = await res.text();
+        setLoginMessage(`Login failed: ${err}`);
+        throw new Error(err);
+      }
+    } catch (err: any) {
+      setLoginMessage("Login failed: Network error");
+      throw err;
     }
   };
 
   const onSignInSubmit: SubmitHandler<SignInFormValues> = async (data) => {
     setIsLoadingEmail(true);
+    console.log("Login button clicked");
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, data.email, data.password);
+      const userCredential = await handleLogin(data);
       const user = userCredential.user;
       toast({
         title: 'Sign In Successful!',
@@ -107,7 +155,7 @@ export default function LoginPage() {
   const onRegisterSubmit: SubmitHandler<RegisterFormValues> = async (data) => {
     setIsLoadingEmail(true);
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password);
+      const userCredential = await handleRegister(data);
       const user = userCredential.user;
       // Optionally, update profile here if you collect more info like display name
       // await updateProfile(user, { displayName: "New User" }); 
@@ -153,8 +201,8 @@ export default function LoginPage() {
         </CardHeader>
         <CardContent className="space-y-6">
           <Button 
-            onClick={handleGoogleSignIn} 
-            disabled={isOverallLoading}
+            onClick={() => {}} 
+            disabled={true}
             variant="outline"
             className="w-full py-3 text-base border-input hover:bg-accent/10"
           >
@@ -253,6 +301,18 @@ export default function LoginPage() {
                     disabled={isOverallLoading}
                   />
                   {registerForm.formState.errors.confirmPassword && <p className="text-xs text-destructive pt-1">{registerForm.formState.errors.confirmPassword.message}</p>}
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="username-register">Username</Label>
+                  <Input 
+                    id="username-register" 
+                    type="text" 
+                    placeholder="Choose a username" 
+                    {...registerForm.register("username")} 
+                    className={cn(registerForm.formState.errors.username && "border-destructive focus-visible:ring-destructive")}
+                    disabled={isOverallLoading}
+                  />
+                  {registerForm.formState.errors.username && <p className="text-xs text-destructive pt-1">{registerForm.formState.errors.username.message}</p>}
                 </div>
                 <Button type="submit" disabled={isOverallLoading} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground py-3 text-base">
                    {isLoadingEmail && activeTab === "register" ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
