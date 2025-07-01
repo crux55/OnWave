@@ -40,6 +40,23 @@ export async function fetchTopTags(): Promise<TopTag[]> {
   return response.json();
 }
 
+export async function fetchCurrentUserProfile() {
+  if (typeof window === "undefined") return null;
+
+  const token = localStorage.getItem("token");
+  if (!token) return null;
+  const apiHost = process.env.NEXT_PUBLIC_API_BASE_URL || '';
+  const auth = JSON.parse(token);
+  const res = await fetch(`${apiHost}/users/me`, {
+    headers: {
+      Authorization: `Bearer ${auth.token}`,
+    }
+  });
+
+  if (!res.ok) return null;
+  return res.json();
+}
+
 
 export async function sortStationsByClickTrend(params: Record<string, string> = {}): Promise<RadioStation[]> {
   const stations = await getTopStations();

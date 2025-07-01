@@ -1,3 +1,5 @@
+import { string } from "zod";
+
 export interface RadioStation {
   stationuuid: string;
   name: string;
@@ -38,4 +40,41 @@ export interface RadioStation {
 export type TopTag = {
   name: string;
   stationcount: number;
+};
+
+export interface User {
+  id: string;
+  username: string;
+  email: string;
+  password: string;
+  role: 'regular' | 'station' | 'dj';
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface Profile {
+  id: string;
+  user_id: string;
+  name: string;
+  location?: string;
+  bio?: string;
+  avatar?: string;
+  website?: string;
+  last_updated: Date;
+}
+
+export interface Token {
+  user_id: string;
+  email: string;
+  role: string;
+  created_at: string | Date;
+  updated_at: string | Date;
+  exp: string | Date;
+  last_login: string | Date;
+}
+
+export type JWT = {
+  token: string;
+  userId: string;
+  message: string;
 };

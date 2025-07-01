@@ -44,8 +44,6 @@ export default function LoginPage() {
   const [isLoadingGoogle, setIsLoadingGoogle] = useState(false);
   const [isLoadingEmail, setIsLoadingEmail] = useState(false);
   const [activeTab, setActiveTab] = useState("signin");
-  const [registerData, setRegisterData] = useState<RegisterFormValues>({ confirmPassword: "", email: "", password: "", username: "" });
-  const [loginData, setLoginData] = useState<SignInFormValues>({ email: "", password: "", username: "" });
   const [registerMessage, setRegisterMessage] = useState("");
   const [loginMessage, setLoginMessage] = useState("");
 
@@ -131,10 +129,10 @@ export default function LoginPage() {
 
   const onSignInSubmit: SubmitHandler<SignInFormValues> = async (data) => {
     setIsLoadingEmail(true);
-    console.log("Login button clicked");
     try {
       const userCredential = await handleLogin(data);
       const user = userCredential.user;
+      localStorage.setItem('token', JSON.stringify(user));
       toast({
         title: 'Sign In Successful!',
         description: `Welcome back, ${user.displayName || user.email}!`,
