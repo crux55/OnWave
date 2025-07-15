@@ -65,21 +65,36 @@ const ProfileListSection: React.FC<ListItemProps> = ({ items, emptyMessage, icon
 
 export default function ProfilePage() {
   const router = useRouter();
+  const apiHost = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080';
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(true);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [userProfile, setUserProfile] = useState<Profile | null>(null);
+  const [token, setToken] = useState<Token | null>(null); // Add state for token
+  const getAvatarUrl = (filename: string | undefined) => {
+  const url = filename ? `${apiHost}${filename}` : undefined;
 
 
+    return url;
+  };
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (!token) {
+    const tokenString = localStorage.getItem("token");
+    if (!tokenString) {
       setIsLoading(false);
       return;
     }
+
+    try {
+      const jwt = JSON.parse(tokenString);
+      const decodedToken = jwt_decode<Token>(jwt?.token || "");
+      setToken(decodedToken);
+    } catch (error) {
+      console.error("Error parsing token:", error);
+    }
+
     fetchCurrentUserProfile()
       .then(data => {
-        console.log("Fetched user data:", data);
+
         if (!data) {
           setUserProfile(null);
           setIsLoading(false);
@@ -94,14 +109,7 @@ export default function ProfilePage() {
       });
   }, []);
 
-  let token: Token | null = null;
-  let jwt : JWT | null = null;
-  if (typeof window !== "undefined" && localStorage.getItem("token")) {
-    jwt = JSON.parse(localStorage.getItem("token") || "{}");
-    token = jwt_decode<Token>(jwt?.token || "");
-  }
 
-  
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
@@ -140,7 +148,7 @@ export default function ProfilePage() {
   // This section acts as a fallback UI or for states where redirect might be pending/failed.
   if (!userProfile) {
     return (
-       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-10rem)] text-center p-4">
+      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-10rem)] text-center p-4">
         <ShieldAlert className="h-16 w-16 text-destructive mb-4" />
         <h2 className="text-2xl font-semibold text-foreground mb-2">Access Denied</h2>
         <p className="text-muted-foreground mb-6">You need to be logged in to view this page.</p>
@@ -152,43 +160,46 @@ export default function ProfilePage() {
   }
 
 
-if (userProfile) {
+  if (userProfile) {
     return (
-            {editing ? (
-        <ProfileEditSection profile={profile} onSave={handleSave} onCancel={() => setEditing(false)} />
-      ) : (
-        <div>
       <div className="container mx-auto py-8 max-w-3xl">
-        {/* <header className="mb-10 text-center">
+        <header className="mb-10 text-center">
           <UserCircle2 className="mx-auto h-20 w-20 text-accent mb-4" />
           <h1 className="text-5xl font-bold tracking-tight text-foreground">Your Profile</h1>
           <p className="text-xl text-muted-foreground mt-3">
             Manage your OnWave account, preferences, and activity.
           </p>
-        </header> */}
-        
+        </header>
+
         <Card className="shadow-xl">
           <CardHeader className="items-center text-center border-b pb-6">
-              <Avatar className="h-28 w-28 border-4 border-primary mb-4 shadow-md">
-                  <AvatarImage src={userProfile?.avatar} alt="User Avatar" data-ai-hint="user profile picture" />
-                  <AvatarFallback>
-                      <UserCircle2 className="h-20 w-20 text-muted-foreground" />
-                  </AvatarFallback>
-              </Avatar>
+            <Avatar className="h-28 w-28 border-4 border-primary mb-4 shadow-md">
+              <AvatarImage
+                src={getAvatarUrl(userProfile?.avatar)}
+                alt="User Avatar"
+                data-ai-hint="user profile picture"
+              />
+              <AvatarFallback>
+                <UserCircle2 className="h-20 w-20 text-muted-foreground" />
+              </AvatarFallback>
+            </Avatar>
             <CardTitle className="text-3xl">{userProfile.name || "No Name Provided"}</CardTitle>
             <CardDescription className="text-base">
               {token ? (token.email || "No email provided") : "No email provided"}
             </CardDescription>
           </CardHeader>
           <CardContent className="p-6 md:p-8 space-y-8">
-            
+
             <section>
               <div className="flex justify-between items-center mb-3">
                 <h3 className="text-xl font-semibold text-foreground flex items-center gap-2">
                   <FileText className="h-5 w-5 text-primary" /> Bio
                 </h3>
-                <Button variant="ghost" size="sm" className="text-xs">
-                  <Edit3 className="mr-1.5 h-3.5 w-3.5" /> Edit Bio
+                <Button
+                  onClick={() => router.push('/profile/edit')}
+                  className="mt-4"
+                >
+                  <Edit3 className="mr-2 h-4 w-4" /> Edit Profile
                 </Button>
               </div>
               <p className="text-sm text-muted-foreground leading-relaxed pl-2 border-l-2 border-primary/50">
@@ -202,7 +213,7 @@ if (userProfile) {
               <h3 className="text-xl font-semibold text-foreground mb-4 flex items-center gap-2">
                 <ListMusic className="h-5 w-5 text-primary" /> My Playlists
               </h3>
-              <ProfileListSection 
+              <ProfileListSection
                 items={userProfileData.playlists}
                 emptyMessage="No playlists created yet. Start curating!"
                 icon={ListMusic}
@@ -210,7 +221,7 @@ if (userProfile) {
             </section>
 
             <Separator />
-            
+
             <section>
               <h3 className="text-xl font-semibold text-foreground mb-3">Following</h3>
               <div className="space-y-6">
@@ -218,7 +229,7 @@ if (userProfile) {
                   <h4 className="text-md font-medium text-muted-foreground mb-2 flex items-center gap-2">
                     <Radio className="h-4 w-4" /> Stations
                   </h4>
-                  <ProfileListSection 
+                  <ProfileListSection
                     items={userProfileData.followedStations}
                     emptyMessage="You're not following any stations yet."
                     icon={Radio}
@@ -228,7 +239,7 @@ if (userProfile) {
                   <h4 className="text-md font-medium text-muted-foreground mb-2 flex items-center gap-2">
                     <Podcast className="h-4 w-4" /> Shows
                   </h4>
-                  <ProfileListSection 
+                  <ProfileListSection
                     items={userProfileData.followedShows}
                     emptyMessage="No shows followed yet. Explore and find some!"
                     icon={Podcast}
@@ -238,7 +249,7 @@ if (userProfile) {
                   <h4 className="text-md font-medium text-muted-foreground mb-2 flex items-center gap-2">
                     <Users className="h-4 w-4" /> DJs
                   </h4>
-                  <ProfileListSection 
+                  <ProfileListSection
                     items={userProfileData.followedDJs}
                     emptyMessage="Not following any DJs. Discover talent!"
                     icon={Users}
@@ -246,7 +257,7 @@ if (userProfile) {
                 </div>
               </div>
             </section>
-            
+
             <Separator />
 
             <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -258,15 +269,15 @@ if (userProfile) {
                     Member since: {token && token.created_at ? new Date(token.created_at).toLocaleDateString() : "Unknown"}
                   </p>
 
-                    <p className="text-muted-foreground">
-                      Account Created: {token && token.created_at ? new Date(token.created_at).toLocaleDateString() : "Unknown"}
-                    </p>
+                  <p className="text-muted-foreground">
+                    Account Created: {token && token.created_at ? new Date(token.created_at).toLocaleDateString() : "Unknown"}
+                  </p>
 
 
-                    <p className="text-muted-foreground">Last Sign In: {userProfile.last_updated.toString()}</p>
+                  <p className="text-muted-foreground">Last Sign In: {userProfile.last_updated.toString()}</p>
                 </div>
               </div>
-              
+
               <div>
                 <h3 className="text-xl font-semibold text-foreground mb-3">Preferences</h3>
                 <div className="space-y-1 text-sm">
@@ -277,10 +288,9 @@ if (userProfile) {
             </section>
 
             <Separator />
-
             <div className="pt-2">
-              <Button 
-                variant="destructive" 
+              <Button
+                variant="destructive"
                 className="w-full sm:w-auto"
                 onClick={handleLogout}
                 disabled={isLoggingOut}
@@ -298,8 +308,6 @@ if (userProfile) {
             </div>
           </CardContent>
         </Card>
-                </div>
-      )}
       </div>
     );
   }
