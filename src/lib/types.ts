@@ -42,6 +42,21 @@ export type TopTag = {
   stationcount: number;
 };
 
+export interface PBSShow {
+  id: number;
+  name: string;
+  dj: string;
+  day: string;
+  date: string;
+  start_time: string;
+  end_time: string;
+  duration: string;
+  status: "upcoming" | "live" | "expired";
+  program_url: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface User {
   id: string;
   username: string;
