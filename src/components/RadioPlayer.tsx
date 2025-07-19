@@ -15,15 +15,16 @@ import { cn } from '@/lib/utils';
 
 interface RadioPlayerProps {
   station: RadioStation | null;
+  className?: string;
 }
 
-export function RadioPlayer({ station }: RadioPlayerProps) {
+export function RadioPlayer({ station, className }: RadioPlayerProps) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const player = usePlayer();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastVolumeBeforeMute, setLastVolumeBeforeMute] = useState(player.volume);
-  const streamUrl = station?.urlResolved || station?.url;
+  const streamUrl = station?.url_resolved || station?.url;
 
 
   useEffect(() => {
@@ -214,8 +215,9 @@ export function RadioPlayer({ station }: RadioPlayerProps) {
   const playerRootClasses = cn(
     "fixed z-40 bg-card shadow-lg border-t transition-all duration-300 ease-in-out",
     player.isPlayerMinimized
-      ? "bottom-4 right-4 w-72 rounded-lg sm:mb-0 mb-16" 
-      : "bottom-0 left-0 right-0 sm:mb-0 mb-16" 
+      ? "bottom-16 right-4 w-72 rounded-lg sm:mb-0 mb-16" // Adjust for ticker when minimized
+      : "left-0 right-0 sm:mb-0 mb-16", // Remove bottom-0, will be controlled by className prop
+    className // Apply the className prop for positioning
   );
 
   const playerContainerClasses = cn(

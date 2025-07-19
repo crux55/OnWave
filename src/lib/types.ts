@@ -93,3 +93,40 @@ export type JWT = {
   userId: string;
   message: string;
 };
+
+export interface SubscriptionRequest {
+  showId: number;
+  showName: string;
+  djName: string;
+  day: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+}
+
+export interface SubscriptionResponse {
+  id: string;
+  userId: string;
+  showId: number;
+  type: 'subscribe' | 'remind';
+  createdAt: string;
+  message: string;
+}
+
+export interface Reminder {
+  id: string;
+  show_name: string;
+  show_date: string;
+  show_start_time: string;
+  reminder_minutes_before: number;
+  created_at: string;
+}
+
+export interface WebSocketNotification {
+  type: 'reminder';
+  message: string;
+  show_name: string;
+  show_date: string;
+  show_start_time: string;
+  minutes_until_show: number;
+}

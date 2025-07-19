@@ -2,7 +2,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { UserCircle2, ListMusic, Radio, Podcast, Users, FileText, Edit3, LogOut, Loader2, ShieldAlert } from 'lucide-react';
+import { UserCircle2, ListMusic, Radio, Podcast, Users, FileText, Edit3, LogOut, Loader2, ShieldAlert, Bell } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -12,6 +12,8 @@ import { useEffect, useState } from "react";
 import { fetchCurrentUserProfile } from "@/lib/api";
 import { JWT, Profile, Token, User } from '@/lib/types';
 import { jwtDecode as jwt_decode } from "jwt-decode";
+import { useWebSocket } from '@/contexts/WebSocketContext';
+import { useReminders } from '@/contexts/RemindersContext';
 
 
 
@@ -67,10 +69,12 @@ export default function ProfilePage() {
   const router = useRouter();
   const apiHost = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080';
   const { toast } = useToast();
+  const { connect, disconnect } = useWebSocket();
+  const { reminders } = useReminders();
   const [isLoading, setIsLoading] = useState(true);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [userProfile, setUserProfile] = useState<Profile | null>(null);
-  const [token, setToken] = useState<Token | null>(null); // Add state for token
+  const [token, setToken] = useState<Token | null>(null);
   const getAvatarUrl = (filename: string | undefined) => {
   const url = filename ? `${apiHost}${filename}` : undefined;
 
@@ -88,6 +92,11 @@ export default function ProfilePage() {
       const jwt = JSON.parse(tokenString);
       const decodedToken = jwt_decode<Token>(jwt?.token || "");
       setToken(decodedToken);
+      
+      // Connect to WebSocket for reminders
+      if (jwt.userId) {
+        connect(jwt.userId);
+      }
     } catch (error) {
       console.error("Error parsing token:", error);
     }
@@ -107,7 +116,14 @@ export default function ProfilePage() {
         setUserProfile(null);
         setIsLoading(false);
       });
-  }, []);
+  }, []); // Empty dependency array - only run once on mount
+
+  // Separate effect for cleanup on unmount
+  useEffect(() => {
+    return () => {
+      disconnect();
+    };
+  }, [disconnect]);
 
 
 
@@ -285,6 +301,22 @@ export default function ProfilePage() {
                   <p className="text-muted-foreground">Theme: Default</p>
                 </div>
               </div>
+            </section>
+
+            <Separator />
+
+            <section>
+              <h3 className="text-xl font-semibold text-foreground mb-4 flex items-center gap-2">
+                <Bell className="h-5 w-5 text-primary" /> Show Reminders
+              </h3>
+              <ProfileListSection
+                items={reminders.map(reminder => ({
+                  id: reminder.id,
+                  name: `${reminder.show_name} - ${new Date(reminder.show_date).toLocaleDateString()} at ${new Date(`2000-01-01T${reminder.show_start_time}`).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}`
+                }))}
+                emptyMessage="No show reminders set. Add some to never miss your favorites!"
+                icon={Bell}
+              />
             </section>
 
             <Separator />

@@ -121,3 +121,117 @@ export async function fetchPBSShowsByDateRange(days: number = 7): Promise<PBSSho
     return [];
   }
 }
+
+// Reminder API functions
+export async function createReminder(reminderData: {
+  show_name: string;
+  show_date: string;
+  show_start_time: string;
+  reminder_minutes_before: number;
+}) {
+  const apiHost = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080';
+  const token = localStorage.getItem("token");
+  
+  if (!token) {
+    throw new Error('User not authenticated');
+  }
+  
+  const auth = JSON.parse(token);
+  const response = await fetch(`${apiHost}/reminders`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${auth.token}`,
+    },
+    body: JSON.stringify(reminderData),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    
+    // Handle unauthorized error
+    if (response.status === 401) {
+      throw new Error('UNAUTHORIZED');
+    }
+    
+    // Handle duplicate reminder error specifically
+    if (response.status === 409 || (errorData.message && errorData.message.includes('Duplicate entry'))) {
+      throw new Error('You already have a reminder set for this show');
+    }
+    
+    throw new Error(errorData.message || 'Failed to create reminder');
+  }
+
+  const result = await response.json();
+  
+  // Transform the API response to match our Reminder type
+  return {
+    id: result.id,
+    show_name: reminderData.show_name,
+    show_date: reminderData.show_date,
+    show_start_time: reminderData.show_start_time,
+    reminder_minutes_before: reminderData.reminder_minutes_before,
+    created_at: new Date().toISOString(),
+  };
+}
+
+export async function getUserReminders() {
+  const apiHost = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080';
+  const token = localStorage.getItem("token");
+  
+  if (!token) {
+    throw new Error('User not authenticated');
+  }
+  
+  const auth = JSON.parse(token);
+  const response = await fetch(`${apiHost}/reminders`, {
+    method: 'GET',
+    headers: {
+      'Authorization': `Bearer ${auth.token}`,
+    },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    
+    // Handle unauthorized error
+    if (response.status === 401) {
+      throw new Error('UNAUTHORIZED');
+    }
+    
+    throw new Error(errorData.message || 'Failed to fetch reminders');
+  }
+
+  const result = await response.json();
+  return result.reminders || [];
+}
+
+export async function deleteReminder(reminderId: string) {
+  const apiHost = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080';
+  const token = localStorage.getItem("token");
+  
+  if (!token) {
+    throw new Error('User not authenticated');
+  }
+  
+  const auth = JSON.parse(token);
+  const response = await fetch(`${apiHost}/reminders/${reminderId}`, {
+    method: 'DELETE',
+    headers: {
+      'Authorization': `Bearer ${auth.token}`,
+    },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    
+    // Handle unauthorized error
+    if (response.status === 401) {
+      throw new Error('UNAUTHORIZED');
+    }
+    
+    throw new Error(errorData.message || 'Failed to delete reminder');
+  }
+
+  return response.ok;
+}

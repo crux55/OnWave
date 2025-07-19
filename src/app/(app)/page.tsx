@@ -1,12 +1,11 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { fetchTopTags, fetchPBSShowsByDateRange } from '@/lib/api';
-import type { RadioStation, TopTag, PBSShow } from '@/lib/types';
+import { fetchTopTags } from '@/lib/api';
+import type { RadioStation, TopTag } from '@/lib/types';
 import { RadioStationCard } from '@/components/RadioStationCard';
-import { PBSShowCard } from '@/components/PBSShowCard';
 import { usePlayer } from '@/contexts/PlayerContext';
-import { Music, Disc3, Radio, Coffee, Tv } from 'lucide-react'; // Example icons
+import { Music, Disc3, Radio, Coffee } from 'lucide-react'; // Example icons
 import { sortStationsByClickTrend, fetchStationByBitRate, sortStationsByListeners, fetchStationByRandom } from '@/lib/api';
 import Link from 'next/link';
 
@@ -14,13 +13,6 @@ interface StationSectionProps {
   title: string;
   stations: RadioStation[];
   onPlay: (station: RadioStation) => void;
-  icon?: React.ElementType;
-  emptyMessage?: string;
-}
-
-interface ShowSectionProps {
-  title: string;
-  shows: PBSShow[];
   icon?: React.ElementType;
   emptyMessage?: string;
 }
@@ -57,43 +49,11 @@ const StationSection: React.FC<StationSectionProps> = ({ title, stations, onPlay
   );
 };
 
-const ShowSection: React.FC<ShowSectionProps> = ({ title, shows, icon: Icon, emptyMessage = "No shows available in this section right now." }) => {
-  if (!shows || shows.length === 0) {
-    return (
-      <section className="mb-12">
-        <div className="flex items-center mb-6">
-          {Icon && <Icon className="h-7 w-7 text-accent mr-3" />}
-          <h2 className="text-3xl font-semibold tracking-tight text-foreground">{title}</h2>
-        </div>
-        <p className="text-muted-foreground">{emptyMessage}</p>
-      </section>
-    );
-  }
-
-  return (
-    <section className="mb-12">
-      <div className="flex items-center mb-6">
-        {Icon && <Icon className="h-7 w-7 text-accent mr-3" />}
-        <h2 className="text-3xl font-semibold tracking-tight text-foreground">{title}</h2>
-      </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-        {shows.map(show => (
-          <PBSShowCard
-            key={show.id}
-            show={show}
-          />
-        ))}
-      </div>
-    </section>
-  );
-};
-
 export default function HomePage() {
   const [featuredStations, setFeaturedStations] = useState<RadioStation[]>([]);
   const [mostListens, setMostListens] = useState<RadioStation[]>([]);
   const [trending, setTrending] = useState<RadioStation[]>([]);
   const [randomiser, setRandomiser] = useState<RadioStation[]>([]);
-  const [pbsShows, setPbsShows] = useState<PBSShow[]>([]);
   const [topTags, setTopTags] = useState<TopTag[]>([]);
   const player = usePlayer();
 
@@ -118,21 +78,6 @@ export default function HomePage() {
     fetchStationByRandom({ term: 'LoFi' })
       .then((stations) => setRandomiser(stations.slice(0, 4)))
       .catch((error) => console.error('Error fetching random stations:', error));
-
-    // Fetch PBS shows for the next 7 days
-    fetchPBSShowsByDateRange(7)
-      .then((shows) => {
-        if (Array.isArray(shows)) {
-          setPbsShows(shows.filter((e) => e.status !== 'expired').slice(0, 4));
-        } else {
-          console.warn('PBS shows response is not an array:', shows);
-          setPbsShows([]);
-        }
-      })
-      .catch((error) => {
-        console.error('Error fetching PBS shows:', error);
-        setPbsShows([]);
-      });
 
     fetchTopTags()
       .then(setTopTags)
@@ -171,13 +116,6 @@ export default function HomePage() {
           </div>
         </section>
       )}
-
-      <ShowSection
-        title="Upcoming PBS Shows"
-        shows={pbsShows}
-        icon={Tv}
-        emptyMessage="No upcoming PBS shows available right now. Check back later!"
-      />
 
       <StationSection
         title="Featured Stations"
