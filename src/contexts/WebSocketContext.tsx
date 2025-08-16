@@ -40,7 +40,6 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
     const websocket = new WebSocket(`${wsHost}/ws?user_id=${userId}`);
 
     websocket.onopen = () => {
-      console.log('WebSocket connected');
       setIsConnected(true);
       setConnectionStatus('connected');
     };
@@ -57,18 +56,16 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
           });
         }
       } catch (error) {
-        console.error('Error parsing WebSocket message:', error);
+        // Silent fail for malformed messages
       }
     };
 
     websocket.onclose = () => {
-      console.log('WebSocket disconnected');
       setIsConnected(false);
       setConnectionStatus('disconnected');
     };
 
     websocket.onerror = (error) => {
-      console.error('WebSocket error:', error);
       setConnectionStatus('error');
     };
 

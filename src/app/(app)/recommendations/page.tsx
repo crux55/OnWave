@@ -47,16 +47,15 @@ export default function RecommendationsPage() {
           description: `We found ${result.recommendations.length} new stations for you.`,
         });
       } else {
-        setError("Received an unexpected response from the AI. Please try again.");
+        setError("AI returned an unexpected response. Please try again.");
          toast({
-          title: "Uh Oh!",
-          description: "Failed to get recommendations. No specific stations returned.",
+          title: "No Recommendations",
+          description: "Failed to generate station recommendations.",
           variant: "destructive",
         });
       }
     } catch (e: any) {
-      console.error("Error getting recommendations:", e);
-      setError(e.message || "An error occurred while fetching recommendations. Please try again.");
+      setError(e.message || "Failed to get recommendations. Please try again.");
       toast({
         title: "Error",
         description: e.message || "Failed to get recommendations.",
@@ -163,7 +162,7 @@ export default function RecommendationsPage() {
 
       {recommendations && recommendations.length === 0 && !error && (
          <Alert className="mt-8 bg-secondary/50">
-           <Music2 className="h-5 w-5 text-secondary-foreground" />
+           <Music className="h-5 w-5 text-secondary-foreground" />
            <AlertTitle className="text-secondary-foreground">No Specific Recommendations</AlertTitle>
            <AlertDescription className="text-muted-foreground">
             The AI couldn't pinpoint specific new stations based on your input this time. Try being more specific or broader in your description.

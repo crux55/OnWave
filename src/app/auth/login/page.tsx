@@ -139,10 +139,9 @@ export default function LoginPage() {
       });
       router.push('/');
     } catch (error: any) {
-      console.error('Email Sign-In Error:', error);
       toast({
         title: 'Sign In Failed',
-        description: error.code === 'auth/invalid-credential' ? 'Invalid email or password.' : (error.message || 'An unexpected error occurred.'),
+        description: error.code === 'auth/invalid-credential' ? 'Invalid email or password.' : (error.message || 'Sign in failed. Please try again.'),
         variant: 'destructive',
       });
     } finally {
@@ -163,12 +162,11 @@ export default function LoginPage() {
       });
       router.push('/'); 
     } catch (error: any) {
-      console.error('Registration Error:', error);
-      let errorMessage = 'An unexpected error occurred. Please try again.';
+      let errorMessage = 'Registration failed. Please try again.';
       if (error.code === 'auth/email-already-in-use') {
-        errorMessage = 'This email address is already in use. Try signing in or use a different email.';
+        errorMessage = 'This email is already registered. Try signing in instead.';
       } else if (error.code === 'auth/weak-password') {
-        errorMessage = 'The password is too weak. Please choose a stronger password.';
+        errorMessage = 'Password is too weak. Please choose a stronger one.';
       } else {
         errorMessage = error.message || errorMessage;
       }

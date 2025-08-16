@@ -57,8 +57,6 @@ export function RadioPlayer({ station, className }: RadioPlayerProps) {
           await audioRef.current.play();
           player.setIsPlaying(true);
         } catch (e: any) {
-          // This catch is for issues with the play() promise itself, not typically stream errors after play starts
-          console.error('Error initiating station play:', e);
           setError(`Stream init error`);
           player.setIsPlaying(false);
         } finally {
@@ -78,19 +76,14 @@ export function RadioPlayer({ station, className }: RadioPlayerProps) {
       const mediaError = audioElement.error;
       
       let uiErrorMessage = 'Stream error'; 
-      let detailedConsoleMessage = 'Stream error occurred.'; 
 
       if (!mediaError) {
-        detailedConsoleMessage = "Audio event triggered on RadioPlayer, but no MediaError object found.";
-        console.error(detailedConsoleMessage, "Event:", e, "Station URL:", audioElement.src);
         setError(uiErrorMessage); 
         player.setIsPlaying(false);
         setIsLoading(false);
         return;
       }
       
-      // Ensure MediaError constants are available (they are on window.MediaError in browsers)
-      // Fallback to numeric codes if MediaError is not found, though unlikely.
       const MEDIA_ERR_ABORTED = (window.MediaError && window.MediaError.MEDIA_ERR_ABORTED) || 1;
       const MEDIA_ERR_NETWORK = (window.MediaError && window.MediaError.MEDIA_ERR_NETWORK) || 2;
       const MEDIA_ERR_DECODE = (window.MediaError && window.MediaError.MEDIA_ERR_DECODE) || 3;
@@ -99,34 +92,20 @@ export function RadioPlayer({ station, className }: RadioPlayerProps) {
       switch (mediaError.code) {
         case MEDIA_ERR_ABORTED:
           uiErrorMessage = 'Playback aborted.';
-          detailedConsoleMessage = `Playback aborted by user or script. Code: ${mediaError.code}.`;
           break;
         case MEDIA_ERR_NETWORK:
           uiErrorMessage = 'Network error.';
-          detailedConsoleMessage = `A network error caused the audio download to fail. Code: ${mediaError.code}.`;
           break;
         case MEDIA_ERR_DECODE:
           uiErrorMessage = 'Decode error.';
-          detailedConsoleMessage = `The audio playback was aborted due to a corruption problem or because the audio used features your browser did not support. Code: ${mediaError.code}.`;
           break;
         case MEDIA_ERR_SRC_NOT_SUPPORTED:
           uiErrorMessage = 'Format not supported.';
-          detailedConsoleMessage = `The audio could not be loaded, either because the server or network failed or because the format is not supported. Code: ${mediaError.code}.`;
           break;
         default:
           uiErrorMessage = 'Unknown stream error.';
-          detailedConsoleMessage = `An unknown error occurred (Code: ${mediaError.code}, Message: ${mediaError.message || 'N/A'}).`;
       }
       
-      console.error(
-        `RadioPlayer Audio Error: ${detailedConsoleMessage}`,
-        { 
-          code: mediaError.code, 
-          messageFromErrorObject: mediaError.message || "No message property in MediaError object."
-        },
-        "Station URL:", audioElement.src,
-        "Full MediaError (original):", mediaError
-      );
       setError(uiErrorMessage); 
       player.setIsPlaying(false);
       setIsLoading(false);
@@ -179,7 +158,6 @@ export function RadioPlayer({ station, className }: RadioPlayerProps) {
         }
         await audioRef.current.play();
       } catch (e: any) {
-        console.error('Error in togglePlayPause:', e);
         setError(`Failed to play`);
         player.setIsPlaying(false); 
       } finally {

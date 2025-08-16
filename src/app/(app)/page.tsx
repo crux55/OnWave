@@ -58,30 +58,27 @@ export default function HomePage() {
   const player = usePlayer();
 
   useEffect(() => {
+    const fetchStations = async () => {
+      try {
+        const [featured, popular, trending, random, tags] = await Promise.all([
+          fetchStationByBitRate({ term: 'LoFi' }).then(stations => stations.slice(0, 4)),
+          sortStationsByListeners({ term: 'LoFi' }).then(stations => stations.slice(0, 4)),
+          sortStationsByClickTrend({ term: 'LoFi' }).then(stations => stations.slice(0, 4)),
+          fetchStationByRandom({ term: 'LoFi' }).then(stations => stations.slice(0, 4)),
+          fetchTopTags()
+        ]);
 
-    // Fetch and set featured stations
-    fetchStationByBitRate({ term: 'LoFi' })
-      .then((stations) => setFeaturedStations(stations.slice(0, 4)))
-      .catch((error) => console.error('Error fetching featured stations:', error));
+        setFeaturedStations(featured);
+        setMostListens(popular);
+        setTrending(trending);
+        setRandomiser(random);
+        setTopTags(tags);
+      } catch (error) {
+        // Silent fail - individual sections will show empty states
+      }
+    };
 
-    // Fetch and set most listened stations
-    sortStationsByListeners({ term: 'LoFi' })
-      .then((stations) => setMostListens(stations.slice(0, 4)))
-      .catch((error) => console.error('Error fetching most listened stations:', error));
-
-    // Fetch and set trending stations
-    sortStationsByClickTrend({ term: 'LoFi' })
-      .then((stations) => setTrending(stations.slice(0, 4)))
-      .catch((error) => console.error('Error fetching trending stations:', error));
-
-    // Fetch and set random stations
-    fetchStationByRandom({ term: 'LoFi' })
-      .then((stations) => setRandomiser(stations.slice(0, 4)))
-      .catch((error) => console.error('Error fetching random stations:', error));
-
-    fetchTopTags()
-      .then(setTopTags)
-      .catch((error) => console.error('Error fetching tags:', error));
+    fetchStations();
   }, []);
 
   const handlePlayStation = (station: RadioStation) => {

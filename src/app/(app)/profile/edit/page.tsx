@@ -103,8 +103,6 @@ export default function EditProfilePage() {
     const formData = new FormData();
     formData.append('avatar', file);
 
-    console.log(`API host: ${apiHost}`);
-
     const response = await fetch(`${apiHost}/profile/avatar`, {
       method: 'PUT',
       body: formData,

@@ -93,12 +93,11 @@ export default function ProfilePage() {
       const decodedToken = jwt_decode<Token>(jwt?.token || "");
       setToken(decodedToken);
       
-      // Connect to WebSocket for reminders
       if (jwt.userId) {
         connect(jwt.userId);
       }
     } catch (error) {
-      console.error("Error parsing token:", error);
+      // Silent fail for invalid tokens
     }
 
     fetchCurrentUserProfile()
@@ -138,10 +137,9 @@ export default function ProfilePage() {
       });
       router.push('/');
     } catch (error: any) {
-      console.error('Logout Error:', error);
       toast({
         title: 'Logout Failed',
-        description: error.message || 'An unexpected error occurred.',
+        description: error.message || 'Logout failed. Please try again.',
         variant: 'destructive',
       });
     } finally {

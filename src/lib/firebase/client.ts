@@ -37,52 +37,26 @@ const firebaseConfig = {
 let firebaseApp: FirebaseApp;
 
 export function initializeAppIfNeeded(): FirebaseApp {
-  // Developer-friendly check: Log a warning if critical Firebase config keys seem to be missing or are common placeholders.
-  // This helps catch common configuration errors before Firebase throws its own, sometimes less direct, error.
-  if (!firebaseConfig.apiKey || 
-      firebaseConfig.apiKey === 'AIzaSyYOUR_REAL_API_KEY' || 
-      firebaseConfig.apiKey === 'YOUR_ACTUAL_API_KEY' || 
-      firebaseConfig.apiKey === 'YOUR_API_KEY_HERE' ||
-      firebaseConfig.apiKey.includes('YOUR_API_KEY') || // General placeholder check
-      firebaseConfig.apiKey.startsWith('AIzaSyYOUR_')) { // Common start of placeholder
-    console.warn(
-      `Firebase Warning: NEXT_PUBLIC_FIREBASE_API_KEY appears to be missing or is a placeholder ('${firebaseConfig.apiKey}'). 
-      Please ensure it's correctly set with your actual Firebase project's API key.
-      - For local development, set this in your .env.local file.
-      - For deployment, set this in your hosting environment variables.
-      You can find your API key in the Firebase Console: Project settings > General > Your apps > Web app > SDK setup and configuration.`
-    );
-  }
-  if (!firebaseConfig.authDomain || firebaseConfig.authDomain.includes('your-project-id')) {
-    console.warn(
-      `Firebase Warning: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN appears to be missing or is a placeholder ('${firebaseConfig.authDomain}'). Check your environment variables.`
-    );
-  }
-  if (!firebaseConfig.projectId || firebaseConfig.projectId.includes('your-project-id')) {
-    console.warn(
-      `Firebase Warning: NEXT_PUBLIC_FIREBASE_PROJECT_ID appears to be missing or is a placeholder ('${firebaseConfig.projectId}'). Check your environment variables.`
-    );
+  // Check for missing or placeholder Firebase config
+  const missingOrPlaceholder = (value: string | undefined, placeholders: string[]) => 
+    !value || placeholders.some(p => value.includes(p));
+
+  const apiKeyIssue = missingOrPlaceholder(firebaseConfig.apiKey, ['YOUR_API_KEY', 'YOUR_REAL_API_KEY', 'YOUR_ACTUAL_API_KEY']);
+  const authDomainIssue = missingOrPlaceholder(firebaseConfig.authDomain, ['your-project-id']);
+  const projectIdIssue = missingOrPlaceholder(firebaseConfig.projectId, ['your-project-id']);
+
+  if (apiKeyIssue || authDomainIssue || projectIdIssue) {
+    throw new Error('Firebase configuration is missing or contains placeholder values. Check your environment variables.');
   }
 
   if (!getApps().length) {
     try {
       firebaseApp = initializeApp(firebaseConfig);
-      // Optional: Initialize Analytics
-      // if (typeof window !== 'undefined') {
-      //   getAnalytics(firebaseApp);
-      // }
-      console.log('Firebase initialized with Project ID:', firebaseConfig.projectId);
     } catch (error) {
-      console.error(
-        "Firebase Initialization Error: Failed to initialize Firebase. This is often due to incorrect or missing Firebase configuration values (apiKey, authDomain, projectId, etc.) in your environment variables. Please double-check them against your Firebase project settings in the Firebase Console.",
-        error
-      );
-      // Re-throw the error to ensure the application knows initialization failed.
-      throw error;
+      throw new Error('Firebase initialization failed. Please check your configuration.');
     }
   } else {
     firebaseApp = getApps()[0];
-    // console.log('Firebase already initialized'); // Can be a bit noisy, enable if needed
   }
   return firebaseApp;
 }

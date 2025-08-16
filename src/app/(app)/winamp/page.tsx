@@ -10,8 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ListMusic, PlayCircle, Search as SearchIcon, AlertTriangle } from 'lucide-react';
 import Image from 'next/image';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { fetchFromApi } from '@/lib/api'; // Assuming you have a fetch function to handle API calls
-import { v4 as uuid } from 'uuid';
+import { fetchFromApi } from '@/lib/api';
 import { useSearchParams } from 'next/navigation';
 
 type SortKey = 'name' | 'bitrate' | 'country' | 'votes' | 'clickcount' | 'clicktrend' | 'status';
@@ -111,7 +110,6 @@ function WinampPageContent() {
       const data: RadioStation[] = await fetchFromApi({ term: query });
       setStations(data.map((s, index) => ({ ...s, id: s.serveruuid || `${s.name}-${index}` })));
     } catch (e: any) {
-      console.error('Search stations error:', e);
       setError(e.message || 'An unexpected error occurred while searching.');
       setStations([]);
     } finally {
@@ -120,20 +118,15 @@ function WinampPageContent() {
   };
 
   const handlePlayStation = (station: RadioStation) => {
-    // Normalize/sanitize the station object for the player
     const playerStation: RadioStation = {
       ...station,
-      serveruuid: station.serveruuid || station.name, // fallback if missing
-      url: station.url_resolved || station.url, // prefer resolved URL if available
-      tags: station.tags?.split(', ')[0]?.trim() || 'Unknown', // first tag as genre
-      favicon: station.favicon || `https://placehold.co/64x64.png`, // fallback icon
+      serveruuid: station.serveruuid || station.name,
+      url: station.url_resolved || station.url,
+      tags: station.tags?.split(', ')[0]?.trim() || 'Unknown',
+      favicon: station.favicon || `https://placehold.co/64x64.png`,
     };
-    console.log("Playing station:", station, playerStation);
-    console.log("Station URL:", playerStation.url);
 
-    // Only play if we have a valid URL
     if (!playerStation.url) {
-      console.error("Station URL is missing!");
       return;
     }
 
@@ -168,7 +161,7 @@ function WinampPageContent() {
             onKeyDown={(e) => e.key === 'Enter' && handleSearchStations()}
             className="flex-grow h-11 text-base"
           />
-          <Button onClick={handleSearchStations} disabled={isLoading} className="h-11">
+          <Button onClick={() => handleSearchStations()} disabled={isLoading} className="h-11">
             {isLoading ? (
               <>
                 <SearchIcon className="mr-2 h-4 w-4 animate-spin" /> Searching...
@@ -267,7 +260,7 @@ function WinampPageContent() {
                 const isOnline = station.lastcheckoktime && lastCheckOKTime >= lastCheckTime;
 
                 return (
-                  <tr key={uuid()} className="hover:bg-muted/20">
+                  <tr key={station.stationuuid || `${station.name}-${station.bitrate}`} className="hover:bg-muted/20">
                     <td className="p-2 border border-border text-foreground break-words whitespace-normal max-w-xs">{station.name}</td>
                     <td className="p-2 border border-border text-muted-foreground">{station.bitrate} kbps</td>
                     <td className="p-2 border border-border text-muted-foreground">{station.country}</td>

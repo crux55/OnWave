@@ -29,32 +29,26 @@ export const ShowTicker: React.FC<ShowTickerProps> = ({ className }) => {
         setIsLoading(true);
         setError(null);
         
-        // Fetch shows for the next 7 days
         const fetchedShows = await fetchPBSShowsByDateRange(7);
         
         if (Array.isArray(fetchedShows)) {
-          // Filter and sort shows
           const filteredShows = fetchedShows
             .filter(show => show.status === 'live' || show.status === 'upcoming')
             .sort((a, b) => {
-              // Sort by date first, then by time
               const dateComparison = new Date(a.date).getTime() - new Date(b.date).getTime();
               if (dateComparison !== 0) return dateComparison;
               return a.start_time.localeCompare(b.start_time);
             });
           
-          // Get live shows + next 3 upcoming shows
           const liveShows = filteredShows.filter(show => show.status === 'live');
           const upcomingShows = filteredShows.filter(show => show.status === 'upcoming').slice(0, 3);
           const limitedShows = [...liveShows, ...upcomingShows];
           
           setShows(limitedShows);
         } else {
-          console.warn('Unexpected shows response format:', fetchedShows);
           setShows([]);
         }
       } catch (error) {
-        console.error('Error fetching shows for ticker:', error);
         setError(error instanceof Error ? error.message : 'Failed to fetch shows');
         setShows([]);
       } finally {
@@ -64,7 +58,6 @@ export const ShowTicker: React.FC<ShowTickerProps> = ({ className }) => {
 
     fetchShows();
     
-    // Refresh data every 5 minutes
     const interval = setInterval(fetchShows, 5 * 60 * 1000);
     
     return () => clearInterval(interval);

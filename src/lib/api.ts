@@ -81,24 +81,17 @@ export async function fetchStationByRandom(params: Record<string, string> = {}):
 export async function fetchPBSShowsByDateRange(days: number = 7): Promise<PBSShow[]> {
   const apiHost = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080';
   
-  // Calculate start date (today) and end date (today + n days)
   const startDate = new Date();
   const endDate = new Date();
   endDate.setDate(startDate.getDate() + days);
   
-  // Format dates as YYYY-MM-DD
-  const startDateStr = startDate.toISOString().split('T')[0];
-  const endDateStr = endDate.toISOString().split('T')[0];
-  
   const params = {
-    start_date: startDateStr,
-    end_date: endDateStr
+    start_date: startDate.toISOString().split('T')[0],
+    end_date: endDate.toISOString().split('T')[0]
   };
   
   const queryString = new URLSearchParams(params).toString();
   const url = `${apiHost}/pbs/shows/range?${queryString}`;
-
-  console.log('Fetching PBS shows from:', url); // Debug log
 
   const response = await fetch(url);
   if (!response.ok) {
@@ -107,19 +100,20 @@ export async function fetchPBSShowsByDateRange(days: number = 7): Promise<PBSSho
   }
 
   const data = await response.json();
-  console.log('PBS shows API response:', data); // Debug log
   
-  // Based on your Go response format, the shows are in the 'shows' property
-  if (data && Array.isArray(data.shows)) {
+  if (data?.shows && Array.isArray(data.shows)) {
     return data.shows;
-  } else if (Array.isArray(data)) {
-    return data;
-  } else if (data && Array.isArray(data.data)) {
-    return data.data;
-  } else {
-    console.warn('Unexpected PBS shows API response format:', data);
-    return [];
   }
+  
+  if (Array.isArray(data)) {
+    return data;
+  }
+  
+  if (data?.data && Array.isArray(data.data)) {
+    return data.data;
+  }
+  
+  return [];
 }
 
 // Reminder API functions
