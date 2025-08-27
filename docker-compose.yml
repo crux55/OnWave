@@ -29,7 +29,7 @@ services:
       - PORT=8080
       - REDIS_ADDR=redis:6379
       - REDIS_PASSWORD=s.o.a.d.
-      - FORCE_CACHE=false
+      - FORCE_CACHE=true
       - CACHE_EXPIRE_HOURS=0
       - JWT_SECRET=supersecretteststring
       - COMPOSE_BAKE=true

@@ -3,25 +3,45 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { UserCircle2, LogIn } from 'lucide-react'; // LogIn might be removed if not used elsewhere
+import { UserCircle2, LogIn } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { getAuth, onAuthStateChanged, type User } from 'firebase/auth';
-import { initializeAppIfNeeded } from '@/lib/firebase/client';
 
-// Initialize Firebase
-initializeAppIfNeeded();
-const auth = getAuth();
+interface User {
+  id: string;
+  email: string;
+  displayName?: string;
+  photoURL?: string;
+}
 
 export function UserAvatar() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setCurrentUser(user);
+    // Check for stored auth token
+    const checkAuth = () => {
+      try {
+        const token = localStorage.getItem('token');
+        if (token) {
+          const authData = JSON.parse(token);
+          // Assuming your API returns user data in a similar format
+          if (authData.userId || authData.id) {
+            setCurrentUser({
+              id: authData.userId || authData.id,
+              email: authData.email || authData.user?.email || '',
+              displayName: authData.displayName || authData.user?.displayName,
+              photoURL: authData.photoURL || authData.user?.photoURL
+            });
+          }
+        }
+      } catch (error) {
+        // Invalid token, clear it
+        localStorage.removeItem('token');
+      }
       setIsLoading(false);
-    });
-    return () => unsubscribe();
+    };
+
+    checkAuth();
   }, []);
 
   if (isLoading) {

@@ -17,7 +17,7 @@ import { useReminders } from '@/contexts/RemindersContext';
 
 
 
-// Placeholder data - in a real app, this would come from an API or Firebase services
+// Placeholder data - in a real app, this would come from your API
 const userProfileData = {
   subscription: 'Premium', // Example
   favoriteGenre: 'Synthwave', // Example
