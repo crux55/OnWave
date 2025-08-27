@@ -18,9 +18,7 @@ services:
     restart: unless-stopped
 
   backend:
-    build:
-      context: ../../Go/project_r
-      dockerfile: Dockerfile
+    image: onwave-backend:latest
     ports:
       - "8080:8080"
     environment:
