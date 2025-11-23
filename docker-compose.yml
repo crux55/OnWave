@@ -12,8 +12,8 @@ services:
       - NODE_ENV=development
       - COMPOSE_BAKE=true
       - DOCKER_BUILDKIT=1
-      - NEXT_PUBLIC_API_BASE_URL=http://localhost:8080
-      - REACT_APP_API_URL=http://localhost:8080
+      - NEXT_PUBLIC_API_BASE_URL=http://backend:8080
+      - REACT_APP_API_URL=http://backend:8080
     volumes:
       - .:/app
       - /app/node_modules
@@ -25,11 +25,11 @@ services:
     ports:
       - "8080:8080"
     environment:
-      - DATABASE_URL=root:s.o.a.d.@tcp(mysql:3306)/radio?parseTime=true
+      - DATABASE_URL=root:databasePassword@tcp(mysql:3306)/radio?parseTime=true
       - LOG_LEVEL=debug
       - PORT=8080
       - REDIS_ADDR=redis:6379
-      - REDIS_PASSWORD=s.o.a.d.
+      - REDIS_PASSWORD=databasePassword
       - FORCE_CACHE=false
       - CACHE_EXPIRE_HOURS=0
       - JWT_SECRET=supersecretteststring
@@ -45,7 +45,7 @@ services:
     image: mysql:8.4
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: s.o.a.d.
+      MYSQL_ROOT_PASSWORD: databasePassword
       MYSQL_DATABASE: radio
     ports:
       - "3306:3306"
@@ -60,7 +60,7 @@ services:
     environment:
       PMA_HOST: mysql
       PMA_USER: root
-      PMA_PASSWORD: s.o.a.d.
+      PMA_PASSWORD: databasePassword
     depends_on:
       - mysql
 
@@ -70,8 +70,8 @@ services:
     ports:
       - "6379:6379"
     environment:
-      - REDIS_PASSWORD=s.o.a.d.
-    command: ["redis-server", "--requirepass", "s.o.a.d."]
+      - REDIS_PASSWORD=databasePassword
+    command: ["redis-server", "--requirepass", "databasePassword"]
     volumes:
       - redis_data:/data
 
