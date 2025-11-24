@@ -11,7 +11,7 @@ services:
   backend:
     image: onwave-backend:latest
     ports:
-      - "${BACKEND_PORT}:${PORT}"
+      - "8080:8080"
     environment:
       - DATABASE_URL=${MYSQL_USER}:${MYSQL_ROOT_PASSWORD}@tcp(${MYSQL_HOST}:${MYSQL_PORT})/${MYSQL_DATABASE}?parseTime=true
       - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
