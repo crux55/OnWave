@@ -18,9 +18,9 @@ echo "📦 Building production images..."
 docker build -f Dockerfile.production -t onwave-frontend:latest .
 
 # Build backend if needed (uncomment if you want to rebuild)
-# cd ../../Go/project_r
-# docker build -t onwave-backend:latest .
-# cd ~/Code/React/OnWave
+cd ../../Go/project_r
+docker build -t onwave-backend:latest .
+cd ~/Code/React/OnWave
 
 # Stop existing containers
 echo "🛑 Stopping existing containers..."
