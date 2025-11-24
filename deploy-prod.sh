@@ -24,7 +24,12 @@ docker build -f Dockerfile.production \
 
 # Build backend if needed (uncomment if you want to rebuild)
 cd /home/andru/Code/Go/project_r
-docker build -t onwave-backend:latest .
+echo "📦 Building backend with environment variables..."
+docker build \
+  --build-arg DATABASE_URL=root:${MYSQL_ROOT_PASSWORD}@tcp(mysql:3306)/radio?parseTime=true \
+  --build-arg REDIS_PASSWORD=${REDIS_PASSWORD} \
+  --build-arg JWT_SECRET=${JWT_SECRET} \
+  -t onwave-backend:latest .
 cd /home/andru/Code/React/OnWave
 
 # Stop existing containers
