@@ -23,8 +23,8 @@ const navItems = [
   { href: '/', label: 'Home', icon: Home },
   { href: '/search', label: 'Search', icon: Search },
   { href: '/shows', label: 'Shows', icon: Radio },
-  { href: '/recommendations', label: 'Explore', icon: Wand2 },
-  { href: '/profile', label: 'Profile', icon: UserCircle2 },
+  // { href: '/recommendations', label: 'Explore', icon: Wand2 },
+  // { href: '/profile', label: 'Profile', icon: UserCircle2 },
 ];
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
