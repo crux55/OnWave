@@ -24,7 +24,6 @@ const navItems = [
   { href: '/search', label: 'Search', icon: Search },
   { href: '/shows', label: 'Shows', icon: Radio },
   { href: '/recommendations', label: 'Explore', icon: Wand2 },
-  { href: '/winamp', label: 'Winamp', icon: ListMusic },
   { href: '/profile', label: 'Profile', icon: UserCircle2 },
 ];
 

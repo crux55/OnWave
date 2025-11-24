@@ -104,7 +104,7 @@ export default function HomePage() {
             {topTags.slice(0, 30).map(tagObj => (
               <Link
                 key={tagObj.name}
-                href={`/winamp?search=${encodeURIComponent(tagObj.name)}`}
+                href={`/search?search=${encodeURIComponent(tagObj.name)}`}
                 className="inline-block bg-muted text-foreground px-3 py-1 rounded-full text-sm font-medium"
               >
                 {tagObj.name} <span className="text-xs text-muted-foreground">({tagObj.stationcount})</span>
