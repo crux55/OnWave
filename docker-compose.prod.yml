@@ -13,7 +13,7 @@ services:
     ports:
       - "8080:8080"
     environment:
-      - DATABASE_URL=root:${MYSQL_ROOT_PASSWORD}@tcp(mysql:3306)/radio?parseTime=true
+      - DATABASE_URL=root:seb395@tcp(mysql:3306)/radio?parseTime=true
       - LOG_LEVEL=error
       - PORT=8080
       - REDIS_ADDR=redis:6379
@@ -34,17 +34,17 @@ services:
     image: mysql:8.0
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_ROOT_PASSWORD: seb395
       MYSQL_DATABASE: radio
-      MYSQL_USER: radiouser
-      MYSQL_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_USER: root
+      MYSQL_PASSWORD: seb395
       MYSQL_ROOT_HOST: '%'
     command: --default-authentication-plugin=mysql_native_password --bind-address=0.0.0.0
     volumes:
       - mysql_data:/var/lib/mysql
       - ./init-mysql:/docker-entrypoint-initdb.d
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-pseb395"]
       timeout: 10s
       retries: 10
     ports:
