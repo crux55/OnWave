@@ -32,11 +32,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     <html lang="en">
       <body>
         <PlayerProvider>
-          <TickerProvider>
+          {/* <TickerProvider> */}
             <RemindersProvider>
               <AppLayoutContent>{children}</AppLayoutContent>
             </RemindersProvider>
-          </TickerProvider>
+          {/* </TickerProvider> */}
         </PlayerProvider>
       </body>
     </html>
