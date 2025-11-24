@@ -13,9 +13,14 @@ if [ ! -f .env.production ]; then
     exit 1
 fi
 
+# Source the environment file
+source .env.production
+
 # Build production images
 echo "📦 Building production images..."
-docker build -f Dockerfile.production -t onwave-frontend:latest .
+docker build -f Dockerfile.production \
+  --build-arg NEXT_PUBLIC_API_BASE_URL=${API_BASE_URL} \
+  -t onwave-frontend:latest .
 
 # Build backend if needed (uncomment if you want to rebuild)
 cd /home/andru/Code/Go/project_r
