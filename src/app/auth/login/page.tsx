@@ -132,6 +132,7 @@ export default function LoginPage() {
     try {
       const userCredential = await handleLogin(data);
       const user = userCredential.user;
+      console.log('Logged in user:', user);
       localStorage.setItem('token', JSON.stringify(user));
       toast({
         title: 'Sign In Successful!',
