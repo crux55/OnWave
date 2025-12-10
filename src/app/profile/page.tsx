@@ -12,7 +12,6 @@ import { useEffect, useState } from "react";
 import { fetchCurrentUserProfile } from "@/lib/api";
 import { JWT, Profile, Token, User } from '@/lib/types';
 import { jwtDecode as jwt_decode } from "jwt-decode";
-import { useWebSocket } from '@/contexts/WebSocketContext';
 import { useReminders } from '@/contexts/RemindersContext';
 
 
@@ -69,7 +68,6 @@ export default function ProfilePage() {
   const router = useRouter();
   const apiHost = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080';
   const { toast } = useToast();
-  const { connect, disconnect } = useWebSocket();
   const { reminders } = useReminders();
   const [isLoading, setIsLoading] = useState(true);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -92,10 +90,6 @@ export default function ProfilePage() {
       const jwt = JSON.parse(tokenString);
       const decodedToken = jwt_decode<Token>(jwt?.token || "");
       setToken(decodedToken);
-      
-      if (jwt.userId) {
-        connect(jwt.userId);
-      }
     } catch (error) {
       // Silent fail for invalid tokens
     }
@@ -117,12 +111,6 @@ export default function ProfilePage() {
       });
   }, []); // Empty dependency array - only run once on mount
 
-  // Separate effect for cleanup on unmount
-  useEffect(() => {
-    return () => {
-      disconnect();
-    };
-  }, [disconnect]);
 
 
 

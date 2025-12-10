@@ -13,6 +13,8 @@ import { RadioPlayer } from '@/components/RadioPlayer';
 import { MaximizedPlayerDialog } from '@/components/MaximizedPlayerDialog';
 import { PlayerProvider, usePlayer } from '@/contexts/PlayerContext';
 import { RemindersProvider } from '@/contexts/RemindersContext';
+import { NotificationProvider } from '@/contexts/NotificationContext';
+import { Toaster } from '@/components/ui/toaster';
 import { cn } from '@/lib/utils';
 
 const navItems = [
@@ -29,7 +31,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <body>
         <PlayerProvider>
           <RemindersProvider>
-            <AppLayoutContent>{children}</AppLayoutContent>
+            <NotificationProvider>
+              <AppLayoutContent>{children}</AppLayoutContent>
+              <Toaster />
+            </NotificationProvider>
           </RemindersProvider>
         </PlayerProvider>
       </body>

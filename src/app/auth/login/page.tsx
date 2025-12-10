@@ -16,6 +16,7 @@ import { AppLogo } from '@/components/AppLogo';
 import { Loader2, LogIn } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { getUserReminders } from '@/lib/api';
 
 
 const commonPasswordSchema = z.string().min(6, { message: "Password must be at least 6 characters." });
@@ -134,6 +135,15 @@ export default function LoginPage() {
       const user = userCredential.user;
       console.log('Logged in user:', user);
       localStorage.setItem('token', JSON.stringify(user));
+      
+      // Preload reminders after successful login
+      try {
+        const reminders = await getUserReminders();
+        localStorage.setItem('reminders', JSON.stringify(reminders));
+      } catch (error) {
+        console.warn('Failed to preload reminders:', error);
+      }
+      
       toast({
         title: 'Sign In Successful!',
         description: `Welcome back, ${user.displayName || user.email}!`,
