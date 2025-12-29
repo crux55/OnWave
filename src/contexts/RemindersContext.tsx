@@ -29,7 +29,6 @@ export const RemindersProvider = ({ children }: { children: ReactNode }) => {
   const [error, setError] = useState<string | null>(null);
 
   const fetchReminders = async () => {
-    // Don't fetch if not logged in
     const token = localStorage.getItem("token");
     if (!token) {
       return;
@@ -58,7 +57,6 @@ export const RemindersProvider = ({ children }: { children: ReactNode }) => {
   }) => {
     setError(null);
     
-    // Check if reminder already exists locally
     const existingReminder = allReminders.find(
       reminder => 
         reminder.show_name === reminderData.show_name &&
@@ -75,7 +73,6 @@ export const RemindersProvider = ({ children }: { children: ReactNode }) => {
     try {
       const newReminder = await createReminder(reminderData);
       setAllReminders(prev => [...prev, newReminder]);
-      // Only fetch reminders if user is still logged in
       const token = localStorage.getItem("token");
       if (token) {
         await fetchReminders();
@@ -93,7 +90,6 @@ export const RemindersProvider = ({ children }: { children: ReactNode }) => {
     
     try {
       await deleteReminder(reminderId);
-      // Remove from both active and all reminders
       setReminders(prev => {
         const currentReminders = Array.isArray(prev) ? prev : [];
         return currentReminders.filter(reminder => reminder.id !== reminderId);
@@ -106,7 +102,6 @@ export const RemindersProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  // Auto-fetch reminders on mount - only once per app session
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (token) {

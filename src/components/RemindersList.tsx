@@ -53,7 +53,6 @@ const ReminderCard: React.FC<{ reminder: Reminder }> = ({ reminder }) => {
     }
   };
 
-  // Check if reminder is in the past
   const isExpired = new Date(`${reminder.show_date}T${reminder.show_start_time}`) < new Date();
 
   return (
@@ -127,7 +126,6 @@ export const RemindersList: React.FC = () => {
     );
   }
 
-  // Sort reminders by date/time
   const sortedReminders = [...allReminders].sort((a, b) => {
     const dateA = new Date(`${a.show_date}T${a.show_start_time}`);
     const dateB = new Date(`${b.show_date}T${b.show_start_time}`);

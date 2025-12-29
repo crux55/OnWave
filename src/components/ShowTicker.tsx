@@ -64,7 +64,7 @@ export const ShowTicker: React.FC<ShowTickerProps> = ({ className }) => {
   }, []);
 
   const formatTime = (timeString: string) => {
-    return timeString.slice(0, 5); // Convert "HH:MM:SS" to "HH:MM"
+    return timeString.slice(0, 5);
   };
 
   const formatDate = (dateString: string) => {
@@ -98,7 +98,6 @@ export const ShowTicker: React.FC<ShowTickerProps> = ({ className }) => {
   };
 
   const handleCreateReminder = async (show: PBSShow) => {
-    // Check if user is logged in before making API call
     const token = localStorage.getItem("token");
     if (!token) {
       toast({
@@ -131,7 +130,6 @@ export const ShowTicker: React.FC<ShowTickerProps> = ({ className }) => {
   };
 
   const hasExistingReminder = (show: PBSShow) => {
-    // Only check for existing reminders if user is logged in
     const token = localStorage.getItem("token");
     if (!token) {
       return false;
@@ -192,7 +190,6 @@ export const ShowTicker: React.FC<ShowTickerProps> = ({ className }) => {
     );
   }
 
-  // Duplicate shows array for seamless scrolling, but less repetition
   const tickerShows = [...shows, ...shows];
 
   return (

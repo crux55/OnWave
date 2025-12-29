@@ -11,7 +11,7 @@ interface PlayerContextType {
   isPlaying: boolean;
   setIsPlaying: (playing: boolean) => void;
   isPlayerMinimized: boolean;
-  togglePlayerSize: () => void; // Toggles between minimized corner and standard bar
+  togglePlayerSize: () => void;
   isMaximizedViewOpen: boolean;
   openMaximizedPlayer: () => void;
   closeMaximizedPlayer: () => void;
@@ -36,9 +36,9 @@ export const PlayerProvider = ({ children }: { children: ReactNode }) => {
   const playStation = useCallback((station: RadioStation) => {
     setCurrentStation(station);
     setIsPlayerBarOpen(true);
-    setIsPlayerMinimized(false); // Default to standard bar
-    setIsMaximizedViewOpen(false); // Ensure maximized view is closed
-    // setIsPlayingState(true); // Player component will handle actual play state
+    setIsPlayerMinimized(false);
+    setIsMaximizedViewOpen(false);
+    setIsPlayingState(true);
   }, []);
 
   const closePlayerBar = useCallback(() => {
@@ -56,15 +56,14 @@ export const PlayerProvider = ({ children }: { children: ReactNode }) => {
   const togglePlayerSize = useCallback(() => {
     if (isPlayerBarOpen) {
       setIsPlayerMinimized(prev => !prev);
-      setIsMaximizedViewOpen(false); // Ensure maximized view is closed when toggling bar/minimized
+      setIsMaximizedViewOpen(false);
     }
   }, [isPlayerBarOpen]);
 
   const openMaximizedPlayer = useCallback(() => {
     if (isPlayerBarOpen) {
       setIsMaximizedViewOpen(true);
-      // Optional: ensure player is not "minimized" state when opening maximized view
-      // setIsPlayerMinimized(false); 
+      setIsPlayerMinimized(false); 
     }
   }, [isPlayerBarOpen]);
 

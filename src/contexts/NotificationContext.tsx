@@ -73,39 +73,32 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
     const showDateTime = new Date(`${reminder.show_date}T${reminder.show_start_time}`);
     const reminderTime = new Date(showDateTime.getTime() - (reminder.reminder_minutes_before * 60 * 1000));
     
-    // Calculate minutes until show starts
     const minutesUntilShow = Math.ceil((showDateTime.getTime() - now.getTime()) / (1000 * 60));
     
-    // Show toast notification
     toast({
       title: "📻 Show Starting Soon!",
       description: `${reminder.show_name} starts in ${minutesUntilShow} minute${minutesUntilShow !== 1 ? 's' : ''}`,
-      duration: 10000, // Show for 10 seconds
+      duration: 10000,
     });
 
-    // Show browser notification if permission granted
     if (notificationPermission === 'granted') {
       try {
         const notification = new Notification(`📻 ${reminder.show_name}`, {
           body: `Starting in ${minutesUntilShow} minute${minutesUntilShow !== 1 ? 's' : ''}`,
           icon: '/icons/icon-192x192.png',
-          tag: reminder.id, // Prevent duplicates
-          requireInteraction: true, // Keep notification until user interacts
+          tag: reminder.id,
+          requireInteraction: true,
         });
 
-        // Optional: Handle notification click to navigate to show
         notification.onclick = () => {
           window.focus();
           notification.close();
-          // You could navigate to a specific show page here
-          // router.push(`/shows/${reminder.show_id}`);
         };
       } catch (error) {
         console.error('Error showing browser notification:', error);
       }
     }
 
-    // Mark as notified to prevent duplicates
     markAsNotified(reminder.id);
   }, [notificationPermission, toast, markAsNotified]);
 
@@ -115,16 +108,12 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
     const now = new Date();
     
     allReminders.forEach(reminder => {
-      // Skip if already notified
       if (notifiedReminders.includes(reminder.id)) return;
 
       try {
-        // Parse reminder date and time
         const showDateTime = new Date(`${reminder.show_date}T${reminder.show_start_time}`);
         const reminderTime = new Date(showDateTime.getTime() - (reminder.reminder_minutes_before * 60 * 1000));
         
-        // Check if it's time to show the reminder
-        // Show notification if current time is past reminder time and before show starts
         if (now >= reminderTime && now < showDateTime) {
           showReminderNotification(reminder);
         }
@@ -134,7 +123,6 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
     });
   }, [allReminders, notifiedReminders, showReminderNotification]);
 
-  // Set up reminder checking interval
     useEffect(() => {
         checkReminders();
     }, [allReminders]);
@@ -144,7 +132,6 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
         return () => clearInterval(interval);
     }, []);
 
-  // Clean up old notified reminders (older than 24 hours)
   useEffect(() => {
     const cleanupOldNotifications = () => {
       const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
@@ -172,7 +159,6 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
     cleanupOldNotifications();
   }, [allReminders]);
 
-  // Request notification permission on first load if not already decided
   useEffect(() => {
     if (notificationPermission === 'default') {
       // Don't automatically request permission - let user trigger it

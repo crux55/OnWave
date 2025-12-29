@@ -13,7 +13,6 @@ interface SafeImageProps {
 export const SafeImage = ({ src, alt, width, height, fallback, className }: SafeImageProps) => {
   const [hasError, setHasError] = useState(false);
 
-  // Validate URL
   const isValidUrl = (urlString: string | null | undefined): boolean => {
     if (!urlString || typeof urlString !== 'string') return false;
     try {

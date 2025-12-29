@@ -71,7 +71,6 @@ export default function EditProfilePage() {
         return;
       }
 
-      // Validate file size (max 5MB)
       if (file.size > 5 * 1024 * 1024) {
         toast({
           title: 'File Too Large',

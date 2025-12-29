@@ -34,7 +34,7 @@ const registerFormSchema = z.object({
   username: z.string().min(3, { message: "Username must be at least 3 characters." }),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match.",
-  path: ["confirmPassword"], // Path of error
+  path: ["confirmPassword"],
 });
 type RegisterFormValues = z.infer<typeof registerFormSchema>;
 
@@ -104,7 +104,6 @@ export default function LoginPage() {
     }
   };
 
-  // Login handler
   const handleLogin = async (data: SignInFormValues) => {
     setLoginMessage("");
     try {

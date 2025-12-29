@@ -74,8 +74,7 @@ export default function HomePage() {
         setRandomiser(random);
         setTopTags(tags);
       } catch (error) {
-        // Silent fail - individual sections will show empty states
-      }
+        console.error('Error fetching stations or tags:', error);}
     };
 
     fetchStations();

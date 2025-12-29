@@ -16,10 +16,9 @@ import { useReminders } from '@/contexts/RemindersContext';
 
 
 
-// Placeholder data - in a real app, this would come from your API
 const userProfileData = {
-  subscription: 'Premium', // Example
-  favoriteGenre: 'Synthwave', // Example
+  subscription: 'Premium',
+  favoriteGenre: 'Synthwave',
   theme: 'Dark Mode (App Default)',
   playlists: [
     { id: 'pl1', name: 'Late Night Coding Vibes' },
@@ -91,7 +90,7 @@ export default function ProfilePage() {
       const decodedToken = jwt_decode<Token>(jwt?.token || "");
       setToken(decodedToken);
     } catch (error) {
-      // Silent fail for invalid tokens
+      console.error("Error decoding token:", error);  
     }
 
     fetchCurrentUserProfile()
@@ -109,7 +108,7 @@ export default function ProfilePage() {
         setUserProfile(null);
         setIsLoading(false);
       });
-  }, []); // Empty dependency array - only run once on mount
+  }, []);
 
 
 
@@ -144,10 +143,6 @@ export default function ProfilePage() {
     );
   }
 
-  // This check now happens *after* isLoading is false.
-  // If currentUser is still null at this point (and not loading),
-  // it means the redirect from useEffect should have already occurred or is in process.
-  // This section acts as a fallback UI or for states where redirect might be pending/failed.
   if (!userProfile) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-10rem)] text-center p-4">

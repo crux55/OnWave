@@ -85,7 +85,6 @@ function SearchPageContent() {
     return 0;
   });
 
-  // Sort handler
   const handleSort = (key: SortKey) => {
     if (sortKey === key) {
       setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
