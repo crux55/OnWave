@@ -2,7 +2,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { UserCircle2, ListMusic, Radio, Podcast, Users, FileText, Edit3, LogOut, Loader2, ShieldAlert, Bell } from 'lucide-react';
+import { UserCircle2, ListMusic, Radio, Podcast, Users, FileText, Edit3, LogOut, Loader2, ShieldAlert, Bell, X } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -67,11 +67,12 @@ export default function ProfilePage() {
   const router = useRouter();
   const apiHost = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080';
   const { toast } = useToast();
-  const { reminders } = useReminders();
+  const { reminders, removeReminder } = useReminders();
   const [isLoading, setIsLoading] = useState(true);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [userProfile, setUserProfile] = useState<Profile | null>(null);
   const [token, setToken] = useState<Token | null>(null);
+  const [deletingReminderId, setDeletingReminderId] = useState<string | null>(null);
   const getAvatarUrl = (filename: string | undefined) => {
   const url = filename ? `${apiHost}${filename}` : undefined;
 
@@ -131,7 +132,26 @@ export default function ProfilePage() {
       });
     } finally {
       setIsLoggingOut(false);
+    
+
+  const handleDeleteReminder = async (reminderId: string) => {
+    setDeletingReminderId(reminderId);
+    try {
+      await removeReminder(reminderId);
+      toast({
+        title: 'Reminder Deleted',
+        description: 'Your reminder has been successfully removed.',
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Delete Failed',
+        description: error.message || 'Failed to delete reminder. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setDeletingReminderId(null);
     }
+  };}
   };
 
   if (isLoading) {
@@ -271,14 +291,40 @@ export default function ProfilePage() {
                   </p>
 
 
-                  <p className="text-muted-foreground">Last Sign In: {userProfile.last_updated.toString()}</p>
-                </div>
-              </div>
-
-              <div>
-                <h3 className="text-xl font-semibold text-foreground mb-3">Preferences</h3>
-                <div className="space-y-1 text-sm">
-                  <p className="text-muted-foreground">Favorite Genre: No info yet</p>
+               div className="space-y-3">
+                {reminders.length > 0 ? (
+                  <ul className="space-y-2">
+                    {reminders.map(reminder => (
+                      <li key={reminder.id} className="flex items-center justify-between gap-3 p-2 bg-muted/30 rounded-md hover:bg-muted/60 transition-colors group">
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                          <Bell className="h-5 w-5 text-accent flex-shrink-0" />
+                          <span className="text-sm text-foreground truncate">
+                            {reminder.show_name} - {new Date(reminder.show_date).toLocaleDateString()} at {new Date(`2000-01-01T${reminder.show_start_time}`).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
+                          </span>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
+                          onClick={() => handleDeleteReminder(reminder.id)}
+                          disabled={deletingReminderId === reminder.id}
+                        >
+                          {deletingReminderId === reminder.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin text-destructive" />
+                          ) : (
+                            <X className="h-4 w-4 text-destructive hover:text-destructive/80" />
+                          )}
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="flex items-center gap-3 p-2 text-sm text-muted-foreground">
+                    <Bell className="h-5 w-5 text-muted-foreground/70 flex-shrink-0" />
+                    No show reminders set. Add some to never miss your favorites!
+                  </p>
+                )}
+              </div   <p className="text-muted-foreground">Favorite Genre: No info yet</p>
                   <p className="text-muted-foreground">Theme: Default</p>
                 </div>
               </div>
