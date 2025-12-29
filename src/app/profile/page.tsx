@@ -132,7 +132,8 @@ export default function ProfilePage() {
       });
     } finally {
       setIsLoggingOut(false);
-    
+    }
+  };
 
   const handleDeleteReminder = async (reminderId: string) => {
     setDeletingReminderId(reminderId);
@@ -151,7 +152,6 @@ export default function ProfilePage() {
     } finally {
       setDeletingReminderId(null);
     }
-  };}
   };
 
   if (isLoading) {
@@ -324,10 +324,10 @@ export default function ProfilePage() {
                     No show reminders set. Add some to never miss your favorites!
                   </p>
                 )}
-              </div   <p className="text-muted-foreground">Favorite Genre: No info yet</p>
+              </div>
+                 <p className="text-muted-foreground">Favorite Genre: No info yet</p>
                   <p className="text-muted-foreground">Theme: Default</p>
                 </div>
-              </div>
             </section>
 
             <Separator />
