@@ -1,9 +1,8 @@
 import type { RadioStation, TopTag, PBSShow } from '@/lib/types';
 
 export async function fetchFromApi(params: Record<string, string> = {}): Promise<RadioStation[]> {
-  const apiHost = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080';
   const queryString = new URLSearchParams(params).toString();
-  const url = `${apiHost}/webradio/search${queryString ? `?${queryString}` : ''}`;
+  const url = `/api/webradio/search${queryString ? `?${queryString}` : ''}`;
 
   const response = await fetch(url);
   if (!response.ok) {
@@ -11,27 +10,29 @@ export async function fetchFromApi(params: Record<string, string> = {}): Promise
     throw new Error(`Failed to fetch: ${response.status} ${errorText || response.statusText}`);
   }
 
-  return response.json();
+  const data = await response.json();
+  if (!Array.isArray(data)) {
+    throw new Error('Invalid response format: expected array');
+  }
+  return data;
 }
 
 export async function getTopStations(): Promise<RadioStation[]> {
-  const apiHost = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080';
-  const url = `${apiHost}/webradio/top`;
-
-  const response = await fetch(url);
+  const response = await fetch('/api/webradio/top');
   if (!response.ok) {
     const errorText = await response.text();
     throw new Error(`Failed to fetch: ${response.status} ${errorText || response.statusText}`);
   }
 
-  return response.json();
+  const data = await response.json();
+  if (!Array.isArray(data)) {
+    throw new Error('Invalid response format: expected array');
+  }
+  return data;
 }
 
 export async function fetchTopTags(): Promise<TopTag[]> {
-  const apiHost = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080';
-  const url = `${apiHost}/webradio/toptags`;
-
-  const response = await fetch(url);
+  const response = await fetch('/api/webradio/toptags');
   if (!response.ok) {
     const errorText = await response.text();
     throw new Error(`Failed to fetch: ${response.status} ${errorText || response.statusText}`);
@@ -45,16 +46,21 @@ export async function fetchCurrentUserProfile() {
 
   const token = localStorage.getItem("token");
   if (!token) return null;
-  const apiHost = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080';
-  const auth = JSON.parse(token);
-  const res = await fetch(`${apiHost}/users/me`, {
-    headers: {
-      Authorization: `Bearer ${auth.token}`,
-    }
-  });
 
-  if (!res.ok) return null;
-  return res.json();
+  try {
+    const auth = JSON.parse(token);
+    const res = await fetch('/api/users/me', {
+      headers: {
+        Authorization: `Bearer ${auth.token}`,
+      }
+    });
+
+    if (!res.ok) return null;
+    return res.json();
+  } catch (error) {
+    console.error('Failed to fetch user profile:', error);
+    return null;
+  }
 }
 
 
@@ -79,21 +85,16 @@ export async function fetchStationByRandom(params: Record<string, string> = {}):
 }
 
 export async function fetchPBSShowsByDateRange(days: number = 7): Promise<PBSShow[]> {
-  const apiHost = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080';
-  
   const startDate = new Date();
   const endDate = new Date();
   endDate.setDate(startDate.getDate() + days);
   
-  const params = {
+  const params = new URLSearchParams({
     start_date: startDate.toISOString().split('T')[0],
     end_date: endDate.toISOString().split('T')[0]
-  };
-  
-  const queryString = new URLSearchParams(params).toString();
-  const url = `${apiHost}/pbs/shows/range?${queryString}`;
+  });
 
-  const response = await fetch(url);
+  const response = await fetch(`/api/pbs/shows/range?${params}`);
   if (!response.ok) {
     const errorText = await response.text();
     throw new Error(`Failed to fetch PBS shows: ${response.status} ${errorText || response.statusText}`);
@@ -101,19 +102,12 @@ export async function fetchPBSShowsByDateRange(days: number = 7): Promise<PBSSho
 
   const data = await response.json();
   
-  if (data?.shows && Array.isArray(data.shows)) {
-    return data.shows;
+  if (!Array.isArray(data)) {
+    console.error('Unexpected API response format:', data);
+    throw new Error('Invalid response format from PBS shows endpoint');
   }
   
-  if (Array.isArray(data)) {
-    return data;
-  }
-  
-  if (data?.data && Array.isArray(data.data)) {
-    return data.data;
-  }
-  
-  return [];
+  return data;
 }
 
 // Reminder API functions
@@ -123,7 +117,6 @@ export async function createReminder(reminderData: {
   show_start_time: string;
   reminder_minutes_before: number;
 }) {
-  const apiHost = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080';
   const token = localStorage.getItem("token");
   
   if (!token) {
@@ -131,7 +124,7 @@ export async function createReminder(reminderData: {
   }
   
   const auth = JSON.parse(token);
-  const response = await fetch(`${apiHost}/reminders`, {
+  const response = await fetch('/api/reminders', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -170,7 +163,6 @@ export async function createReminder(reminderData: {
 }
 
 export async function getUserReminders() {
-  const apiHost = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080';
   const token = localStorage.getItem("token");
   
   if (!token) {
@@ -178,7 +170,7 @@ export async function getUserReminders() {
   }
   
   const auth = JSON.parse(token);
-  const response = await fetch(`${apiHost}/reminders`, {
+  const response = await fetch(`/api/reminders`, {
     method: 'GET',
     headers: {
       'Authorization': `Bearer ${auth.token}`,
@@ -201,7 +193,6 @@ export async function getUserReminders() {
 }
 
 export async function deleteReminder(reminderId: string) {
-  const apiHost = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080';
   const token = localStorage.getItem("token");
   
   if (!token) {
@@ -209,7 +200,7 @@ export async function deleteReminder(reminderId: string) {
   }
   
   const auth = JSON.parse(token);
-  const response = await fetch(`${apiHost}/reminders/${reminderId}`, {
+  const response = await fetch(`/api/reminders/${reminderId}`, {
     method: 'DELETE',
     headers: {
       'Authorization': `Bearer ${auth.token}`,
