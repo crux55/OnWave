@@ -291,7 +291,7 @@ export default function ProfilePage() {
                   </p>
 
 
-               div className="space-y-3">
+               <div className="space-y-3">
                 {reminders.length > 0 ? (
                   <ul className="space-y-2">
                     {reminders.map(reminder => (
@@ -324,10 +324,11 @@ export default function ProfilePage() {
                     No show reminders set. Add some to never miss your favorites!
                   </p>
                 )}
-              </div>
+                </div>
                  <p className="text-muted-foreground">Favorite Genre: No info yet</p>
                   <p className="text-muted-foreground">Theme: Default</p>
                 </div>
+              </div>
             </section>
 
             <Separator />
