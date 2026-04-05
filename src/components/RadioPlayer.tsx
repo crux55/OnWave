@@ -45,9 +45,8 @@ export function RadioPlayer({ station, className }: RadioPlayerProps) {
     
     if (streamUrl && audioRef.current.src !== streamUrl) {
         audioRef.current.src = streamUrl;
-        audioRef.current.load(); // Ensure stream is loaded
+        audioRef.current.load();
     }
-    // audioRef.current.volume set by volume effect
 
     const playAudio = async () => {
       if (audioRef.current && streamUrl) {

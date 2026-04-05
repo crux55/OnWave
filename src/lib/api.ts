@@ -110,7 +110,6 @@ export async function fetchPBSShowsByDateRange(days: number = 7): Promise<PBSSho
   return data;
 }
 
-// Reminder API functions
 export async function createReminder(reminderData: {
   show_name: string;
   show_date: string;
@@ -136,12 +135,10 @@ export async function createReminder(reminderData: {
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
     
-    // Handle unauthorized error
     if (response.status === 401) {
       throw new Error('UNAUTHORIZED');
     }
     
-    // Handle duplicate reminder error specifically
     if (response.status === 409 || (errorData.message && errorData.message.includes('Duplicate entry'))) {
       throw new Error('You already have a reminder set for this show');
     }
@@ -151,7 +148,6 @@ export async function createReminder(reminderData: {
 
   const result = await response.json();
   
-  // Transform the API response to match our Reminder type
   return {
     id: result.id,
     show_name: reminderData.show_name,
@@ -180,7 +176,6 @@ export async function getUserReminders() {
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
     
-    // Handle unauthorized error
     if (response.status === 401) {
       throw new Error('UNAUTHORIZED');
     }
@@ -210,7 +205,6 @@ export async function deleteReminder(reminderId: string) {
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
     
-    // Handle unauthorized error
     if (response.status === 401) {
       throw new Error('UNAUTHORIZED');
     }

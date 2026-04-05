@@ -25,7 +25,6 @@ export const PBSShowCard: React.FC<PBSShowCardProps> = ({ show }) => {
   const { toast } = useToast();
   const [isCreatingReminder, setIsCreatingReminder] = useState(false);
 
-  // Check if reminder already exists for this show
   const hasExistingReminder = allReminders.some(
     reminder => 
       reminder.show_name === show.name &&
@@ -57,7 +56,6 @@ export const PBSShowCard: React.FC<PBSShowCardProps> = ({ show }) => {
     setIsCreatingReminder(true);
     
     try {
-      // Default to 15 minutes before - can be configured later
       await addReminder({
         show_name: show.name,
         show_date: show.date,
@@ -71,7 +69,6 @@ export const PBSShowCard: React.FC<PBSShowCardProps> = ({ show }) => {
       });
       
     } catch (error) {
-      // Handle unauthorized error specially
       if (error instanceof Error && error.message === 'UNAUTHORIZED') {
         toast({
           title: "Login Required",
@@ -95,7 +92,6 @@ export const PBSShowCard: React.FC<PBSShowCardProps> = ({ show }) => {
     }
   };
 
-  // Check if the show is live or expired
   const canSetReminder = show.status !== 'live' && show.status !== 'expired';
 
   const getStatusColor = (status: string) => {

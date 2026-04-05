@@ -40,7 +40,6 @@ export const CreateReminderForm: React.FC = () => {
         reminder_minutes_before: parseInt(reminderMinutes),
       });
 
-      // Reset form
       setShowName('');
       setShowDate('');
       setShowTime('');
@@ -52,7 +51,6 @@ export const CreateReminderForm: React.FC = () => {
       });
       
     } catch (error) {
-      // Handle unauthorized error specially
       if (error instanceof Error && error.message === 'UNAUTHORIZED') {
         toast({
           title: "Login Required",
@@ -76,7 +74,6 @@ export const CreateReminderForm: React.FC = () => {
     }
   };
 
-  // Get today's date in YYYY-MM-DD format for min date
   const today = new Date().toISOString().split('T')[0];
 
   return (

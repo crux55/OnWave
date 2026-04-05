@@ -74,8 +74,7 @@ export default function HomePage() {
         setRandomiser(random);
         setTopTags(tags);
       } catch (error) {
-        // Silent fail - individual sections will show empty states
-      }
+        console.error('Error fetching stations or tags:', error);}
     };
 
     fetchStations();
@@ -104,7 +103,7 @@ export default function HomePage() {
             {topTags.slice(0, 30).map(tagObj => (
               <Link
                 key={tagObj.name}
-                href={`/winamp?search=${encodeURIComponent(tagObj.name)}`}
+                href={`/search?search=${encodeURIComponent(tagObj.name)}`}
                 className="inline-block bg-muted text-foreground px-3 py-1 rounded-full text-sm font-medium"
               >
                 {tagObj.name} <span className="text-xs text-muted-foreground">({tagObj.stationcount})</span>

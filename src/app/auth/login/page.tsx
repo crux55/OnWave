@@ -16,6 +16,7 @@ import { AppLogo } from '@/components/AppLogo';
 import { Loader2, LogIn } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { getUserReminders } from '@/lib/api';
 
 
 const commonPasswordSchema = z.string().min(6, { message: "Password must be at least 6 characters." });
@@ -33,7 +34,7 @@ const registerFormSchema = z.object({
   username: z.string().min(3, { message: "Username must be at least 3 characters." }),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match.",
-  path: ["confirmPassword"], // Path of error
+  path: ["confirmPassword"],
 });
 type RegisterFormValues = z.infer<typeof registerFormSchema>;
 
@@ -103,7 +104,6 @@ export default function LoginPage() {
     }
   };
 
-  // Login handler
   const handleLogin = async (data: SignInFormValues) => {
     setLoginMessage("");
     try {
@@ -132,7 +132,17 @@ export default function LoginPage() {
     try {
       const userCredential = await handleLogin(data);
       const user = userCredential.user;
+      console.log('Logged in user:', user);
       localStorage.setItem('token', JSON.stringify(user));
+      
+      // Preload reminders after successful login
+      try {
+        const reminders = await getUserReminders();
+        localStorage.setItem('reminders', JSON.stringify(reminders));
+      } catch (error) {
+        console.warn('Failed to preload reminders:', error);
+      }
+      
       toast({
         title: 'Sign In Successful!',
         description: `Welcome back, ${user.displayName || user.email}!`,

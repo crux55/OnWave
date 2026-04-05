@@ -18,13 +18,11 @@ export function UserAvatar() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Check for stored auth token
     const checkAuth = () => {
       try {
         const token = localStorage.getItem('token');
         if (token) {
           const authData = JSON.parse(token);
-          // Assuming your API returns user data in a similar format
           if (authData.userId || authData.id) {
             setCurrentUser({
               id: authData.userId || authData.id,
@@ -35,7 +33,6 @@ export function UserAvatar() {
           }
         }
       } catch (error) {
-        // Invalid token, clear it
         localStorage.removeItem('token');
       }
       setIsLoading(false);

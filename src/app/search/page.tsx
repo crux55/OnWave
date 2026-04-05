@@ -12,16 +12,17 @@ import Image from 'next/image';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { fetchFromApi } from '@/lib/api';
 import { useSearchParams } from 'next/navigation';
+import { SafeImage } from '@/components/SafeImage';
 
 type SortKey = 'name' | 'bitrate' | 'country' | 'votes' | 'clickcount' | 'clicktrend' | 'status';
 type SortOrder = 'asc' | 'desc';
 
 
-function WinampPageContent() {
+function SearchPageContent() {
   const searchParams = useSearchParams();
   const initialSearch = searchParams.get('search') || '';
   const [searchTerm, setSearchTerm] = useState(initialSearch);
-    const [stations, setStations] = useState<RadioStation[]>([]);
+  const [stations, setStations] = useState<RadioStation[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const player = usePlayer();
@@ -84,7 +85,6 @@ function WinampPageContent() {
     return 0;
   });
 
-  // Sort handler
   const handleSort = (key: SortKey) => {
     if (sortKey === key) {
       setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
@@ -284,11 +284,13 @@ function WinampPageContent() {
                       </a>
                     </td>
                     <td className="p-2 border border-border">
-                      {station.favicon ? (
-                        <Image src={station.favicon} alt="Favicon" width={16} height={16} className="object-contain" data-ai-hint="radio logo" onError={(e) => e.currentTarget.style.display='none'}/>
-                      ) : (
-                        '-'
-                      )}
+                      <SafeImage 
+                        src={station.favicon}
+                        alt="Station favicon"
+                        width={16}
+                        height={16}
+                        className="object-contain"
+                      />
                     </td>
                     <td className="p-2 border border-border text-muted-foreground truncate max-w-xs">{station.tags}</td>
                     <td className="p-2 border border-border text-muted-foreground">{station.clickcount}</td>
@@ -318,10 +320,10 @@ function WinampPageContent() {
   );
 }
 
-export default function WinampPage() {
+export default function SearchPage() {
   return (
     <React.Suspense fallback={<div>Loading...</div>}>
-      <WinampPageContent />
+      <SearchPageContent />
     </React.Suspense>
   );
 }

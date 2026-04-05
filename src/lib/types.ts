@@ -130,3 +130,13 @@ export interface WebSocketNotification {
   show_start_time: string;
   minutes_until_show: number;
 }
+
+export interface ReminderNotification {
+  id: string;
+  reminder: Reminder;
+  triggered_at: string;
+  shown_at?: string;
+  dismissed_at?: string;
+}
+
+export type NotificationPermissionState = 'default' | 'granted' | 'denied';
