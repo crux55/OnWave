@@ -64,8 +64,11 @@ export function RadioPlayer({ station, className }: RadioPlayerProps) {
       }
     };
 
-    if (player.isPlayerBarOpen) {
-        playAudio();
+    // Only autoplay when context says playback should be active.
+    if (player.isPlaying) {
+      playAudio();
+    } else if (audioRef.current) {
+      audioRef.current.pause();
     }
     
     const currentAudio = audioRef.current;
@@ -133,7 +136,32 @@ export function RadioPlayer({ station, className }: RadioPlayerProps) {
         currentAudio.removeEventListener('canplay', handleCanPlay);
       }
     };
-  }, [station, player.isPlayerBarOpen, player.setIsPlaying]);
+  }, [station, streamUrl, player.isPlayerBarOpen, player.isPlaying, player.setIsPlaying]);
+
+
+  useEffect(() => {
+    if (!audioRef.current || !station || !player.isPlayerBarOpen) return;
+
+    const syncPlayback = async () => {
+      if (!audioRef.current) return;
+
+      if (player.isPlaying) {
+        try {
+          if (streamUrl && audioRef.current.src !== streamUrl) {
+            audioRef.current.src = streamUrl;
+            audioRef.current.load();
+          }
+          await audioRef.current.play();
+        } catch {
+          player.setIsPlaying(false);
+        }
+      } else {
+        audioRef.current.pause();
+      }
+    };
+
+    syncPlayback();
+  }, [player.isPlaying, player.isPlayerBarOpen, player.setIsPlaying, station, streamUrl]);
 
 
   useEffect(() => {
@@ -143,27 +171,10 @@ export function RadioPlayer({ station, className }: RadioPlayerProps) {
   }, [player.volume, player.isMuted]);
 
 
-  const togglePlayPause = useCallback(async () => {
-    if (!audioRef.current || !station?.url) return;
-    if (player.isPlaying) {
-      audioRef.current.pause();
-    } else {
-      setIsLoading(true);
-      setError(null);
-      try {
-        if (streamUrl && audioRef.current.src !== streamUrl) {
-            audioRef.current.src = streamUrl;
-            audioRef.current.load();
-        }
-        await audioRef.current.play();
-      } catch (e: any) {
-        setError(`Failed to play`);
-        player.setIsPlaying(false); 
-      } finally {
-        setIsLoading(false);
-      }
-    }
-  }, [player.isPlaying, station, player.setIsPlaying]);
+  const togglePlayPause = useCallback(() => {
+    if (!streamUrl) return;
+    player.togglePlayback();
+  }, [player, streamUrl]);
 
   const handleVolumeChange = useCallback((newVolume: number[]) => {
     const vol = newVolume[0];

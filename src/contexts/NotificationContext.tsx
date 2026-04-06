@@ -1,16 +1,15 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState, useCallback, ReactNode } from 'react';
-import { useReminders } from './RemindersContext';
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef, ReactNode } from 'react';
 import { useToast } from '@/hooks/use-toast';
-import { Reminder } from '@/lib/types';
+import type { WebSocketNotification } from '@/lib/types';
 
 interface NotificationContextType {
   requestNotificationPermission: () => Promise<boolean>;
   notificationPermission: NotificationPermission;
   notifiedReminders: string[];
-  markAsNotified: (reminderId: string) => void;
   clearNotifiedReminders: () => void;
+  isWsConnected: boolean;
 }
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
@@ -27,8 +26,10 @@ interface NotificationProviderProps {
   children: ReactNode;
 }
 
+const WS_BASE_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8080';
+const MAX_RECONNECT_DELAY_MS = 30000;
+
 export const NotificationProvider: React.FC<NotificationProviderProps> = ({ children }) => {
-  const { allReminders } = useReminders();
   const { toast } = useToast();
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>(
     typeof window !== 'undefined' ? Notification.permission : 'default'
@@ -40,6 +41,12 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
     }
     return [];
   });
+  const [isWsConnected, setIsWsConnected] = useState(false);
+
+  const wsRef = useRef<WebSocket | null>(null);
+  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reconnectDelayRef = useRef(1000);
+  const isUnmountedRef = useRef(false);
 
   const requestNotificationPermission = useCallback(async (): Promise<boolean> => {
     if ('Notification' in window) {
@@ -55,123 +62,111 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
     return false;
   }, []);
 
-  const markAsNotified = useCallback((reminderId: string) => {
-    setNotifiedReminders(prev => {
-      const newNotified = [...prev, reminderId];
-      localStorage.setItem('notifiedReminders', JSON.stringify(newNotified));
-      return newNotified;
-    });
-  }, []);
-
   const clearNotifiedReminders = useCallback(() => {
     setNotifiedReminders([]);
     localStorage.setItem('notifiedReminders', JSON.stringify([]));
   }, []);
 
-  const showReminderNotification = useCallback((reminder: Reminder) => {
-    const now = new Date();
-    const showDateTime = new Date(`${reminder.show_date}T${reminder.show_start_time}`);
-    const reminderTime = new Date(showDateTime.getTime() - (reminder.reminder_minutes_before * 60 * 1000));
-    
-    const minutesUntilShow = Math.ceil((showDateTime.getTime() - now.getTime()) / (1000 * 60));
-    
+  const showReminderNotification = useCallback((notification: WebSocketNotification) => {
     toast({
-      title: "📻 Show Starting Soon!",
-      description: `${reminder.show_name} starts in ${minutesUntilShow} minute${minutesUntilShow !== 1 ? 's' : ''}`,
+      title: notification.title || '📻 Show Starting Soon!',
+      description: notification.message,
       duration: 10000,
     });
 
-    if (notificationPermission === 'granted') {
+    const currentPermission = typeof window !== 'undefined' ? Notification.permission : 'default';
+    if (currentPermission === 'granted') {
       try {
-        const notification = new Notification(`📻 ${reminder.show_name}`, {
-          body: `Starting in ${minutesUntilShow} minute${minutesUntilShow !== 1 ? 's' : ''}`,
+        const browserNotification = new Notification(`📻 ${notification.show_name}`, {
+          body: notification.message,
           icon: '/icons/icon-192x192.png',
-          tag: reminder.id,
           requireInteraction: true,
         });
-
-        notification.onclick = () => {
+        browserNotification.onclick = () => {
           window.focus();
-          notification.close();
+          browserNotification.close();
         };
       } catch (error) {
         console.error('Error showing browser notification:', error);
       }
     }
 
-    markAsNotified(reminder.id);
-  }, [notificationPermission, toast, markAsNotified]);
-
-  const checkReminders = useCallback(() => {
-    if (!allReminders.length) return;
-
-    const now = new Date();
-    
-    allReminders.forEach(reminder => {
-      if (notifiedReminders.includes(reminder.id)) return;
-
-      try {
-        const showDateTime = new Date(`${reminder.show_date}T${reminder.show_start_time}`);
-        const reminderTime = new Date(showDateTime.getTime() - (reminder.reminder_minutes_before * 60 * 1000));
-        
-        if (now >= reminderTime && now < showDateTime) {
-          showReminderNotification(reminder);
-        }
-      } catch (error) {
-        console.error('Error processing reminder:', reminder, error);
-      }
+    // Track in history for the Recent Notifications UI
+    const key = `${notification.show_name}-${notification.show_time}-${notification.timestamp}`;
+    setNotifiedReminders(prev => {
+      const newNotified = [...prev, key];
+      localStorage.setItem('notifiedReminders', JSON.stringify(newNotified));
+      return newNotified;
     });
-  }, [allReminders, notifiedReminders, showReminderNotification]);
+  }, [toast]);
 
-    useEffect(() => {
-        checkReminders();
-    }, [allReminders]);
+  const connect = useCallback(() => {
+    if (isUnmountedRef.current) return;
 
-    useEffect(() => {
-        const interval = setInterval(checkReminders, 60000);
-        return () => clearInterval(interval);
-    }, []);
+    const stored = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+    if (!stored) return;
 
-  useEffect(() => {
-    const cleanupOldNotifications = () => {
-      const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-      
-      const validReminderIds = allReminders
-        .filter(reminder => {
-          try {
-            const showDate = new Date(`${reminder.show_date}T${reminder.show_start_time}`);
-            return showDate > oneDayAgo;
-          } catch {
-            return false;
-          }
-        })
-        .map(reminder => reminder.id);
+    let userId: string;
+    try {
+      const auth = JSON.parse(stored);
+      userId = auth.userId;
+      if (!userId) return;
+    } catch {
+      return;
+    }
 
-      setNotifiedReminders(prev => {
-        const filtered = prev.filter(id => validReminderIds.includes(id));
-        if (filtered.length !== prev.length) {
-          localStorage.setItem('notifiedReminders', JSON.stringify(filtered));
-        }
-        return filtered;
-      });
+    const url = `${WS_BASE_URL}/ws?user_id=${userId}`;
+    const ws = new WebSocket(url);
+    wsRef.current = ws;
+
+    ws.onopen = () => {
+      if (isUnmountedRef.current) { ws.close(); return; }
+      setIsWsConnected(true);
+      reconnectDelayRef.current = 1000;
     };
 
-    cleanupOldNotifications();
-  }, [allReminders]);
+    ws.onmessage = (event) => {
+      try {
+        const data: WebSocketNotification = JSON.parse(event.data);
+        if (data.type === 'show_reminder') {
+          showReminderNotification(data);
+        }
+      } catch (err) {
+        console.error('[WS] Failed to parse message:', err);
+      }
+    };
+
+    ws.onclose = () => {
+      setIsWsConnected(false);
+      wsRef.current = null;
+      if (isUnmountedRef.current) return;
+      const delay = reconnectDelayRef.current;
+      reconnectDelayRef.current = Math.min(delay * 2, MAX_RECONNECT_DELAY_MS);
+      reconnectTimeoutRef.current = setTimeout(connect, delay);
+    };
+
+    ws.onerror = (err) => {
+      console.error('[WS] WebSocket error:', err);
+      ws.close();
+    };
+  }, [showReminderNotification]);
 
   useEffect(() => {
-    if (notificationPermission === 'default') {
-      // Don't automatically request permission - let user trigger it
-      // You could show a banner or button to request permission
-    }
-  }, [notificationPermission]);
+    isUnmountedRef.current = false;
+    connect();
+    return () => {
+      isUnmountedRef.current = true;
+      if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
+      if (wsRef.current) { wsRef.current.close(); wsRef.current = null; }
+    };
+  }, [connect]);
 
   const value: NotificationContextType = {
     requestNotificationPermission,
     notificationPermission,
     notifiedReminders,
-    markAsNotified,
     clearNotifiedReminders,
+    isWsConnected,
   };
 
   return (

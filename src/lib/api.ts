@@ -1,6 +1,6 @@
-import type { RadioStation, TopTag, PBSShow } from '@/lib/types';
+import type { RadioStation, TopTag, PBSShow, WebradioSearchResponse } from '@/lib/types';
 
-export async function fetchFromApi(params: Record<string, string> = {}): Promise<RadioStation[]> {
+export async function fetchFromApi(params: Record<string, string> = {}): Promise<WebradioSearchResponse> {
   const queryString = new URLSearchParams(params).toString();
   const url = `/api/webradio/search${queryString ? `?${queryString}` : ''}`;
 
@@ -11,10 +11,31 @@ export async function fetchFromApi(params: Record<string, string> = {}): Promise
   }
 
   const data = await response.json();
-  if (!Array.isArray(data)) {
-    throw new Error('Invalid response format: expected array');
+
+  // Backward-compatible parsing: older backend returned a raw array.
+  if (Array.isArray(data)) {
+    return {
+      stations: data,
+      total: data.length,
+      filters: {
+        min_bitrate: Number(params.min_bitrate ?? 0),
+        max_bitrate: Number(params.max_bitrate ?? 999999),
+        min_clicks: Number(params.min_clicks ?? 0),
+        max_clicks: Number(params.max_clicks ?? 999999999),
+        min_trend: Number(params.min_trend ?? -999999),
+        max_trend: Number(params.max_trend ?? 999999),
+        codec: params.codec || undefined,
+        country: params.country || undefined,
+        limit: Number(params.limit ?? 50),
+      },
+    };
   }
-  return data;
+
+  if (!data || !Array.isArray(data.stations)) {
+    throw new Error('Invalid response format: expected { stations, total, filters }');
+  }
+
+  return data as WebradioSearchResponse;
 }
 
 export async function getTopStations(): Promise<RadioStation[]> {
@@ -94,6 +115,7 @@ export async function fetchPBSShowsByDateRange(days: number = 7): Promise<PBSSho
     end_date: endDate.toISOString().split('T')[0]
   });
 
+  // Frontend calls the Next.js API proxy route; proxy forwards to backend /pbs/shows/range.
   const response = await fetch(`/api/pbs/shows/range?${params}`);
   if (!response.ok) {
     const errorText = await response.text();
@@ -101,13 +123,15 @@ export async function fetchPBSShowsByDateRange(days: number = 7): Promise<PBSSho
   }
 
   const data = await response.json();
-  
-  if (!Array.isArray(data)) {
+
+  const shows = Array.isArray(data) ? data : data?.shows;
+
+  if (!Array.isArray(shows)) {
     console.error('Unexpected API response format:', data);
     throw new Error('Invalid response format from PBS shows endpoint');
   }
-  
-  return data;
+
+  return shows;
 }
 
 export async function createReminder(reminderData: {

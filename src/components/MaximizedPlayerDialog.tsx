@@ -19,21 +19,15 @@ interface MaximizedPlayerDialogProps {
 
 export function MaximizedPlayerDialog({ station }: MaximizedPlayerDialogProps) {
   const player = usePlayer();
+  const streamUrl = station.url_resolved || station.url;
   // isLoading and error states might need to be mirrored from RadioPlayer or context if they are specific to playback attempts.
   // For simplicity, we'll rely on context's isPlaying for now.
   const [lastVolumeBeforeMute, setLastVolumeBeforeMute] = React.useState(player.volume);
 
 
   const togglePlayPause = useCallback(() => {
-    // This action should be handled by the main RadioPlayer's audio element via context changes.
-    // The main RadioPlayer component should already have an effect listening to player.isPlaying.
-    // For direct control if needed (e.g. if main RadioPlayer is not guaranteed to be in sync):
-    // We expect the main audio element in RadioPlayer.tsx to react to player.setIsPlaying.
-     if (player.isPlaying) {
-        player.setIsPlaying(false); // Request pause
-    } else {
-        player.setIsPlaying(true); // Request play
-    }
+    if (!streamUrl) return;
+    player.togglePlayback();
   }, [player]);
 
   const handleVolumeChange = useCallback((newVolume: number[]) => {
@@ -71,7 +65,7 @@ export function MaximizedPlayerDialog({ station }: MaximizedPlayerDialogProps) {
       <DialogContent className="sm:max-w-2xl md:max-w-3xl lg:max-w-4xl p-0 overflow-hidden data-[state=open]:min-h-[70vh] flex flex-col">
         <div className="relative h-60 sm:h-80 md:h-96 w-full">
           <Image
-            src={station.faviconUrl || `https://placehold.co/1200x800.png`}
+            src={station.favicon || `https://placehold.co/1200x800.png`}
             alt={`${station.name} artwork`}
             layout="fill"
             objectFit="cover"
@@ -111,7 +105,7 @@ export function MaximizedPlayerDialog({ station }: MaximizedPlayerDialogProps) {
                 variant="outline" 
                 size="icon" 
                 className="w-16 h-16 rounded-full border-2 border-primary hover:bg-primary/10"
-                disabled={!station.streamUrl /* || player.isLoading - if isLoading is in context */}
+                disabled={!streamUrl /* || player.isLoading - if isLoading is in context */}
               >
                 {/* {player.isLoading ? <Loader2 className="h-8 w-8 animate-spin text-primary" /> : player.isPlaying ? <Pause className="h-8 w-8 text-primary" /> : <Play className="h-8 w-8 text-primary" />} */}
                  {player.isPlaying ? <Pause className="h-8 w-8 text-primary" /> : <Play className="h-8 w-8 text-primary" />}
@@ -139,8 +133,8 @@ export function MaximizedPlayerDialog({ station }: MaximizedPlayerDialogProps) {
         </div>
 
         <DialogFooter className="p-6 border-t items-center justify-between sm:justify-between">
-           <Button variant="ghost" asChild className="text-sm">
-              <a href={station.streamUrl} target="_blank" rel="noopener noreferrer" aria-label="Open stream URL">
+           <Button variant="ghost" asChild className="text-sm" disabled={!streamUrl}>
+              <a href={streamUrl} target="_blank" rel="noopener noreferrer" aria-label="Open stream URL">
                 <ExternalLink className="mr-2 h-4 w-4" /> Open Stream
               </a>
             </Button>

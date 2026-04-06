@@ -4,7 +4,7 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const apiHost = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://backend:8080';
+  const apiHost = process.env.API_BASE_URL || 'http://backend:8080';
   const token = request.cookies.get('token')?.value || 
                 request.headers.get('Authorization')?.replace('Bearer ', '');
 

@@ -1,7 +1,7 @@
 import type { NextRequest } from 'next/server';
 
 export async function GET(request: NextRequest) {
-  const apiHost = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://backend:8080';
+  const apiHost = process.env.API_BASE_URL || 'http://backend:8080';
   const { searchParams } = new URL(request.url);
   
   const queryString = searchParams.toString();

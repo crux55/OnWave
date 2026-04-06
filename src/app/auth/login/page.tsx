@@ -38,6 +38,11 @@ const registerFormSchema = z.object({
 });
 type RegisterFormValues = z.infer<typeof registerFormSchema>;
 
+const getAuthApiBaseUrl = () => {
+  const rawBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080';
+  return rawBaseUrl.endsWith('/') ? rawBaseUrl.slice(0, -1) : rawBaseUrl;
+};
+
 
 export default function LoginPage() {
   const router = useRouter();
@@ -84,7 +89,8 @@ export default function LoginPage() {
     const handleRegister = async (data: RegisterFormValues) => {
     setRegisterMessage("");
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/users`, {
+      const apiBaseUrl = getAuthApiBaseUrl();
+      const res = await fetch(`${apiBaseUrl}/users`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
@@ -107,7 +113,8 @@ export default function LoginPage() {
   const handleLogin = async (data: SignInFormValues) => {
     setLoginMessage("");
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/users/login`, {
+      const apiBaseUrl = getAuthApiBaseUrl();
+      const res = await fetch(`${apiBaseUrl}/users/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),

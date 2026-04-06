@@ -1,7 +1,7 @@
 import type { NextRequest } from 'next/server';
 
 export async function GET(request: NextRequest) {
-  const apiHost = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://backend:8080';
+  const apiHost = process.env.API_BASE_URL || 'http://backend:8080';
 
   try {
     const response = await fetch(`${apiHost}/webradio/toptags`);

@@ -10,6 +10,7 @@ interface PlayerContextType {
   closePlayerBar: () => void;
   isPlaying: boolean;
   setIsPlaying: (playing: boolean) => void;
+  togglePlayback: () => void;
   isPlayerMinimized: boolean;
   togglePlayerSize: () => void;
   isMaximizedViewOpen: boolean;
@@ -53,6 +54,10 @@ export const PlayerProvider = ({ children }: { children: ReactNode }) => {
     setIsPlayingState(playing);
   }, []);
 
+  const togglePlayback = useCallback(() => {
+    setIsPlayingState(prev => !prev);
+  }, []);
+
   const togglePlayerSize = useCallback(() => {
     if (isPlayerBarOpen) {
       setIsPlayerMinimized(prev => !prev);
@@ -88,6 +93,7 @@ export const PlayerProvider = ({ children }: { children: ReactNode }) => {
       closePlayerBar, 
       isPlaying, 
       setIsPlaying, 
+      togglePlayback,
       isPlayerMinimized, 
       togglePlayerSize,
       isMaximizedViewOpen,

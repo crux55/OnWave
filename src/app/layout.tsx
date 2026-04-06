@@ -103,10 +103,10 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
       </main>
 
       {/* Radio Player */}
-      {player.isPlayerBarOpen && player.currentStation && !player.isMaximizedViewOpen && (
+      {player.isPlayerBarOpen && player.currentStation && (
         <RadioPlayer 
           station={player.currentStation} 
-          className="bottom-0"
+          className={player.isMaximizedViewOpen ? "bottom-0 invisible pointer-events-none" : "bottom-0"}
         />
       )}
       

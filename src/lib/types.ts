@@ -1,5 +1,3 @@
-import { string } from "zod";
-
 export interface RadioStation {
   stationuuid: string;
   name: string;
@@ -36,6 +34,24 @@ export interface RadioStation {
   iso_3166_2: string;
   hls: number;
 };
+
+export interface WebradioSearchFilters {
+  min_bitrate: number;
+  max_bitrate: number;
+  min_clicks: number;
+  max_clicks: number;
+  min_trend: number;
+  max_trend: number;
+  codec?: string;
+  country?: string;
+  limit: number;
+}
+
+export interface WebradioSearchResponse {
+  stations: RadioStation[];
+  total: number;
+  filters: WebradioSearchFilters;
+}
 
 export type TopTag = {
   name: string;
@@ -123,12 +139,12 @@ export interface Reminder {
 }
 
 export interface WebSocketNotification {
-  type: 'reminder';
+  type: 'show_reminder';
+  title: string;
   message: string;
   show_name: string;
-  show_date: string;
-  show_start_time: string;
-  minutes_until_show: number;
+  show_time: string;
+  timestamp: string;
 }
 
 export interface ReminderNotification {
