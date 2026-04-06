@@ -1,4 +1,4 @@
-import type { RadioStation, TopTag, PBSShow, WebradioSearchResponse } from '@/lib/types';
+import type { RadioStation, TopTag, PBSShow, WebradioSearchResponse, TopStationsResponse } from '@/lib/types';
 
 export async function fetchFromApi(params: Record<string, string> = {}): Promise<WebradioSearchResponse> {
   const queryString = new URLSearchParams(params).toString();
@@ -38,7 +38,7 @@ export async function fetchFromApi(params: Record<string, string> = {}): Promise
   return data as WebradioSearchResponse;
 }
 
-export async function getTopStations(): Promise<RadioStation[]> {
+export async function getTopStationsGrouped(): Promise<TopStationsResponse> {
   const response = await fetch('/api/webradio/top');
   if (!response.ok) {
     const errorText = await response.text();
@@ -46,10 +46,40 @@ export async function getTopStations(): Promise<RadioStation[]> {
   }
 
   const data = await response.json();
-  if (!Array.isArray(data)) {
-    throw new Error('Invalid response format: expected array');
+
+  // New grouped response
+  if (data && typeof data === 'object' && !Array.isArray(data)) {
+    return {
+      featured: Array.isArray(data.featured) ? data.featured : [],
+      popular: Array.isArray(data.popular) ? data.popular : [],
+      trending: Array.isArray(data.trending) ? data.trending : [],
+      random: Array.isArray(data.random) ? data.random : [],
+    };
   }
-  return data;
+
+  // Legacy flat-array fallback: distribute evenly across categories
+  if (Array.isArray(data)) {
+    const chunk = Math.ceil(data.length / 4);
+    return {
+      featured: data.slice(0, chunk),
+      popular: data.slice(chunk, chunk * 2),
+      trending: data.slice(chunk * 2, chunk * 3),
+      random: data.slice(chunk * 3),
+    };
+  }
+
+  throw new Error('Invalid response format from /api/webradio/top');
+}
+
+/** @deprecated Use getTopStationsGrouped(). Kept for legacy sort helpers. */
+export async function getTopStations(): Promise<RadioStation[]> {
+  const grouped = await getTopStationsGrouped();
+  return [
+    ...grouped.featured,
+    ...grouped.popular,
+    ...grouped.trending,
+    ...grouped.random,
+  ];
 }
 
 export async function fetchTopTags(): Promise<TopTag[]> {
@@ -135,40 +165,22 @@ export async function fetchHomePageSections(): Promise<{
   discover: RadioStation[];
   discoverGenre: string;
 }> {
-  const topStations = (await getTopStations()).filter(isQualityStation);
-  const seen = new Set<string>();
+  const grouped = await getTopStationsGrouped();
 
-  const pickUnique = (sorted: RadioStation[], n: number): RadioStation[] => {
-    const result: RadioStation[] = [];
-    for (const s of sorted) {
-      if (!seen.has(s.stationuuid)) {
-        seen.add(s.stationuuid);
-        result.push(s);
-        if (result.length >= n) break;
-      }
-    }
-    return result;
-  };
+  // Use the backend's pre-sorted, pre-deduplicated categories directly.
+  // Slice to 4 cards per section; fall back gracefully if a category is empty.
+  const featured = grouped.featured.slice(0, 4);
+  const popular = grouped.popular.slice(0, 4);
+  const trending = grouped.trending.slice(0, 4);
 
-  // Editor's picks: highest community votes (active approval, not just passive listens)
-  const featured = pickUnique(
-    [...topStations].sort((a, b) => b.votes - a.votes),
-    4
-  );
+  // Collect IDs already shown so Discover doesn't repeat them
+  const seen = new Set<string>([
+    ...featured.map(s => s.stationuuid),
+    ...popular.map(s => s.stationuuid),
+    ...trending.map(s => s.stationuuid),
+  ]);
 
-  // Most listened: highest all-time click count
-  const popular = pickUnique(
-    [...topStations].sort((a, b) => b.clickcount - a.clickcount),
-    4
-  );
-
-  // Trending: fastest growing right now (positive trend only)
-  const trending = pickUnique(
-    [...topStations].filter(s => s.clicktrend > 0).sort((a, b) => b.clicktrend - a.clicktrend),
-    4
-  );
-
-  // Discover: pull a random genre from a broad list via the search API
+  // Discover: try a random genre first, fall back to backend's random category
   const genre = DISCOVER_GENRES[Math.floor(Math.random() * DISCOVER_GENRES.length)];
   let discoverPool: RadioStation[] = [];
   try {
@@ -177,8 +189,8 @@ export async function fetchHomePageSections(): Promise<{
       .filter(isQualityStation)
       .filter(s => !seen.has(s.stationuuid));
   } catch {
-    // Fallback: shuffle the remaining top stations
-    discoverPool = topStations.filter(s => !seen.has(s.stationuuid));
+    // Fallback: use the backend's random category, excluding already-shown stations
+    discoverPool = grouped.random.filter(s => !seen.has(s.stationuuid));
   }
 
   return {

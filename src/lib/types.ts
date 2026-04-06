@@ -5,6 +5,7 @@ export interface RadioStation {
   url_resolved: string;
   homepage: string;
   favicon: string;
+  has_valid_favicon: boolean;
   tags: string;
   country: string;
   countrycode: string;
@@ -34,6 +35,13 @@ export interface RadioStation {
   iso_3166_2: string;
   hls: number;
 };
+
+export interface TopStationsResponse {
+  featured: RadioStation[];
+  popular: RadioStation[];
+  trending: RadioStation[];
+  random: RadioStation[];
+}
 
 export interface WebradioSearchFilters {
   min_bitrate: number;

@@ -26,7 +26,7 @@ interface NotificationProviderProps {
   children: ReactNode;
 }
 
-const WS_BASE_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost';
+const WS_BASE_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost/ws';
 const MAX_RECONNECT_DELAY_MS = 30000;
 
 export const NotificationProvider: React.FC<NotificationProviderProps> = ({ children }) => {
@@ -115,7 +115,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
       return;
     }
 
-    const url = `${WS_BASE_URL}/ws?user_id=${userId}`;
+    const url = `${WS_BASE_URL}?user_id=${userId}`;
     const ws = new WebSocket(url);
     wsRef.current = ws;
 

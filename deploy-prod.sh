@@ -21,6 +21,7 @@ echo "📦 Building production images..."
 docker build -f Dockerfile.production \
   --no-cache \
   --build-arg NEXT_PUBLIC_API_BASE_URL=${API_BASE_URL} \
+  --build-arg NEXT_PUBLIC_WS_URL=${NEXT_PUBLIC_WS_URL} \
   -t onwave-frontend:latest .
 
 # Build backend if needed (uncomment if you want to rebuild)

@@ -5,7 +5,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const response = await fetch(`${apiHost}/webradio/top`);
-    
+
     if (!response.ok) {
       const errorText = await response.text();
       return Response.json(
@@ -15,11 +15,17 @@ export async function GET(request: NextRequest) {
     }
 
     const data = await response.json();
-    
-    if (!Array.isArray(data)) {
+
+    // Accept grouped object { featured, popular, trending, random } or legacy flat array
+    const isGrouped =
+      data && typeof data === 'object' && !Array.isArray(data) &&
+      ('featured' in data || 'popular' in data || 'trending' in data || 'random' in data);
+    const isLegacyArray = Array.isArray(data);
+
+    if (!isGrouped && !isLegacyArray) {
       console.error('Invalid response format from /webradio/top:', data);
       return Response.json(
-        { error: 'Invalid response format: expected array' },
+        { error: 'Invalid response format: expected grouped object or array' },
         { status: 500 }
       );
     }
