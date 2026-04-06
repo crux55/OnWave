@@ -1,13 +1,14 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { fetchTopTags } from '@/lib/api';
+import React, { useState, useEffect, useCallback } from 'react';
+import { fetchTopTags, fetchHomePageSections, fetchDiscoverSection } from '@/lib/api';
 import type { RadioStation, TopTag } from '@/lib/types';
 import { RadioStationCard } from '@/components/RadioStationCard';
 import { usePlayer } from '@/contexts/PlayerContext';
-import { Music, Disc3, Radio, Coffee } from 'lucide-react'; // Example icons
-import { sortStationsByClickTrend, fetchStationByBitRate, sortStationsByListeners, fetchStationByRandom } from '@/lib/api';
+import { Music, Disc3, TrendingUp, RefreshCw, Sparkles, Shuffle } from 'lucide-react';
 import Link from 'next/link';
+import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface StationSectionProps {
   title: string;
@@ -15,16 +16,43 @@ interface StationSectionProps {
   onPlay: (station: RadioStation) => void;
   icon?: React.ElementType;
   emptyMessage?: string;
+  action?: React.ReactNode;
+  isLoading?: boolean;
 }
 
-const StationSection: React.FC<StationSectionProps> = ({ title, stations, onPlay, icon: Icon, emptyMessage = "No stations available in this section right now." }) => {
+const StationSection: React.FC<StationSectionProps> = ({
+  title, stations, onPlay, icon: Icon,
+  emptyMessage = 'No stations available in this section right now.',
+  action,
+  isLoading = false,
+}) => {
+  const header = (
+    <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center">
+        {Icon && <Icon className="h-7 w-7 text-accent mr-3" />}
+        <h2 className="text-3xl font-semibold tracking-tight text-foreground">{title}</h2>
+      </div>
+      {action}
+    </div>
+  );
+
+  if (isLoading) {
+    return (
+      <section className="mb-12">
+        {header}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-48 w-full rounded-xl" />
+          ))}
+        </div>
+      </section>
+    );
+  }
+
   if (!stations || stations.length === 0) {
     return (
       <section className="mb-12">
-        <div className="flex items-center mb-6">
-          {Icon && <Icon className="h-7 w-7 text-accent mr-3" />}
-          <h2 className="text-3xl font-semibold tracking-tight text-foreground">{title}</h2>
-        </div>
+        {header}
         <p className="text-muted-foreground">{emptyMessage}</p>
       </section>
     );
@@ -32,10 +60,7 @@ const StationSection: React.FC<StationSectionProps> = ({ title, stations, onPlay
 
   return (
     <section className="mb-12">
-      <div className="flex items-center mb-6">
-        {Icon && <Icon className="h-7 w-7 text-accent mr-3" />}
-        <h2 className="text-3xl font-semibold tracking-tight text-foreground">{title}</h2>
-      </div>
+      {header}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
         {stations.map(station => (
           <RadioStationCard
@@ -53,31 +78,47 @@ export default function HomePage() {
   const [featuredStations, setFeaturedStations] = useState<RadioStation[]>([]);
   const [mostListens, setMostListens] = useState<RadioStation[]>([]);
   const [trending, setTrending] = useState<RadioStation[]>([]);
-  const [randomiser, setRandomiser] = useState<RadioStation[]>([]);
+  const [discoverStations, setDiscoverStations] = useState<RadioStation[]>([]);
+  const [discoverGenre, setDiscoverGenre] = useState<string>('');
   const [topTags, setTopTags] = useState<TopTag[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isShuffling, setIsShuffling] = useState(false);
   const player = usePlayer();
 
   useEffect(() => {
-    const fetchStations = async () => {
+    const load = async () => {
+      setIsLoading(true);
       try {
-        const [featured, popular, trending, random, tags] = await Promise.all([
-          fetchStationByBitRate({ term: 'LoFi' }).then(stations => stations.slice(0, 4)),
-          sortStationsByListeners({ term: 'LoFi' }).then(stations => stations.slice(0, 4)),
-          sortStationsByClickTrend({ term: 'LoFi' }).then(stations => stations.slice(0, 4)),
-          fetchStationByRandom({ term: 'LoFi' }).then(stations => stations.slice(0, 4)),
-          fetchTopTags()
+        const [sections, tags] = await Promise.all([
+          fetchHomePageSections(),
+          fetchTopTags(),
         ]);
-
-        setFeaturedStations(featured);
-        setMostListens(popular);
-        setTrending(trending);
-        setRandomiser(random);
+        setFeaturedStations(sections.featured);
+        setMostListens(sections.popular);
+        setTrending(sections.trending);
+        setDiscoverStations(sections.discover);
+        setDiscoverGenre(sections.discoverGenre);
         setTopTags(tags);
       } catch (error) {
-        console.error('Error fetching stations or tags:', error);}
+        console.error('Error loading home page:', error);
+      } finally {
+        setIsLoading(false);
+      }
     };
+    load();
+  }, []);
 
-    fetchStations();
+  const handleShuffle = useCallback(async () => {
+    setIsShuffling(true);
+    try {
+      const result = await fetchDiscoverSection();
+      setDiscoverStations(result.stations);
+      setDiscoverGenre(result.genre);
+    } catch (error) {
+      console.error('Shuffle failed:', error);
+    } finally {
+      setIsShuffling(false);
+    }
   }, []);
 
   const handlePlayStation = (station: RadioStation) => {
@@ -114,34 +155,51 @@ export default function HomePage() {
       )}
 
       <StationSection
-        title="Featured Stations"
+        title="Editor's Picks"
         stations={featuredStations}
         onPlay={handlePlayStation}
-        icon={Radio}
+        icon={Sparkles}
+        isLoading={isLoading}
+        emptyMessage="No featured stations available right now."
       />
 
       <StationSection
-        title="Popular Stations"
+        title="Most Listened"
         stations={mostListens}
         onPlay={handlePlayStation}
         icon={Disc3}
-        emptyMessage="No popular stations available right now. Chill to something else?"
+        isLoading={isLoading}
+        emptyMessage="No popular stations available right now."
       />
 
       <StationSection
-        title="Trending Stations"
+        title="Trending Now"
         stations={trending}
         onPlay={handlePlayStation}
-        icon={Music}
-        emptyMessage="No trending stations available right now. Chill to something else?"
+        icon={TrendingUp}
+        isLoading={isLoading}
+        emptyMessage="No trending stations right now. Check back later!"
       />
-      
+
       <StationSection
-        title="Random Stations"
-        stations={randomiser}
+        title={discoverGenre ? `Discover: ${discoverGenre.charAt(0).toUpperCase() + discoverGenre.slice(1)}` : 'Discover'}
+        stations={discoverStations}
         onPlay={handlePlayStation}
-        icon={Coffee}
-        emptyMessage="The randomizer is taking a break. Check back later for more stations!"
+        icon={Shuffle}
+        isLoading={isLoading}
+        emptyMessage="Nothing to discover right now. Try shuffling!"
+        action={
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleShuffle}
+            disabled={isShuffling || isLoading}
+            className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground"
+          >
+            <RefreshCw className={`h-4 w-4 ${isShuffling ? 'animate-spin' : ''}`} />
+            Shuffle
+          </Button>
+        }
       />
     </div>
   );

@@ -105,6 +105,108 @@ export async function fetchStationByRandom(params: Record<string, string> = {}):
   return stations.sort(() => Math.random() - 0.5);
 }
 
+// ---------- Home page section helpers ----------
+
+const DISCOVER_GENRES = [
+  'jazz', 'classical', 'electronic', 'ambient', 'chill', 'lofi',
+  'rock', 'indie', 'pop', 'news', 'hip hop', 'country', 'metal',
+  'reggae', 'soul', 'blues', 'folk', 'dance', 'techno', 'house',
+  'drum and bass', 'world', 'latin', 'funk',
+];
+
+function isQualityStation(station: RadioStation): boolean {
+  // Accept streams with no bitrate metadata (0) or at least 64 kbps, and recently verified online
+  return station.lastcheckok === 1 && (station.bitrate === 0 || station.bitrate >= 64);
+}
+
+function fisherYatesShuffle<T>(arr: T[]): T[] {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+export async function fetchHomePageSections(): Promise<{
+  featured: RadioStation[];
+  popular: RadioStation[];
+  trending: RadioStation[];
+  discover: RadioStation[];
+  discoverGenre: string;
+}> {
+  const topStations = (await getTopStations()).filter(isQualityStation);
+  const seen = new Set<string>();
+
+  const pickUnique = (sorted: RadioStation[], n: number): RadioStation[] => {
+    const result: RadioStation[] = [];
+    for (const s of sorted) {
+      if (!seen.has(s.stationuuid)) {
+        seen.add(s.stationuuid);
+        result.push(s);
+        if (result.length >= n) break;
+      }
+    }
+    return result;
+  };
+
+  // Editor's picks: highest community votes (active approval, not just passive listens)
+  const featured = pickUnique(
+    [...topStations].sort((a, b) => b.votes - a.votes),
+    4
+  );
+
+  // Most listened: highest all-time click count
+  const popular = pickUnique(
+    [...topStations].sort((a, b) => b.clickcount - a.clickcount),
+    4
+  );
+
+  // Trending: fastest growing right now (positive trend only)
+  const trending = pickUnique(
+    [...topStations].filter(s => s.clicktrend > 0).sort((a, b) => b.clicktrend - a.clicktrend),
+    4
+  );
+
+  // Discover: pull a random genre from a broad list via the search API
+  const genre = DISCOVER_GENRES[Math.floor(Math.random() * DISCOVER_GENRES.length)];
+  let discoverPool: RadioStation[] = [];
+  try {
+    const result = await fetchFromApi({ term: genre, limit: '60', min_bitrate: '64' });
+    discoverPool = result.stations
+      .filter(isQualityStation)
+      .filter(s => !seen.has(s.stationuuid));
+  } catch {
+    // Fallback: shuffle the remaining top stations
+    discoverPool = topStations.filter(s => !seen.has(s.stationuuid));
+  }
+
+  return {
+    featured,
+    popular,
+    trending,
+    discover: fisherYatesShuffle(discoverPool).slice(0, 4),
+    discoverGenre: genre,
+  };
+}
+
+export async function fetchDiscoverSection(): Promise<{
+  stations: RadioStation[];
+  genre: string;
+}> {
+  const genre = DISCOVER_GENRES[Math.floor(Math.random() * DISCOVER_GENRES.length)];
+  try {
+    const result = await fetchFromApi({ term: genre, limit: '60', min_bitrate: '64' });
+    const filtered = result.stations.filter(isQualityStation);
+    return {
+      stations: fisherYatesShuffle(filtered).slice(0, 4),
+      genre,
+    };
+  } catch {
+    return { stations: [], genre };
+  }
+}
+
 export async function fetchPBSShowsByDateRange(days: number = 7): Promise<PBSShow[]> {
   const startDate = new Date();
   const endDate = new Date();
