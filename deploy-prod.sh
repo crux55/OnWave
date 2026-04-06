@@ -19,13 +19,14 @@ source .env.production
 # Build production images
 echo "📦 Building production images..."
 docker build -f Dockerfile.production \
+  --no-cache \
   --build-arg NEXT_PUBLIC_API_BASE_URL=${API_BASE_URL} \
   -t onwave-frontend:latest .
 
 # Build backend if needed (uncomment if you want to rebuild)
 cd /home/andru/Code/Go/project_r
 echo "📦 Building backend..."
-docker build -t onwave-backend:latest .
+docker build --no-cache -t onwave-backend:latest .
 cd /home/andru/Code/React/OnWave
 
 # Stop existing containers
@@ -40,7 +41,7 @@ docker-compose -f docker-compose.prod.yml --env-file .env.production down
 # Start production services
 echo "🎯 Starting production services..."
 export COMPOSE_HTTP_TIMEOUT=300
-docker-compose -f docker-compose.prod.yml --env-file .env.production up -d
+docker-compose -f docker-compose.prod.yml --env-file .env.production up -d --force-recreate
 
 # Wait for services to start
 echo "⏳ Waiting for services to start..."
