@@ -55,8 +55,9 @@ echo "📋 Recent logs:"
 docker-compose -f docker-compose.prod.yml --env-file .env.production logs --tail=50
 
 echo "✅ Production deployment complete!"
-echo "🌐 Frontend: http://192.168.1.110"
-echo "🔧 API: http://192.168.1.110:8080"
+echo "🌐 App:  http://192.168.1.110"
+echo "🔧 API:  http://192.168.1.110/api"
+echo "🔔 WS:   ws://192.168.1.110/ws"
 echo ""
 echo "To view logs: docker-compose -f docker-compose.prod.yml logs -f"
 echo "To stop: docker-compose -f docker-compose.prod.yml down"
