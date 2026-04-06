@@ -118,6 +118,7 @@ export default function ProfilePage() {
     setIsLoggingOut(true);
     try {
       localStorage.removeItem('token');
+      window.dispatchEvent(new Event('authChange'));
       setUserProfile(null);
       toast({
         title: 'Logged Out',

@@ -26,7 +26,7 @@ interface NotificationProviderProps {
   children: ReactNode;
 }
 
-const WS_BASE_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8080';
+const WS_BASE_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost';
 const MAX_RECONNECT_DELAY_MS = 30000;
 
 export const NotificationProvider: React.FC<NotificationProviderProps> = ({ children }) => {
@@ -145,17 +145,35 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
       reconnectTimeoutRef.current = setTimeout(connect, delay);
     };
 
-    ws.onerror = (err) => {
-      console.error('[WS] WebSocket error:', err);
-      ws.close();
+    ws.onerror = () => {
+      // onerror is always followed by onclose which handles reconnect;
+      // logging the Event object directly shows {} because its props aren't enumerable.
+      console.warn('[WS] WebSocket connection error — reconnecting automatically');
     };
   }, [showReminderNotification]);
 
   useEffect(() => {
     isUnmountedRef.current = false;
     connect();
+
+    const handleAuthChange = () => {
+      const hasToken = !!localStorage.getItem('token');
+      if (hasToken) {
+        // Connect if not already open or connecting
+        if (!wsRef.current) connect();
+      } else {
+        // Logged out — cancel pending reconnect and close socket
+        if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
+        if (wsRef.current) { wsRef.current.close(); wsRef.current = null; }
+        setIsWsConnected(false);
+      }
+    };
+
+    window.addEventListener('authChange', handleAuthChange);
+
     return () => {
       isUnmountedRef.current = true;
+      window.removeEventListener('authChange', handleAuthChange);
       if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
       if (wsRef.current) { wsRef.current.close(); wsRef.current = null; }
     };

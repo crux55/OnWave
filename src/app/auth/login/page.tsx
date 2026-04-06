@@ -38,10 +38,7 @@ const registerFormSchema = z.object({
 });
 type RegisterFormValues = z.infer<typeof registerFormSchema>;
 
-const getAuthApiBaseUrl = () => {
-  const rawBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080';
-  return rawBaseUrl.endsWith('/') ? rawBaseUrl.slice(0, -1) : rawBaseUrl;
-};
+
 
 
 export default function LoginPage() {
@@ -89,8 +86,7 @@ export default function LoginPage() {
     const handleRegister = async (data: RegisterFormValues) => {
     setRegisterMessage("");
     try {
-      const apiBaseUrl = getAuthApiBaseUrl();
-      const res = await fetch(`${apiBaseUrl}/users`, {
+      const res = await fetch('/api/users', {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
@@ -113,15 +109,14 @@ export default function LoginPage() {
   const handleLogin = async (data: SignInFormValues) => {
     setLoginMessage("");
     try {
-      const apiBaseUrl = getAuthApiBaseUrl();
-      const res = await fetch(`${apiBaseUrl}/users/login`, {
+      const res = await fetch('/api/users/login', {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
       if (res.ok) {
         const result = await res.json();
-        setLoginMessage(`Login successful! User ID: ${result.userId}`);
+        setLoginMessage(`Login successful! User ID: ${result.displayName || result.email}`);
         return { user: result }; // mimic userCredential for onSignInSubmit
       } else {
         const err = await res.text();
@@ -141,6 +136,7 @@ export default function LoginPage() {
       const user = userCredential.user;
       console.log('Logged in user:', user);
       localStorage.setItem('token', JSON.stringify(user));
+      window.dispatchEvent(new Event('authChange'));
       
       // Preload reminders after successful login
       try {

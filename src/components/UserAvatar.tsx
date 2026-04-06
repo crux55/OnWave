@@ -27,18 +27,30 @@ export function UserAvatar() {
             setCurrentUser({
               id: authData.userId || authData.id,
               email: authData.email || authData.user?.email || '',
-              displayName: authData.displayName || authData.user?.displayName,
+              displayName: authData.displayName || authData.username || authData.user?.displayName,
               photoURL: authData.photoURL || authData.user?.photoURL
             });
+          } else {
+            setCurrentUser(null);
           }
+        } else {
+          setCurrentUser(null);
         }
       } catch (error) {
         localStorage.removeItem('token');
+        setCurrentUser(null);
       }
       setIsLoading(false);
     };
 
     checkAuth();
+    window.addEventListener('authChange', checkAuth);
+    window.addEventListener('storage', checkAuth);
+
+    return () => {
+      window.removeEventListener('authChange', checkAuth);
+      window.removeEventListener('storage', checkAuth);
+    };
   }, []);
 
   if (isLoading) {
