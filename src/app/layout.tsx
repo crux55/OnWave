@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Home, Search, Wand2, UserCircle2, ListMusic, Bell, Radio } from 'lucide-react';
+import { Sora, Manrope } from 'next/font/google';
 import React from 'react';
 
 import './globals.css';
@@ -17,6 +18,9 @@ import { NotificationProvider } from '@/contexts/NotificationContext';
 import { Toaster } from '@/components/ui/toaster';
 import { cn } from '@/lib/utils';
 
+const sora = Sora({ subsets: ['latin'], weight: ['500', '600', '700'], variable: '--font-sora' });
+const manrope = Manrope({ subsets: ['latin'], weight: ['400', '500', '600'], variable: '--font-manrope' });
+
 const navItems = [
   { href: '/', label: 'Home', icon: Home },
   { href: '/search', label: 'Search', icon: Search },
@@ -27,10 +31,10 @@ const navItems = [
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" className={`${sora.variable} ${manrope.variable}`}>
       <head>
         <link rel="manifest" href="/manifest.json" />
-        <meta name="theme-color" content="#7000A8" />
+        <meta name="theme-color" content="#0A0A12" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
@@ -61,13 +65,13 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
         <div className="flex items-center gap-4">
           <AppLogo iconOnly={false} />
         </div>
-        <nav className="hidden sm:flex items-center gap-2">
+        <nav className="hidden sm:flex items-center gap-1 rounded-full border border-border bg-card/40 p-1">
           {navItems.map((item) => (
             <Button
               key={item.href}
               variant={pathname === item.href ? 'secondary' : 'ghost'}
               asChild
-              className="text-sm"
+              className="rounded-full text-sm"
             >
               <Link href={item.href}>
                 <item.icon className="mr-2 h-4 w-4" />

@@ -4,89 +4,88 @@
 @tailwind utilities;
 
 body {
-  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  font-family: var(--font-manrope), system-ui, Arial, Helvetica, sans-serif;
 }
 
 @layer base {
   :root {
-    /* Dark Theme based on user request */
-    --background: 270 30% 12%; /* Dark Purple */
-    --foreground: 330 70% 92%; /* Light Pinkish White for text */
+    /* Nightwave: neutral near-black base with a cyan/magenta accent duo */
+    --background: 240 20% 6%;
+    --foreground: 220 20% 95%;
 
-    --card: 270 25% 18%; /* Darker Purple/Grey for cards */
-    --card-foreground: 330 70% 90%;
+    --card: 240 14% 11%;
+    --card-foreground: 220 20% 95%;
 
-    --popover: 270 25% 15%; /* Darker popover */
-    --popover-foreground: 330 70% 90%;
+    --popover: 240 16% 9%;
+    --popover-foreground: 220 20% 95%;
 
-    --primary: 330 80% 60%; /* Vibrant Pink */
-    --primary-foreground: 270 30% 10%; /* Dark text for pink buttons */
+    --primary: 183 80% 58%; /* Cyan */
+    --primary-foreground: 240 20% 6%;
 
-    --secondary: 270 20% 25%; /* Muted dark purple */
-    --secondary-foreground: 330 60% 85%;
+    --secondary: 240 12% 16%;
+    --secondary-foreground: 220 15% 85%;
 
-    --muted: 270 15% 30%; /* Slightly lighter muted purple */
-    --muted-foreground: 270 15% 65%; /* Muted text */
+    --muted: 240 10% 14%;
+    --muted-foreground: 220 10% 62%;
 
-    --accent: 320 100% 55%; /* Hot Pink for accents/focus */
-    --accent-foreground: 0 0% 100%; /* White text for accent elements */
+    --accent: 183 80% 58%; /* Cyan, mirrors primary for icons/highlights */
+    --accent-foreground: 240 20% 6%;
+    --accent-2: 331 90% 62%; /* Magenta, the second half of the duo — gradients/charts only */
 
-    --destructive: 0 70% 55%; /* Adjusted for dark theme */
+    --destructive: 0 70% 55%;
     --destructive-foreground: 0 0% 98%;
 
-    --border: 270 20% 30%; /* Darker border */
-    --input: 270 20% 22%; /* Dark input background */
-    --ring: 320 100% 55%; /* Hot Pink for focus rings */
+    --border: 240 12% 18%;
+    --input: 240 12% 14%;
+    --ring: 183 80% 58%;
 
-    --chart-1: 330 80% 60%; /* Pink */
-    --chart-2: 300 70% 50%; /* Purple */
-    --chart-3: 320 90% 70%; /* Lighter Pink */
-    --chart-4: 260 60% 55%; /* Indigo */
-    --chart-5: 340 75% 65%; /* Rose */
-    --radius: 0.5rem;
+    --chart-1: 183 80% 58%;
+    --chart-2: 331 90% 62%;
+    --chart-3: 260 75% 65%;
+    --chart-4: 190 70% 70%;
+    --chart-5: 340 80% 70%;
+    --radius: 0.75rem;
 
-    /* Sidebar specific theme (keeping for completeness, though sidebar isn't primary nav) */
-    /* These might need further adjustment if a sidebar is reintroduced or used elsewhere */
-    --sidebar-background: 270 25% 16%; 
-    --sidebar-foreground: 330 60% 88%; 
-    --sidebar-primary: 330 80% 60%; 
-    --sidebar-primary-foreground: 270 30% 10%; 
-    --sidebar-accent: 320 100% 55%; 
-    --sidebar-accent-foreground: 0 0% 100%; 
-    --sidebar-border: 270 20% 25%; 
-    --sidebar-ring: 320 100% 55%; 
+    --sidebar-background: 240 16% 9%;
+    --sidebar-foreground: 220 20% 90%;
+    --sidebar-primary: 183 80% 58%;
+    --sidebar-primary-foreground: 240 20% 6%;
+    --sidebar-accent: 183 80% 58%;
+    --sidebar-accent-foreground: 240 20% 6%;
+    --sidebar-border: 240 12% 18%;
+    --sidebar-ring: 183 80% 58%;
   }
 
   .dark {
-    /* Fallback for any .dark specific styles, primarily aligns with the new base dark theme */
-    --background: 270 30% 12%;
-    --foreground: 330 70% 92%;
-    --card: 270 25% 18%;
-    --card-foreground: 330 70% 90%;
-    --popover: 270 25% 15%;
-    --popover-foreground: 330 70% 90%;
-    --primary: 330 80% 60%;
-    --primary-foreground: 270 30% 10%;
-    --secondary: 270 20% 25%;
-    --secondary-foreground: 330 60% 85%;
-    --muted: 270 15% 30%;
-    --muted-foreground: 270 15% 65%;
-    --accent: 320 100% 55%;
-    --accent-foreground: 0 0% 100%;
+    --background: 240 20% 6%;
+    --foreground: 220 20% 95%;
+    --card: 240 14% 11%;
+    --card-foreground: 220 20% 95%;
+    --popover: 240 16% 9%;
+    --popover-foreground: 220 20% 95%;
+    --primary: 183 80% 58%;
+    --primary-foreground: 240 20% 6%;
+    --secondary: 240 12% 16%;
+    --secondary-foreground: 220 15% 85%;
+    --muted: 240 10% 14%;
+    --muted-foreground: 220 10% 62%;
+    --accent: 183 80% 58%;
+    --accent-foreground: 240 20% 6%;
+    --accent-2: 331 90% 62%;
     --destructive: 0 70% 55%;
     --destructive-foreground: 0 0% 98%;
-    --border: 270 20% 30%;
-    --input: 270 20% 22%;
-    --ring: 320 100% 55%;
-    
-    --sidebar-background: 270 25% 16%;
-    --sidebar-foreground: 330 60% 88%;
-    --sidebar-primary: 330 80% 60%;
-    --sidebar-primary-foreground: 270 30% 10%;
-    --sidebar-accent: 320 100% 55%;
-    --sidebar-accent-foreground: 0 0% 100%;
-    --sidebar-border: 270 20% 25%;
-    --sidebar-ring: 320 100% 55%;
+    --border: 240 12% 18%;
+    --input: 240 12% 14%;
+    --ring: 183 80% 58%;
+
+    --sidebar-background: 240 16% 9%;
+    --sidebar-foreground: 220 20% 90%;
+    --sidebar-primary: 183 80% 58%;
+    --sidebar-primary-foreground: 240 20% 6%;
+    --sidebar-accent: 183 80% 58%;
+    --sidebar-accent-foreground: 240 20% 6%;
+    --sidebar-border: 240 12% 18%;
+    --sidebar-ring: 183 80% 58%;
   }
 }
 

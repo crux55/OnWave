@@ -5,7 +5,7 @@ import { fetchTopTags, fetchHomePageSections, fetchDiscoverSection } from '@/lib
 import type { RadioStation, TopTag } from '@/lib/types';
 import { RadioStationCard } from '@/components/RadioStationCard';
 import { usePlayer } from '@/contexts/PlayerContext';
-import { Music, Disc3, TrendingUp, RefreshCw, Sparkles, Shuffle } from 'lucide-react';
+import { Disc3, TrendingUp, RefreshCw, Sparkles, Shuffle } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -33,8 +33,8 @@ const StationSection: React.FC<StationSectionProps> = ({
   const header = (
     <div className="flex items-center justify-between mb-6">
       <div className="flex items-center">
-        {Icon && <Icon className="h-7 w-7 text-accent mr-3" />}
-        <h2 className="text-3xl font-semibold tracking-tight text-foreground">{title}</h2>
+        {Icon && <Icon className="h-5 w-5 text-accent mr-2.5" />}
+        <h2 className="font-display text-2xl font-semibold tracking-tight text-foreground">{title}</h2>
       </div>
       {action}
     </div>
@@ -134,24 +134,23 @@ export default function HomePage() {
   return (
     <div className="container mx-auto">
       <header className="mb-10 text-center">
-        <Music className="mx-auto h-16 w-16 text-primary mb-4" />
-        <h1 className="text-5xl font-bold tracking-tight text-foreground">
-          Welcome to OnWave
+        <h1 className="font-display text-5xl font-bold tracking-tight text-foreground">
+          Tune into something new.
         </h1>
         <p className="text-xl text-muted-foreground mt-3 max-w-2xl mx-auto">
-          Discover curated radio stations, explore new sounds, and find your next favorite tune.
+          Curated radio stations, discovered fresh every visit.
         </p>
       </header>
 
       {topTags.length > 0 && (
         <section className="mb-10">
-          <h2 className="text-2xl font-semibold mb-3 text-foreground">Top Tags</h2>
+          <h2 className="font-display text-2xl font-semibold mb-3 text-foreground">Top Tags</h2>
           <div className="flex flex-wrap gap-2">
             {topTags.slice(0, 30).map(tagObj => (
               <Link
                 key={tagObj.name}
                 href={`/search?search=${encodeURIComponent(tagObj.name)}`}
-                className="inline-block bg-muted text-foreground px-3 py-1 rounded-full text-sm font-medium"
+                className="inline-block rounded-full border border-border bg-card/40 px-3 py-1 text-sm font-medium text-foreground"
               >
                 {tagObj.name} <span className="text-xs text-muted-foreground">({tagObj.stationcount})</span>
               </Link>
@@ -200,7 +199,7 @@ export default function HomePage() {
             size="sm"
             onClick={handleShuffle}
             disabled={isShuffling || isLoading}
-            className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground"
+            className="flex items-center gap-1.5 rounded-full border border-border bg-card/40 px-4 text-muted-foreground hover:border-accent/40 hover:text-foreground"
           >
             <RefreshCw className={`h-4 w-4 ${isShuffling ? 'animate-spin' : ''}`} />
             Shuffle
