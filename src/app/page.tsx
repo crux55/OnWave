@@ -10,6 +10,10 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 
+function capitalize(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
 interface StationSectionProps {
   title: string;
   stations: RadioStation[];
@@ -76,6 +80,7 @@ const StationSection: React.FC<StationSectionProps> = ({
 
 export default function HomePage() {
   const [featuredStations, setFeaturedStations] = useState<RadioStation[]>([]);
+  const [featuredGenre, setFeaturedGenre] = useState<string>('');
   const [mostListens, setMostListens] = useState<RadioStation[]>([]);
   const [trending, setTrending] = useState<RadioStation[]>([]);
   const [discoverStations, setDiscoverStations] = useState<RadioStation[]>([]);
@@ -94,6 +99,7 @@ export default function HomePage() {
           fetchTopTags(),
         ]);
         setFeaturedStations(sections.featured);
+        setFeaturedGenre(sections.featuredGenre);
         setMostListens(sections.popular);
         setTrending(sections.trending);
         setDiscoverStations(sections.discover);
@@ -155,7 +161,7 @@ export default function HomePage() {
       )}
 
       <StationSection
-        title="Editor's Picks"
+        title={featuredGenre ? `Editor's Picks: ${capitalize(featuredGenre)}` : "Editor's Picks"}
         stations={featuredStations}
         onPlay={handlePlayStation}
         icon={Sparkles}
@@ -182,7 +188,7 @@ export default function HomePage() {
       />
 
       <StationSection
-        title={discoverGenre ? `Discover: ${discoverGenre.charAt(0).toUpperCase() + discoverGenre.slice(1)}` : 'Discover'}
+        title={discoverGenre ? `Discover: ${capitalize(discoverGenre)}` : 'Discover'}
         stations={discoverStations}
         onPlay={handlePlayStation}
         icon={Shuffle}

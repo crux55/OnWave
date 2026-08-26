@@ -158,20 +158,38 @@ function fisherYatesShuffle<T>(arr: T[]): T[] {
   return a;
 }
 
+function pickGenre(exclude: string[] = []): string {
+  const available = DISCOVER_GENRES.filter(g => !exclude.includes(g));
+  return available[Math.floor(Math.random() * available.length)];
+}
+
+async function fetchGenreStations(genre: string): Promise<RadioStation[]> {
+  const result = await fetchFromApi({ term: genre, limit: '60', min_bitrate: '64' });
+  return fisherYatesShuffle(result.stations.filter(isQualityStation));
+}
+
 export async function fetchHomePageSections(): Promise<{
   featured: RadioStation[];
   popular: RadioStation[];
   trending: RadioStation[];
   discover: RadioStation[];
+  featuredGenre: string;
   discoverGenre: string;
 }> {
   const grouped = await getTopStationsGrouped();
 
-  // Use the backend's pre-sorted, pre-deduplicated categories directly.
-  // Slice to 4 cards per section; fall back gracefully if a category is empty.
-  const featured = grouped.featured.slice(0, 4);
   const popular = grouped.popular.slice(0, 4);
   const trending = grouped.trending.slice(0, 4);
+
+  // Featured: try a random genre first, fall back to the backend's featured category
+  const featuredGenre = pickGenre();
+  let featured = grouped.featured.slice(0, 4);
+  try {
+    const genreStations = (await fetchGenreStations(featuredGenre)).slice(0, 4);
+    if (genreStations.length > 0) featured = genreStations;
+  } catch {
+    // keep the backend's featured category
+  }
 
   // Collect IDs already shown so Discover doesn't repeat them
   const seen = new Set<string>([
@@ -180,14 +198,11 @@ export async function fetchHomePageSections(): Promise<{
     ...trending.map(s => s.stationuuid),
   ]);
 
-  // Discover: try a random genre first, fall back to backend's random category
-  const genre = DISCOVER_GENRES[Math.floor(Math.random() * DISCOVER_GENRES.length)];
+  // Discover: a second, distinct genre, falling back to the backend's random category
+  const discoverGenre = pickGenre([featuredGenre]);
   let discoverPool: RadioStation[] = [];
   try {
-    const result = await fetchFromApi({ term: genre, limit: '60', min_bitrate: '64' });
-    discoverPool = result.stations
-      .filter(isQualityStation)
-      .filter(s => !seen.has(s.stationuuid));
+    discoverPool = (await fetchGenreStations(discoverGenre)).filter(s => !seen.has(s.stationuuid));
   } catch {
     // Fallback: use the backend's random category, excluding already-shown stations
     discoverPool = grouped.random.filter(s => !seen.has(s.stationuuid));
@@ -197,8 +212,9 @@ export async function fetchHomePageSections(): Promise<{
     featured,
     popular,
     trending,
-    discover: fisherYatesShuffle(discoverPool).slice(0, 4),
-    discoverGenre: genre,
+    discover: discoverPool.slice(0, 4),
+    featuredGenre,
+    discoverGenre,
   };
 }
 
@@ -206,14 +222,9 @@ export async function fetchDiscoverSection(): Promise<{
   stations: RadioStation[];
   genre: string;
 }> {
-  const genre = DISCOVER_GENRES[Math.floor(Math.random() * DISCOVER_GENRES.length)];
+  const genre = pickGenre();
   try {
-    const result = await fetchFromApi({ term: genre, limit: '60', min_bitrate: '64' });
-    const filtered = result.stations.filter(isQualityStation);
-    return {
-      stations: fisherYatesShuffle(filtered).slice(0, 4),
-      genre,
-    };
+    return { stations: (await fetchGenreStations(genre)).slice(0, 4), genre };
   } catch {
     return { stations: [], genre };
   }

@@ -76,7 +76,7 @@ export function MaximizedPlayerDialog({ station }: MaximizedPlayerDialogProps) {
           <div className="absolute bottom-0 left-0 p-6 w-full">
             <DialogHeader>
               <DialogTitle className="text-3xl sm:text-4xl font-bold text-card-foreground truncate">{station.name}</DialogTitle>
-              <p className="text-sm text-muted-foreground">{station.genre} &bull; {station.country}</p>
+              <p className="text-sm text-muted-foreground">{station.tags} &bull; {station.country}</p>
             </DialogHeader>
           </div>
            <DialogClose asChild className="absolute top-4 right-4 z-50">
