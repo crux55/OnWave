@@ -13,6 +13,8 @@ import { fetchCurrentUserProfile } from "@/lib/api";
 import { JWT, Profile, Token, User } from '@/lib/types';
 import { jwtDecode as jwt_decode } from "jwt-decode";
 import { useReminders } from '@/contexts/RemindersContext';
+import { NotificationSettings } from '@/components/NotificationSettings';
+import { ConnectionStatus } from '@/components/ConnectionStatus';
 
 
 
@@ -346,6 +348,18 @@ export default function ProfilePage() {
                 emptyMessage="No show reminders set. Add some to never miss your favorites!"
                 icon={Bell}
               />
+            </section>
+
+            <Separator />
+
+            <section>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-xl font-semibold text-foreground flex items-center gap-2">
+                  <Bell className="h-5 w-5 text-primary" /> Notifications
+                </h3>
+                <ConnectionStatus />
+              </div>
+              <NotificationSettings />
             </section>
 
             <Separator />
