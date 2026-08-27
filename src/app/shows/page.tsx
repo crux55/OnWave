@@ -54,7 +54,16 @@ export default function ShowsPage() {
           candidates[0] ||
           result.stations[0] ||
           null;
-        setPbsStation(best);
+        // Some redirect-based stream hosts (e.g. StreamTheWorld, which serves
+        // PBS FM) resolve to an http:// or https:// final stream depending on
+        // the scheme of the *request*, not a fixed value. Since this site is
+        // served over https, force https on the initial request so the
+        // resulting stream isn't blocked as mixed content.
+        const toHttps = (url: string | undefined) => url?.replace(/^http:\/\//i, 'https://');
+        const secureBest = best
+          ? { ...best, url: toHttps(best.url) ?? best.url, url_resolved: toHttps(best.url_resolved) ?? best.url_resolved }
+          : null;
+        setPbsStation(secureBest);
       } catch (error) {
         setPbsStation(null);
       } finally {
