@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Search, Wand2, UserCircle2, ListMusic, Bell, Radio } from 'lucide-react';
+import { Home, Search, UserCircle2, ListMusic, Bell, Radio } from 'lucide-react';
 import { Sora, Manrope } from 'next/font/google';
 import React from 'react';
 
@@ -25,7 +25,6 @@ const navItems = [
   { href: '/', label: 'Home', icon: Home },
   { href: '/search', label: 'Search', icon: Search },
   { href: '/shows', label: 'Shows', icon: Radio },
-  // { href: '/recommendations', label: 'Explore', icon: Wand2 },
   // { href: '/profile', label: 'Profile', icon: UserCircle2 },
 ];
 
