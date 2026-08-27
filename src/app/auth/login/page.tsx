@@ -148,9 +148,9 @@ export default function LoginPage() {
       
       toast({
         title: 'Sign In Successful!',
-        description: `Welcome back, ${user.displayName || user.email}!`,
+        description: `Welcome back, ${data.email}!`,
       });
-      router.push('/');
+      router.push('/profile');
     } catch (error: any) {
       toast({
         title: 'Sign In Failed',
@@ -165,15 +165,27 @@ export default function LoginPage() {
   const onRegisterSubmit: SubmitHandler<RegisterFormValues> = async (data) => {
     setIsLoadingEmail(true);
     try {
-      const userCredential = await handleRegister(data);
+      await handleRegister(data);
+
+      // Registration doesn't return a session token, so log in with the
+      // same credentials to actually establish one before redirecting.
+      const userCredential = await handleLogin({ email: data.email, password: data.password });
       const user = userCredential.user;
-      // Optionally, update profile here if you collect more info like display name
-      // await updateProfile(user, { displayName: "New User" }); 
+      localStorage.setItem('token', JSON.stringify(user));
+      window.dispatchEvent(new Event('authChange'));
+
+      try {
+        const reminders = await getUserReminders();
+        localStorage.setItem('reminders', JSON.stringify(reminders));
+      } catch (error) {
+        console.warn('Failed to preload reminders:', error);
+      }
+
       toast({
         title: 'Registration Successful!',
-        description: `Welcome, ${user.email}! You're now signed in.`,
+        description: `Welcome, ${data.username}! You're now signed in.`,
       });
-      router.push('/'); 
+      router.push('/profile');
     } catch (error: any) {
       let errorMessage = 'Registration failed. Please try again.';
       if (error.code === 'auth/email-already-in-use') {
