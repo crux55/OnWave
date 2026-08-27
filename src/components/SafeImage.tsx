@@ -1,5 +1,6 @@
 import Image from 'next/image';
 import { useState } from 'react';
+import { isValidImageUrl } from '@/lib/utils';
 
 interface SafeImageProps {
   src: string | null | undefined;
@@ -13,17 +14,7 @@ interface SafeImageProps {
 export const SafeImage = ({ src, alt, width, height, fallback, className }: SafeImageProps) => {
   const [hasError, setHasError] = useState(false);
 
-  const isValidUrl = (urlString: string | null | undefined): boolean => {
-    if (!urlString || typeof urlString !== 'string') return false;
-    try {
-      const url = new URL(urlString);
-      return url.protocol === 'http:' || url.protocol === 'https:';
-    } catch {
-      return false;
-    }
-  };
-
-  if (!isValidUrl(src) || hasError) {
+  if (!isValidImageUrl(src) || hasError) {
     return fallback || (
       <div className={`bg-gray-200 rounded flex items-center justify-center text-xs ${className}`} 
            style={{ width, height }}>

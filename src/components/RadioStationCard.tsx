@@ -1,7 +1,7 @@
 import type { RadioStation } from '@/lib/types';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Play } from 'lucide-react';
-import Image from 'next/image';
+import { SafeImage } from '@/components/SafeImage';
 
 interface RadioStationCardProps {
   station: RadioStation;
@@ -13,13 +13,13 @@ export function RadioStationCard({ station, onPlay }: RadioStationCardProps) {
     <Card className="flex h-full flex-col overflow-hidden border-border/80 bg-card/60 transition-colors duration-300 hover:border-accent/40">
       <CardHeader className="flex flex-row items-start gap-3 p-4">
         <div className="h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-gradient-to-br from-accent/25 to-[hsl(var(--accent-2))]/20">
-          <Image
-            src={station.favicon || 'https://placehold.co/64x64.png'}
+          <SafeImage
+            src={station.favicon}
             alt={`${station.name} logo`}
             width={48}
             height={48}
             className="h-full w-full object-cover"
-            data-ai-hint="radio logo"
+            fallback={<div className="h-full w-full" />}
           />
         </div>
         <div className="min-w-0 flex-1">
