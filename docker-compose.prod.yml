@@ -106,8 +106,8 @@ services:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "${MYSQL_USER}", "-p${MYSQL_ROOT_PASSWORD}"]
       timeout: 10s
       retries: 10
-    ports:
-      - "${MYSQL_PORT}:3306"
+    expose:
+      - "3306"
 
   redis:
     image: redis:7.2

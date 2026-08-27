@@ -20,7 +20,6 @@ source .env.production
 FRONTEND_SHA=$(git rev-parse --short HEAD)
 echo "📦 Building production images..."
 docker build -f Dockerfile.production \
-  --no-cache \
   --build-arg NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL} \
   --build-arg NEXT_PUBLIC_WS_URL=${NEXT_PUBLIC_WS_URL} \
   -t onwave-frontend:latest \
@@ -30,7 +29,7 @@ docker build -f Dockerfile.production \
 cd /home/andru/Code/Go/project_r
 BACKEND_SHA=$(git rev-parse --short HEAD)
 echo "📦 Building backend..."
-docker build --no-cache -t onwave-backend:latest -t onwave-backend:${BACKEND_SHA} .
+docker build -t onwave-backend:latest -t onwave-backend:${BACKEND_SHA} .
 cd /home/andru/Code/React/OnWave
 
 # Stop existing containers
