@@ -1,27 +1,34 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
-import { fetchPBSShowsByDateRange } from '@/lib/api';
-import type { PBSShow } from '@/lib/types';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { fetchPBSShowsByDateRange, fetchFromApi } from '@/lib/api';
+import type { PBSShow, RadioStation } from '@/lib/types';
 import { PBSShowCard } from '@/components/PBSShowCard';
-import { Tv, Calendar, Clock, Radio } from 'lucide-react';
+import { Tv, Calendar, Clock, Radio, Play, Pause, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { usePlayer } from '@/contexts/PlayerContext';
 
 export default function ShowsPage() {
   const [allShows, setAllShows] = useState<PBSShow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [pbsStation, setPbsStation] = useState<RadioStation | null>(null);
+  const [isLoadingStation, setIsLoadingStation] = useState(true);
+  const player = usePlayer();
 
   const { currentShows, upcomingShows } = useMemo(() => ({
     currentShows: allShows.filter(show => show.status === 'live'),
     upcomingShows: allShows.filter(show => show.status === 'upcoming')
   }), [allShows]);
 
+  const isPbsPlaying = player.isPlaying && !!pbsStation && player.currentStation?.stationuuid === pbsStation.stationuuid;
+
   useEffect(() => {
     const fetchAllShows = async () => {
       try {
         const pbsShows = await fetchPBSShowsByDateRange(30);
-        const filteredShows = Array.isArray(pbsShows) 
+        const filteredShows = Array.isArray(pbsShows)
           ? pbsShows.filter(show => show.status !== 'expired')
           : [];
         setAllShows(filteredShows);
@@ -34,6 +41,38 @@ export default function ShowsPage() {
 
     fetchAllShows();
   }, []);
+
+  useEffect(() => {
+    const loadPbsStation = async () => {
+      try {
+        const result = await fetchFromApi({ term: 'PBS FM' });
+        // Prefer a direct stream over HLS (.m3u8) — plain <audio> elements
+        // only play HLS natively in Safari, not Chrome/Firefox.
+        const candidates = result.stations.filter(s => s.lastcheckok === 1);
+        const best =
+          candidates.find(s => !s.url_resolved?.includes('.m3u8')) ||
+          candidates[0] ||
+          result.stations[0] ||
+          null;
+        setPbsStation(best);
+      } catch (error) {
+        setPbsStation(null);
+      } finally {
+        setIsLoadingStation(false);
+      }
+    };
+
+    loadPbsStation();
+  }, []);
+
+  const handleListenLive = useCallback(() => {
+    if (!pbsStation) return;
+    if (isPbsPlaying) {
+      player.togglePlayback();
+    } else {
+      player.playStation(pbsStation);
+    }
+  }, [pbsStation, isPbsPlaying, player]);
 
   if (isLoading) {
     return (
@@ -57,7 +96,21 @@ export default function ShowsPage() {
         </p>
       </div>
 
-      <div className="flex flex-wrap gap-2 mb-8">
+      <div className="flex flex-wrap items-center gap-3 mb-8">
+        <Button
+          onClick={handleListenLive}
+          disabled={isLoadingStation || !pbsStation}
+          className="gap-2"
+        >
+          {isLoadingStation ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : isPbsPlaying ? (
+            <Pause className="h-4 w-4" />
+          ) : (
+            <Play className="h-4 w-4" />
+          )}
+          {isPbsPlaying ? 'Playing PBS FM' : 'Listen Live to PBS FM'}
+        </Button>
         <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
           <Tv className="h-3 w-3 mr-1" />
           PBS Radio
