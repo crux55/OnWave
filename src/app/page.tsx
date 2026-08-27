@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { fetchTopTags, fetchHomePageSections, fetchDiscoverSection } from '@/lib/api';
+import { PINNED_STATIONS } from '@/lib/pinned-stations';
 import type { RadioStation, TopTag } from '@/lib/types';
 import { RadioStationCard } from '@/components/RadioStationCard';
 import { usePlayer } from '@/contexts/PlayerContext';
@@ -98,7 +99,7 @@ export default function HomePage() {
           fetchHomePageSections(),
           fetchTopTags(),
         ]);
-        setFeaturedStations(sections.featured);
+        setFeaturedStations([...PINNED_STATIONS, ...sections.featured].slice(0, 4));
         setFeaturedGenre(sections.featuredGenre);
         setMostListens(sections.popular);
         setTrending(sections.trending);
