@@ -97,12 +97,6 @@ export function MaximizedPlayerDialog({ station }: MaximizedPlayerDialogProps) {
         </div>
 
         <div className="flex-grow p-6 space-y-6">
-          <div className="text-center space-y-2">
-            <h3 className="text-2xl font-semibold text-primary">Current Song Title Placeholder</h3>
-            <p className="text-lg text-muted-foreground">Artist Name Placeholder</p>
-            {/* Placeholder for error display if needed */}
-            {/* {player.error && <p className="text-sm text-destructive">{player.error}</p>} */}
-          </div>
 
           {/* Player Controls */}
           <div className="flex flex-col items-center space-y-4">

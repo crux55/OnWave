@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import {
   Play, Pause, Volume2, VolumeX, ExternalLink, Loader2,
-  SkipForward, SkipBack, PanelBottomClose, PanelBottomOpen, Expand, X, Music2, Cast, Airplay
+  SkipForward, SkipBack, PanelBottomClose, PanelBottomOpen, Expand, X, Cast, Airplay
 } from 'lucide-react';
 import React, { useRef, useEffect, useCallback, useState } from 'react';
 import Image from 'next/image';
@@ -321,13 +321,6 @@ export function RadioPlayer({ station, className }: RadioPlayerProps) {
                             <p className="text-xs text-muted-foreground truncate hidden md:block">
                               {(station.tags?.split(',')[0]?.trim() || 'Unknown')} - {station.country || 'Unknown'}
                             </p>                        </div>
-                        <div className="flex items-center gap-2">
-                        <Music2 className="h-4 w-4 text-primary flex-shrink-0" />
-                        <div className="overflow-hidden">
-                            <p className="text-sm text-primary truncate">Current Song Title Placeholder</p>
-                            <p className="text-xs text-muted-foreground truncate">Artist Name Placeholder</p>
-                        </div>
-                        </div>
                         {error && <p className="text-xs text-destructive truncate mt-0.5">{error}</p>}
                     </div>
                 </div>
