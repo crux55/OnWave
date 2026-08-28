@@ -83,8 +83,9 @@ export function RadioPlayer({ station, className }: RadioPlayerProps) {
       }
     };
 
-    // Only autoplay when context says playback should be active.
-    if (player.isPlaying) {
+    // Only autoplay when context says playback should be active — and not
+    // while casting, since the remote device is the one actually playing.
+    if (player.isPlaying && !chromecast.isCasting) {
       playAudio();
     } else if (audioRef.current) {
       audioRef.current.pause();
@@ -155,7 +156,7 @@ export function RadioPlayer({ station, className }: RadioPlayerProps) {
         currentAudio.removeEventListener('canplay', handleCanPlay);
       }
     };
-  }, [station, streamUrl, player.isPlayerBarOpen, player.isPlaying, player.setIsPlaying]);
+  }, [station, streamUrl, player.isPlayerBarOpen, player.isPlaying, player.setIsPlaying, chromecast.isCasting]);
 
 
   useEffect(() => {
@@ -164,7 +165,7 @@ export function RadioPlayer({ station, className }: RadioPlayerProps) {
     const syncPlayback = async () => {
       if (!audioRef.current) return;
 
-      if (player.isPlaying) {
+      if (player.isPlaying && !chromecast.isCasting) {
         try {
           if (streamUrl && audioRef.current.src !== streamUrl) {
             audioRef.current.src = streamUrl;
@@ -180,7 +181,7 @@ export function RadioPlayer({ station, className }: RadioPlayerProps) {
     };
 
     syncPlayback();
-  }, [player.isPlaying, player.isPlayerBarOpen, player.setIsPlaying, station, streamUrl]);
+  }, [player.isPlaying, player.isPlayerBarOpen, player.setIsPlaying, station, streamUrl, chromecast.isCasting]);
 
 
   useEffect(() => {
@@ -211,8 +212,16 @@ export function RadioPlayer({ station, className }: RadioPlayerProps) {
 
   const togglePlayPause = useCallback(() => {
     if (!streamUrl) return;
+    if (chromecast.isCasting) {
+      chromecast.toggleRemotePlayback();
+      return;
+    }
     player.togglePlayback();
-  }, [player, streamUrl]);
+  }, [player, streamUrl, chromecast]);
+
+  // While casting, the play/pause button reflects and controls the remote
+  // session's state, not the (paused) local audio element.
+  const isPlayingDisplay = chromecast.isCasting ? !chromecast.isRemotePaused : player.isPlaying;
 
   const handleVolumeChange = useCallback((newVolume: number[]) => {
     const vol = newVolume[0];
@@ -275,7 +284,7 @@ export function RadioPlayer({ station, className }: RadioPlayerProps) {
                 {error && <p className="text-xs text-destructive truncate">{error}</p>}
               </div>
               <Button onClick={togglePlayPause} variant="ghost" size="icon" className="w-8 h-8" disabled={isLoading || !streamUrl}>
-                {isLoading ? <Loader2 className="h-4 w-4 animate-spin text-primary" /> : player.isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                {isLoading ? <Loader2 className="h-4 w-4 animate-spin text-primary" /> : isPlayingDisplay ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
               </Button>
               <Button onClick={player.playPrevious} variant="ghost" size="icon" className="w-8 h-8" disabled={!player.hasPrevious} title="Previous in queue">
                 <SkipBack className={cn("h-4 w-4", !player.hasPrevious && "text-muted-foreground/50")} />
@@ -338,7 +347,7 @@ export function RadioPlayer({ station, className }: RadioPlayerProps) {
                         <SkipBack className={cn("h-4 w-4", !player.hasPrevious && "text-muted-foreground/50")} />
                     </Button>
                     <Button onClick={togglePlayPause} variant="ghost" size="icon" className="w-10 h-10" disabled={isLoading || !streamUrl}>
-                        {isLoading ? <Loader2 className="h-5 w-5 animate-spin text-primary" /> : player.isPlaying ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
+                        {isLoading ? <Loader2 className="h-5 w-5 animate-spin text-primary" /> : isPlayingDisplay ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
                     </Button>
                     <Button onClick={player.playNext} variant="ghost" size="icon" className="w-9 h-9" disabled={!player.hasNext} title="Next in queue">
                         <SkipForward className={cn("h-4 w-4", !player.hasNext && "text-muted-foreground/50")} />

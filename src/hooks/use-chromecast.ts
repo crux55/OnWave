@@ -79,8 +79,41 @@ export function useChromecast(streamUrl: string | undefined, stationName: string
   const [available, setAvailable] = useState(false);
   const [isCasting, setIsCasting] = useState(false);
   const [deviceName, setDeviceName] = useState<string | null>(null);
+  const [isRemotePaused, setIsRemotePaused] = useState(false);
   const sessionListenerRef = useRef<((event: any) => void) | null>(null);
+  const remotePlayerControllerRef = useRef<any>(null);
   const { toast } = useToast();
+
+  // The remote player mirrors and controls the cast session's own playback
+  // state (play/pause), independent of the local <audio> element — so
+  // pausing/resuming while casting commands the TV/speaker, not a silent
+  // local element, and stays in sync if playback is controlled from
+  // elsewhere (e.g. a Google Home app).
+  useEffect(() => {
+    if (!available) return;
+
+    const remotePlayer = new window.cast.framework.RemotePlayer();
+    const remotePlayerController = new window.cast.framework.RemotePlayerController(remotePlayer);
+    remotePlayerControllerRef.current = remotePlayerController;
+
+    const onPausedChanged = () => setIsRemotePaused(remotePlayer.isPaused);
+    remotePlayerController.addEventListener(
+      window.cast.framework.RemotePlayerEventType.IS_PAUSED_CHANGED,
+      onPausedChanged
+    );
+
+    return () => {
+      remotePlayerController.removeEventListener(
+        window.cast.framework.RemotePlayerEventType.IS_PAUSED_CHANGED,
+        onPausedChanged
+      );
+      remotePlayerControllerRef.current = null;
+    };
+  }, [available]);
+
+  const toggleRemotePlayback = useCallback(() => {
+    remotePlayerControllerRef.current?.playOrPause();
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -118,7 +151,13 @@ export function useChromecast(streamUrl: string | undefined, stationName: string
     const session = window.cast?.framework?.CastContext.getInstance().getCurrentSession();
     if (!session || !streamUrl) return;
 
-    const mediaInfo = new window.chrome.cast.media.MediaInfo(streamUrl, codecToContentType(codec));
+    // The cast receiver is a separate physical device with no notion of
+    // "relative to the current page" — a relative URL (e.g. our own
+    // /api/stream-proxy/* routes) has to be resolved to absolute before
+    // handing it off, or the receiver can't fetch it at all.
+    const absoluteStreamUrl = new URL(streamUrl, window.location.origin).href;
+
+    const mediaInfo = new window.chrome.cast.media.MediaInfo(absoluteStreamUrl, codecToContentType(codec));
     mediaInfo.streamType = window.chrome.cast.media.StreamType.LIVE;
     mediaInfo.metadata = new window.chrome.cast.media.GenericMediaMetadata();
     mediaInfo.metadata.title = stationName || 'OnWave';
@@ -159,5 +198,5 @@ export function useChromecast(streamUrl: string | undefined, stationName: string
     if (isCasting) loadCurrentMedia();
   }, [isCasting, loadCurrentMedia]);
 
-  return { available, isCasting, deviceName, toggleCast };
+  return { available, isCasting, deviceName, toggleCast, isRemotePaused, toggleRemotePlayback };
 }
