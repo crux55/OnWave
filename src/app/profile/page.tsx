@@ -2,14 +2,15 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { UserCircle2, ListMusic, Radio, Podcast, Users, FileText, Edit3, LogOut, Loader2, ShieldAlert, Bell, X } from 'lucide-react';
+import Link from 'next/link';
+import { UserCircle2, Radio, Podcast, Users, FileText, Edit3, LogOut, Loader2, ShieldAlert, Bell, X, Heart, ChevronRight } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { useEffect, useState } from "react";
-import { fetchCurrentUserProfile } from "@/lib/api";
+import { fetchCurrentUserProfile, fetchLikedStations } from "@/lib/api";
 import { JWT, Profile, Token, User } from '@/lib/types';
 import { jwtDecode as jwt_decode } from "jwt-decode";
 import { useReminders } from '@/contexts/RemindersContext';
@@ -22,10 +23,6 @@ const userProfileData = {
   subscription: 'Premium',
   favoriteGenre: 'Synthwave',
   theme: 'Dark Mode (App Default)',
-  playlists: [
-    { id: 'pl1', name: 'Late Night Coding Vibes' },
-    { id: 'pl2', name: "Retro Drive '86" },
-  ],
   followedStations: [
     { id: 'st1', name: 'Synthwave FM' },
     { id: 'st2', name: 'Chillhop Raccoon' },
@@ -75,6 +72,7 @@ export default function ProfilePage() {
   const [userProfile, setUserProfile] = useState<Profile | null>(null);
   const [token, setToken] = useState<Token | null>(null);
   const [deletingReminderId, setDeletingReminderId] = useState<string | null>(null);
+  const [likedCount, setLikedCount] = useState<number | null>(null);
   const getAvatarUrl = (filename: string | undefined) => {
   const url = filename ? `${apiHost}${filename}` : undefined;
 
@@ -111,6 +109,10 @@ export default function ProfilePage() {
         setUserProfile(null);
         setIsLoading(false);
       });
+
+    fetchLikedStations()
+      .then(stations => setLikedCount(stations.length))
+      .catch(() => setLikedCount(null));
   }, []);
 
 
@@ -230,14 +232,18 @@ export default function ProfilePage() {
             <Separator />
 
             <section>
-              <h3 className="text-xl font-semibold text-foreground mb-4 flex items-center gap-2">
-                <ListMusic className="h-5 w-5 text-primary" /> My Playlists
-              </h3>
-              <ProfileListSection
-                items={userProfileData.playlists}
-                emptyMessage="No playlists created yet. Start curating!"
-                icon={ListMusic}
-              />
+              <Link
+                href="/liked"
+                className="flex items-center justify-between gap-3 p-3 -mx-3 rounded-md hover:bg-muted/30 transition-colors"
+              >
+                <h3 className="text-xl font-semibold text-foreground flex items-center gap-2">
+                  <Heart className="h-5 w-5 text-primary" /> Liked Stations
+                  {likedCount !== null && (
+                    <span className="text-sm font-normal text-muted-foreground">({likedCount})</span>
+                  )}
+                </h3>
+                <ChevronRight className="h-5 w-5 text-muted-foreground" />
+              </Link>
             </section>
 
             <Separator />
