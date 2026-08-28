@@ -9,11 +9,11 @@ import {
   SkipForward, SkipBack, PanelBottomClose, PanelBottomOpen, Expand, X, Cast, Airplay, Heart
 } from 'lucide-react';
 import React, { useRef, useEffect, useCallback, useState } from 'react';
-import Image from 'next/image';
 import { usePlayer } from '@/contexts/PlayerContext';
 import { cn } from '@/lib/utils';
 import { useChromecast } from '@/hooks/use-chromecast';
 import { useLikedStations } from '@/hooks/use-liked-stations';
+import { SafeImage } from '@/components/SafeImage';
 
 declare global {
   interface HTMLMediaElement {
@@ -279,14 +279,16 @@ export function RadioPlayer({ station, className }: RadioPlayerProps) {
         <div className={playerContainerClasses}>
           <div className={playerFlexClasses}>
             <div className="flex items-center gap-2 w-full">
-              {/* <Image
-                src={station.faviconUrl || `https://placehold.co/32x32.png`}
-                alt={station.name}
-                width={32}
-                height={32}
-                className="rounded border"
-                data-ai-hint="radio logo"
-              /> */}
+              <div className="h-8 w-8 shrink-0 overflow-hidden rounded-md bg-gradient-to-br from-accent/25 to-[hsl(var(--accent-2))]/20">
+                <SafeImage
+                  src={station.favicon}
+                  alt={`${station.name} logo`}
+                  width={32}
+                  height={32}
+                  className="h-full w-full object-cover"
+                  fallback={<div className="h-full w-full" />}
+                />
+              </div>
               <div className="flex-grow overflow-hidden">
                 <h4 className="text-xs font-semibold truncate text-foreground">{station.name}</h4>
                 {error && <p className="text-xs text-destructive truncate">{error}</p>}
@@ -326,14 +328,16 @@ export function RadioPlayer({ station, className }: RadioPlayerProps) {
         <div className={playerContainerClasses}>
             <div className={playerFlexClasses}>
                 <div className="flex items-center gap-3 md:gap-4 flex-grow overflow-hidden">
-                    {/* <Image
-                        src={station.faviconUrl || `https://placehold.co/64x64.png`}
-                        alt={station.name}
-                        width={64}
-                        height={64}
-                        className="rounded-md border hidden sm:block aspect-square object-cover"
-                        data-ai-hint="radio station art"
-                    /> */}
+                    <div className="hidden sm:block h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-gradient-to-br from-accent/25 to-[hsl(var(--accent-2))]/20">
+                        <SafeImage
+                            src={station.favicon}
+                            alt={`${station.name} logo`}
+                            width={48}
+                            height={48}
+                            className="h-full w-full object-cover"
+                            fallback={<div className="h-full w-full" />}
+                        />
+                    </div>
                     <div className="flex-grow overflow-hidden space-y-1">
                         <div className="flex items-baseline gap-2">
                             <h3 className="text-base font-semibold truncate text-foreground">{station.name}</h3>
