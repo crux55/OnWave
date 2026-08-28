@@ -149,6 +149,14 @@ export function RadioPlayer({ station, className }: RadioPlayerProps) {
 
     return () => {
       if (currentAudio) {
+        // Closing the player (station -> null) makes the parent stop
+        // rendering this component entirely rather than re-rendering it
+        // with the new props first — the early-return branch above that
+        // would normally pause playback never runs, only this cleanup
+        // does. Without an explicit pause here, the Audio object keeps
+        // playing in the background, orphaned from any component, and a
+        // newly opened station then plays on top of it as a second stream.
+        currentAudio.pause();
         currentAudio.removeEventListener('error', handleAudioError);
         currentAudio.removeEventListener('playing', handlePlaying);
         currentAudio.removeEventListener('waiting', handleWaiting);
