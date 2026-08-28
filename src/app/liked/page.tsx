@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { fetchLikedStations, type LikedStation } from '@/lib/api';
+import { fetchLikedStations, likedStationToRadioStation } from '@/lib/api';
 import type { RadioStation } from '@/lib/types';
 import { RadioStationCard } from '@/components/RadioStationCard';
 import { usePlayer } from '@/contexts/PlayerContext';
@@ -9,44 +9,6 @@ import { useLikedStations } from '@/hooks/use-liked-stations';
 import { Heart } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import Link from 'next/link';
-
-function toRadioStation(liked: LikedStation): RadioStation {
-  return {
-    stationuuid: liked.stationuuid,
-    name: liked.name,
-    url: liked.url,
-    url_resolved: liked.url_resolved || liked.url,
-    homepage: '',
-    favicon: liked.favicon,
-    has_valid_favicon: !!liked.favicon,
-    tags: liked.tags,
-    country: liked.country,
-    countrycode: '',
-    state: '',
-    language: '',
-    languagecodes: '',
-    bitrate: liked.bitrate,
-    codec: liked.codec,
-    votes: 0,
-    clickcount: 0,
-    clicktrend: 0,
-    lastchangetime: '',
-    lastchangetime_iso8601: '',
-    lastchecktime: '',
-    lastchecktime_iso8601: '',
-    lastcheckok: 1,
-    lastcheckoktime: '',
-    lastcheckoktime_iso8601: '',
-    lastlocalchecktime: '',
-    lastlocalchecktime_iso8601: '',
-    ssl_error: 0,
-    has_extended_info: false,
-    serveruuid: liked.stationuuid,
-    changeuuid: '',
-    iso_3166_2: '',
-    hls: 0,
-  };
-}
 
 export default function LikedStationsPage() {
   const [stations, setStations] = useState<RadioStation[]>([]);
@@ -59,7 +21,7 @@ export default function LikedStationsPage() {
     setIsLoading(true);
     try {
       const liked = await fetchLikedStations();
-      setStations(liked.map(toRadioStation));
+      setStations(liked.map(likedStationToRadioStation));
       setIsAuthed(true);
     } catch (error) {
       if (error instanceof Error && error.message === 'UNAUTHORIZED') {

@@ -1,15 +1,16 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { fetchTopTags, fetchHomePageSections, fetchDiscoverSection } from '@/lib/api';
+import { fetchTopTags, fetchHomePageSections, fetchDiscoverSection, fetchLikedStations, likedStationToRadioStation } from '@/lib/api';
 import type { RadioStation, TopTag } from '@/lib/types';
 import { RadioStationCard } from '@/components/RadioStationCard';
 import { usePlayer } from '@/contexts/PlayerContext';
 import { useLikedStations } from '@/hooks/use-liked-stations';
-import { Disc3, TrendingUp, RefreshCw, Sparkles, Shuffle } from 'lucide-react';
+import { Disc3, TrendingUp, RefreshCw, Sparkles, Shuffle, Heart, Play } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { cn } from '@/lib/utils';
 
 function capitalize(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
@@ -26,8 +27,58 @@ interface HomeCache {
   trending: RadioStation[];
   discoverStations: RadioStation[];
   discoverGenre: string;
+  discoverStations2: RadioStation[];
+  discoverGenre2: string;
+  likedStations: RadioStation[];
   topTags: TopTag[];
 }
+
+interface HeroCardProps {
+  station: RadioStation;
+  onPlay: (station: RadioStation) => void;
+  isLiked: boolean;
+  onToggleLike: (station: RadioStation) => void;
+}
+
+const HeroCard: React.FC<HeroCardProps> = ({ station, onPlay, isLiked, onToggleLike }) => (
+  <div
+    className="relative mb-12 overflow-hidden rounded-2xl border border-border/60"
+    style={{
+      background:
+        'radial-gradient(120% 140% at 15% 0%, hsl(var(--accent-2) / 0.32), transparent 60%), ' +
+        'radial-gradient(120% 140% at 90% 100%, hsl(var(--accent) / 0.28), transparent 55%), ' +
+        'hsl(var(--card))',
+    }}
+  >
+    <div className="relative flex min-h-[200px] flex-col justify-end gap-4 p-6 sm:min-h-[260px] sm:p-8">
+      <span className="text-xs font-bold uppercase tracking-wider text-accent">Today&rsquo;s Pick</span>
+      <div className="flex w-full items-end justify-between gap-4">
+        <div className="min-w-0">
+          <h2 className="font-display truncate text-2xl font-bold text-foreground sm:text-4xl">{station.name}</h2>
+          <p className="mt-1 truncate text-sm text-muted-foreground">
+            {(station.tags?.split(',')[0]?.trim() || 'Unknown')} &bull; {station.country || 'Unknown'}
+          </p>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <button
+            onClick={() => onToggleLike(station)}
+            aria-label={isLiked ? `Unlike ${station.name}` : `Like ${station.name}`}
+            className="flex h-10 w-10 items-center justify-center rounded-full border border-border/60 bg-card/60 text-muted-foreground transition-colors hover:text-accent"
+          >
+            <Heart className={cn('h-4 w-4', isLiked && 'fill-accent text-accent')} />
+          </button>
+          <button
+            onClick={() => onPlay(station)}
+            aria-label={`Play ${station.name}`}
+            className="flex h-14 w-14 items-center justify-center rounded-full bg-accent text-accent-foreground transition-transform hover:scale-105"
+          >
+            <Play className="h-5 w-5 fill-current" />
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+);
 
 interface StationSectionProps {
   title: string;
@@ -50,7 +101,7 @@ const StationSection: React.FC<StationSectionProps> = ({
   onToggleLike,
 }) => {
   const header = (
-    <div className="flex items-center justify-between mb-6">
+    <div className="flex items-center justify-between mb-4">
       <div className="flex items-center">
         {Icon && <Icon className="h-5 w-5 text-accent mr-2.5" />}
         <h2 className="font-display text-2xl font-semibold tracking-tight text-foreground">{title}</h2>
@@ -61,11 +112,11 @@ const StationSection: React.FC<StationSectionProps> = ({
 
   if (isLoading) {
     return (
-      <section className="mb-12">
+      <section className="mb-10">
         {header}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-48 w-full rounded-xl" />
+        <div className="flex gap-4 overflow-x-hidden">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Skeleton key={i} className="h-52 w-40 shrink-0 rounded-xl" />
           ))}
         </div>
       </section>
@@ -74,7 +125,7 @@ const StationSection: React.FC<StationSectionProps> = ({
 
   if (!stations || stations.length === 0) {
     return (
-      <section className="mb-12">
+      <section className="mb-10">
         {header}
         <p className="text-muted-foreground">{emptyMessage}</p>
       </section>
@@ -82,17 +133,19 @@ const StationSection: React.FC<StationSectionProps> = ({
   }
 
   return (
-    <section className="mb-12">
+    <section className="mb-10">
       {header}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+      <div className="flex gap-4 overflow-x-auto pb-2 snap-x snap-mandatory [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
         {stations.map(station => (
-          <RadioStationCard
-            key={station.stationuuid}
-            station={station}
-            onPlay={onPlay}
-            isLiked={isLiked?.(station.stationuuid)}
-            onToggleLike={onToggleLike}
-          />
+          <div key={station.stationuuid} className="w-36 shrink-0 snap-start sm:w-40">
+            <RadioStationCard
+              station={station}
+              onPlay={onPlay}
+              isLiked={isLiked?.(station.stationuuid)}
+              onToggleLike={onToggleLike}
+              variant="row"
+            />
+          </div>
         ))}
       </div>
     </section>
@@ -106,6 +159,9 @@ export default function HomePage() {
   const [trending, setTrending] = useState<RadioStation[]>([]);
   const [discoverStations, setDiscoverStations] = useState<RadioStation[]>([]);
   const [discoverGenre, setDiscoverGenre] = useState<string>('');
+  const [discoverStations2, setDiscoverStations2] = useState<RadioStation[]>([]);
+  const [discoverGenre2, setDiscoverGenre2] = useState<string>('');
+  const [likedStations, setLikedStations] = useState<RadioStation[]>([]);
   const [topTags, setTopTags] = useState<TopTag[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isShuffling, setIsShuffling] = useState(false);
@@ -127,6 +183,9 @@ export default function HomePage() {
           setTrending(parsed.trending);
           setDiscoverStations(parsed.discoverStations);
           setDiscoverGenre(parsed.discoverGenre);
+          setDiscoverStations2(parsed.discoverStations2 ?? []);
+          setDiscoverGenre2(parsed.discoverGenre2 ?? '');
+          setLikedStations(parsed.likedStations ?? []);
           setTopTags(parsed.topTags);
           setIsLoading(false);
           return;
@@ -139,9 +198,13 @@ export default function HomePage() {
     const load = async () => {
       setIsLoading(true);
       try {
-        const [sections, tags] = await Promise.all([
+        const [sections, tags, discover2, liked] = await Promise.all([
           fetchHomePageSections(),
           fetchTopTags(),
+          // A second, distinct genre so Discover reads as two real rows,
+          // not one row plus an empty one.
+          fetchDiscoverSection([]).catch(() => ({ stations: [] as RadioStation[], genre: '' })),
+          fetchLikedStations().catch(() => []),
         ]);
         const featured = sections.featured;
         setFeaturedStations(featured);
@@ -150,6 +213,10 @@ export default function HomePage() {
         setTrending(sections.trending);
         setDiscoverStations(sections.discover);
         setDiscoverGenre(sections.discoverGenre);
+        setDiscoverStations2(discover2.stations);
+        setDiscoverGenre2(discover2.genre);
+        const likedAsStations = liked.map(likedStationToRadioStation);
+        setLikedStations(likedAsStations);
         setTopTags(tags);
 
         try {
@@ -161,6 +228,9 @@ export default function HomePage() {
             trending: sections.trending,
             discoverStations: sections.discover,
             discoverGenre: sections.discoverGenre,
+            discoverStations2: discover2.stations,
+            discoverGenre2: discover2.genre,
+            likedStations: likedAsStations,
             topTags: tags,
           };
           sessionStorage.setItem(HOME_CACHE_KEY, JSON.stringify(cache));
@@ -205,6 +275,9 @@ export default function HomePage() {
     player.playStation(station);
   };
 
+  const heroStation = featuredStations[0];
+  const editorsPicksRest = featuredStations.slice(1);
+
   return (
     <div className="container mx-auto">
       <header className="mb-10 text-center">
@@ -233,9 +306,14 @@ export default function HomePage() {
         </section>
       )}
 
+      {!isLoading && heroStation && (
+        <HeroCard station={heroStation} onPlay={handlePlayStation} isLiked={isLiked(heroStation.stationuuid)} onToggleLike={toggleLike} />
+      )}
+      {isLoading && <Skeleton className="mb-12 h-[200px] w-full rounded-2xl sm:h-[260px]" />}
+
       <StationSection
         title={featuredGenre ? `Editor's Picks: ${capitalize(featuredGenre)}` : "Editor's Picks"}
-        stations={featuredStations}
+        stations={editorsPicksRest}
         onPlay={handlePlayStation}
         icon={Sparkles}
         isLoading={isLoading}
@@ -243,6 +321,18 @@ export default function HomePage() {
         onToggleLike={toggleLike}
         emptyMessage="No featured stations available right now."
       />
+
+      {likedStations.length > 0 && (
+        <StationSection
+          title="Liked Stations"
+          stations={likedStations}
+          onPlay={handlePlayStation}
+          icon={Heart}
+          isLoading={isLoading}
+          isLiked={isLiked}
+          onToggleLike={toggleLike}
+        />
+      )}
 
       <StationSection
         title="Most Listened"
@@ -288,6 +378,18 @@ export default function HomePage() {
           </Button>
         }
       />
+
+      {discoverStations2.length > 0 && (
+        <StationSection
+          title={discoverGenre2 ? `Discover: ${capitalize(discoverGenre2)}` : 'Discover More'}
+          stations={discoverStations2}
+          onPlay={handlePlayStation}
+          icon={Shuffle}
+          isLoading={isLoading}
+          isLiked={isLiked}
+          onToggleLike={toggleLike}
+        />
+      )}
     </div>
   );
 }

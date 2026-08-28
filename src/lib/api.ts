@@ -202,8 +202,8 @@ export async function fetchHomePageSections(): Promise<{
     fetchGenreStations(discoverGenre).catch(() => [] as RadioStation[]),
   ]);
 
-  const popular = grouped.popular.slice(0, 4);
-  const trending = grouped.trending.slice(0, 4);
+  const popular = grouped.popular.slice(0, 8);
+  const trending = grouped.trending.slice(0, 8);
 
   const pinnedUuids = new Set(PINNED_STATIONS.map(s => s.stationuuid));
   let featured = [...PINNED_STATIONS];
@@ -228,19 +228,19 @@ export async function fetchHomePageSections(): Promise<{
     featured,
     popular,
     trending,
-    discover: discoverPool.slice(0, 4),
+    discover: discoverPool.slice(0, 8),
     featuredGenre,
     discoverGenre,
   };
 }
 
-export async function fetchDiscoverSection(): Promise<{
+export async function fetchDiscoverSection(exclude: string[] = [], count: number = 8): Promise<{
   stations: RadioStation[];
   genre: string;
 }> {
-  const genre = pickGenre();
+  const genre = pickGenre(exclude);
   try {
-    return { stations: (await fetchGenreStations(genre)).slice(0, 4), genre };
+    return { stations: (await fetchGenreStations(genre)).slice(0, count), genre };
   } catch {
     return { stations: [], genre };
   }
@@ -391,6 +391,44 @@ export interface LikedStation {
   codec: string;
   bitrate: number;
   created_at: string;
+}
+
+export function likedStationToRadioStation(liked: LikedStation): RadioStation {
+  return {
+    stationuuid: liked.stationuuid,
+    name: liked.name,
+    url: liked.url,
+    url_resolved: liked.url_resolved || liked.url,
+    homepage: '',
+    favicon: liked.favicon,
+    has_valid_favicon: !!liked.favicon,
+    tags: liked.tags,
+    country: liked.country,
+    countrycode: '',
+    state: '',
+    language: '',
+    languagecodes: '',
+    bitrate: liked.bitrate,
+    codec: liked.codec,
+    votes: 0,
+    clickcount: 0,
+    clicktrend: 0,
+    lastchangetime: '',
+    lastchangetime_iso8601: '',
+    lastchecktime: '',
+    lastchecktime_iso8601: '',
+    lastcheckok: 1,
+    lastcheckoktime: '',
+    lastcheckoktime_iso8601: '',
+    lastlocalchecktime: '',
+    lastlocalchecktime_iso8601: '',
+    ssl_error: 0,
+    has_extended_info: false,
+    serveruuid: liked.stationuuid,
+    changeuuid: '',
+    iso_3166_2: '',
+    hls: 0,
+  };
 }
 
 export async function fetchLikedStations(): Promise<LikedStation[]> {
