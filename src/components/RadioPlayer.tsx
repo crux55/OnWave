@@ -53,8 +53,13 @@ export function RadioPlayer({ station, className }: RadioPlayerProps) {
 
     if (!audioRef.current) {
       audioRef.current = new Audio();
+      // Lets the visualizer attempt real frequency analysis via Web Audio —
+      // harmless for playback either way, streams that don't send CORS
+      // headers just stay untaint-able for analysis and keep playing normally.
+      audioRef.current.crossOrigin = 'anonymous';
+      player.audioElementRef.current = audioRef.current;
     }
-    
+
     if (streamUrl && audioRef.current.src !== streamUrl) {
         audioRef.current.src = streamUrl;
         audioRef.current.load();

@@ -12,6 +12,8 @@ import {
   Play, Pause, Volume2, VolumeX, SkipForward, SkipBack, Loader2, ExternalLink, Minimize2, Music2, X
 } from 'lucide-react';
 import { cn, isValidImageUrl } from '@/lib/utils';
+import { AudioVisualizer } from '@/components/AudioVisualizer';
+import { useAudioVisualizer } from '@/hooks/use-audio-visualizer';
 
 interface MaximizedPlayerDialogProps {
   station: RadioStation;
@@ -23,6 +25,7 @@ export function MaximizedPlayerDialog({ station }: MaximizedPlayerDialogProps) {
   // isLoading and error states might need to be mirrored from RadioPlayer or context if they are specific to playback attempts.
   // For simplicity, we'll rely on context's isPlaying for now.
   const [lastVolumeBeforeMute, setLastVolumeBeforeMute] = React.useState(player.volume);
+  const { mode: visualizerMode, getFrequencyData } = useAudioVisualizer(player.audioElementRef.current, player.isPlaying);
 
 
   const togglePlayPause = useCallback(() => {
@@ -69,9 +72,16 @@ export function MaximizedPlayerDialog({ station }: MaximizedPlayerDialogProps) {
             alt={`${station.name} artwork`}
             layout="fill"
             objectFit="cover"
-            className="bg-muted"
+            className="bg-muted blur-md scale-110 opacity-50"
             data-ai-hint="radio station background"
           />
+          <div className="absolute inset-0">
+            <AudioVisualizer
+              mode={visualizerMode}
+              getFrequencyData={getFrequencyData}
+              isPlaying={player.isPlaying}
+            />
+          </div>
           <div className="absolute inset-0 bg-gradient-to-t from-card via-card/70 to-transparent" />
           <div className="absolute bottom-0 left-0 p-6 w-full">
             <DialogHeader>

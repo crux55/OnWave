@@ -1,7 +1,7 @@
 
 'use client';
 import type { RadioStation } from '@/lib/types';
-import React, { createContext, useState, useContext, ReactNode, useCallback } from 'react';
+import React, { createContext, useState, useContext, useRef, ReactNode, useCallback } from 'react';
 
 interface PlayerContextType {
   currentStation: RadioStation | null;
@@ -30,6 +30,7 @@ interface PlayerContextType {
   playPrevious: () => void;
   hasNext: boolean;
   hasPrevious: boolean;
+  audioElementRef: React.MutableRefObject<HTMLAudioElement | null>;
 }
 
 const PlayerContext = createContext<PlayerContextType | undefined>(undefined);
@@ -44,6 +45,7 @@ export const PlayerProvider = ({ children }: { children: ReactNode }) => {
   const [isMuted, setIsMutedState] = useState(false);
   const [queue, setQueue] = useState<RadioStation[]>([]);
   const [queueIndex, setQueueIndex] = useState(-1);
+  const audioElementRef = useRef<HTMLAudioElement | null>(null);
 
 
   const playStation = useCallback((station: RadioStation) => {
@@ -173,7 +175,8 @@ export const PlayerProvider = ({ children }: { children: ReactNode }) => {
       playNext,
       playPrevious,
       hasNext,
-      hasPrevious
+      hasPrevious,
+      audioElementRef
     }}>
       {children}
     </PlayerContext.Provider>
