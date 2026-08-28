@@ -156,7 +156,14 @@ function SearchPageContent() {
       setSearchTerm(initialSearch);
       handleSearchStations(initialSearch);
     }
-  }, [initialSearch, handleSearchStations]);
+    // Deliberately only reacting to the URL's search term changing, not to
+    // handleSearchStations — that callback's identity changes on every
+    // keystroke (it depends on searchTerm), which would re-fire this effect
+    // and forcibly reset the input back to initialSearch on every keystroke,
+    // making it impossible to edit the search box after arriving with a
+    // ?search= param (e.g. from a home page tag link).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialSearch]);
 
   // Restore the last search from this tab's session on a plain refresh (no
   // ?search= in the URL, which already drives its own fetch above).
