@@ -6,12 +6,22 @@ import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import {
   Play, Pause, Volume2, VolumeX, ExternalLink, Loader2,
-  SkipForward, SkipBack, PanelBottomClose, PanelBottomOpen, Expand, X, Music2
+  SkipForward, SkipBack, PanelBottomClose, PanelBottomOpen, Expand, X, Music2, Cast, Airplay
 } from 'lucide-react';
 import React, { useRef, useEffect, useCallback, useState } from 'react';
 import Image from 'next/image';
 import { usePlayer } from '@/contexts/PlayerContext';
 import { cn } from '@/lib/utils';
+import { useChromecast } from '@/hooks/use-chromecast';
+
+declare global {
+  interface HTMLMediaElement {
+    webkitShowPlaybackTargetPicker?: () => void;
+  }
+  interface WindowEventMap {
+    webkitplaybacktargetavailabilitychanged: Event;
+  }
+}
 
 interface RadioPlayerProps {
   station: RadioStation | null;
@@ -24,7 +34,9 @@ export function RadioPlayer({ station, className }: RadioPlayerProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastVolumeBeforeMute, setLastVolumeBeforeMute] = useState(player.volume);
+  const [airPlayAvailable, setAirPlayAvailable] = useState(false);
   const streamUrl = station?.url_resolved || station?.url;
+  const chromecast = useChromecast(streamUrl, station?.name);
 
 
   useEffect(() => {
@@ -171,6 +183,25 @@ export function RadioPlayer({ station, className }: RadioPlayerProps) {
   }, [player.volume, player.isMuted]);
 
 
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio || typeof audio.webkitShowPlaybackTargetPicker !== 'function') {
+      setAirPlayAvailable(false);
+      return;
+    }
+    setAirPlayAvailable(true);
+
+    const handleAvailabilityChanged = (event: any) => {
+      setAirPlayAvailable(event?.availability !== 'not-available');
+    };
+    audio.addEventListener('webkitplaybacktargetavailabilitychanged', handleAvailabilityChanged);
+    return () => audio.removeEventListener('webkitplaybacktargetavailabilitychanged', handleAvailabilityChanged);
+  }, [station]);
+
+  const toggleAirPlay = useCallback(() => {
+    audioRef.current?.webkitShowPlaybackTargetPicker?.();
+  }, []);
+
   const togglePlayPause = useCallback(() => {
     if (!streamUrl) return;
     player.togglePlayback();
@@ -241,6 +272,16 @@ export function RadioPlayer({ station, className }: RadioPlayerProps) {
               </Button>
               <Button variant="ghost" size="icon" className="w-8 h-8" disabled> <SkipBack className="h-4 w-4 text-muted-foreground/50" /> </Button>
               <Button variant="ghost" size="icon" className="w-8 h-8" disabled> <SkipForward className="h-4 w-4 text-muted-foreground/50" /> </Button>
+              {chromecast.available && (
+                <Button onClick={chromecast.toggleCast} variant="ghost" size="icon" className="w-8 h-8" title={chromecast.isCasting ? `Casting to ${chromecast.deviceName || 'device'}` : 'Cast'}>
+                  <Cast className={cn("h-4 w-4", chromecast.isCasting && "text-primary")} />
+                </Button>
+              )}
+              {airPlayAvailable && (
+                <Button onClick={toggleAirPlay} variant="ghost" size="icon" className="w-8 h-8" title="AirPlay">
+                  <Airplay className="h-4 w-4" />
+                </Button>
+              )}
               <Button onClick={player.togglePlayerSize} variant="ghost" size="icon" className="w-8 h-8">
                 <PanelBottomOpen className="h-4 w-4" /> <span className="sr-only">Maximize to bar</span>
               </Button>
@@ -298,6 +339,16 @@ export function RadioPlayer({ station, className }: RadioPlayerProps) {
                         </Button>
                         <Slider value={[player.isMuted ? 0 : player.volume]} max={1} step={0.01} onValueChange={handleVolumeChange} className="flex-grow" aria-label="Volume control" />
                     </div>
+                    {chromecast.available && (
+                        <Button onClick={chromecast.toggleCast} variant="ghost" size="icon" className="w-9 h-9" title={chromecast.isCasting ? `Casting to ${chromecast.deviceName || 'device'}` : 'Cast'}>
+                            <Cast className={cn("h-4 w-4", chromecast.isCasting && "text-primary")} />
+                        </Button>
+                    )}
+                    {airPlayAvailable && (
+                        <Button onClick={toggleAirPlay} variant="ghost" size="icon" className="w-9 h-9" title="AirPlay">
+                            <Airplay className="h-4 w-4" />
+                        </Button>
+                    )}
                      <Button variant="ghost" size="icon" asChild className="w-9 h-9 hidden md:inline-flex" title="Open stream in new tab">
                         <a href={streamUrl} target="_blank" rel="noopener noreferrer" aria-label="Open stream URL">
                             <ExternalLink className="h-4 w-4" />
