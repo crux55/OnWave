@@ -176,20 +176,24 @@ export async function fetchHomePageSections(): Promise<{
   featuredGenre: string;
   discoverGenre: string;
 }> {
-  const grouped = await getTopStationsGrouped();
+  const featuredGenre = pickGenre();
+  const discoverGenre = pickGenre([featuredGenre]);
+
+  // These three don't depend on each other's data (only picking discoverGenre
+  // needed featuredGenre, done above) — fire them together instead of
+  // sequentially, which was tripling home page load latency for no reason.
+  const [grouped, featuredResult, discoverResult] = await Promise.all([
+    getTopStationsGrouped(),
+    fetchGenreStations(featuredGenre).catch(() => [] as RadioStation[]),
+    fetchGenreStations(discoverGenre).catch(() => [] as RadioStation[]),
+  ]);
 
   const popular = grouped.popular.slice(0, 4);
   const trending = grouped.trending.slice(0, 4);
 
-  // Featured: try a random genre first, fall back to the backend's featured category
-  const featuredGenre = pickGenre();
-  let featured = grouped.featured.slice(0, 4);
-  try {
-    const genreStations = (await fetchGenreStations(featuredGenre)).slice(0, 4);
-    if (genreStations.length > 0) featured = genreStations;
-  } catch {
-    // keep the backend's featured category
-  }
+  const featured = featuredResult.length > 0
+    ? featuredResult.slice(0, 4)
+    : grouped.featured.slice(0, 4);
 
   // Collect IDs already shown so Discover doesn't repeat them
   const seen = new Set<string>([
@@ -198,15 +202,9 @@ export async function fetchHomePageSections(): Promise<{
     ...trending.map(s => s.stationuuid),
   ]);
 
-  // Discover: a second, distinct genre, falling back to the backend's random category
-  const discoverGenre = pickGenre([featuredGenre]);
-  let discoverPool: RadioStation[] = [];
-  try {
-    discoverPool = (await fetchGenreStations(discoverGenre)).filter(s => !seen.has(s.stationuuid));
-  } catch {
-    // Fallback: use the backend's random category, excluding already-shown stations
-    discoverPool = grouped.random.filter(s => !seen.has(s.stationuuid));
-  }
+  const discoverPool = discoverResult.length > 0
+    ? discoverResult.filter(s => !seen.has(s.stationuuid))
+    : grouped.random.filter(s => !seen.has(s.stationuuid));
 
   return {
     featured,

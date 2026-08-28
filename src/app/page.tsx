@@ -16,6 +16,20 @@ function capitalize(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
+const HOME_CACHE_KEY = 'onwave:home-cache';
+const HOME_CACHE_MAX_AGE_MS = 10 * 60 * 1000;
+
+interface HomeCache {
+  timestamp: number;
+  featuredStations: RadioStation[];
+  featuredGenre: string;
+  mostListens: RadioStation[];
+  trending: RadioStation[];
+  discoverStations: RadioStation[];
+  discoverGenre: string;
+  topTags: TopTag[];
+}
+
 interface StationSectionProps {
   title: string;
   stations: RadioStation[];
@@ -100,6 +114,29 @@ export default function HomePage() {
   const { isLiked, toggleLike } = useLikedStations();
 
   useEffect(() => {
+    // A fresh cached snapshot skips the network round-trip entirely so
+    // switching back to Home from another tab is instant, not another full
+    // fetch chain against the backend/radio-browser.info every single time.
+    try {
+      const cached = sessionStorage.getItem(HOME_CACHE_KEY);
+      if (cached) {
+        const parsed: HomeCache = JSON.parse(cached);
+        if (Date.now() - parsed.timestamp < HOME_CACHE_MAX_AGE_MS) {
+          setFeaturedStations(parsed.featuredStations);
+          setFeaturedGenre(parsed.featuredGenre);
+          setMostListens(parsed.mostListens);
+          setTrending(parsed.trending);
+          setDiscoverStations(parsed.discoverStations);
+          setDiscoverGenre(parsed.discoverGenre);
+          setTopTags(parsed.topTags);
+          setIsLoading(false);
+          return;
+        }
+      }
+    } catch {
+      // Corrupt or inaccessible cache — fall through to a normal fetch.
+    }
+
     const load = async () => {
       setIsLoading(true);
       try {
@@ -107,13 +144,30 @@ export default function HomePage() {
           fetchHomePageSections(),
           fetchTopTags(),
         ]);
-        setFeaturedStations([...PINNED_STATIONS, ...sections.featured].slice(0, 4));
+        const featured = [...PINNED_STATIONS, ...sections.featured].slice(0, 4);
+        setFeaturedStations(featured);
         setFeaturedGenre(sections.featuredGenre);
         setMostListens(sections.popular);
         setTrending(sections.trending);
         setDiscoverStations(sections.discover);
         setDiscoverGenre(sections.discoverGenre);
         setTopTags(tags);
+
+        try {
+          const cache: HomeCache = {
+            timestamp: Date.now(),
+            featuredStations: featured,
+            featuredGenre: sections.featuredGenre,
+            mostListens: sections.popular,
+            trending: sections.trending,
+            discoverStations: sections.discover,
+            discoverGenre: sections.discoverGenre,
+            topTags: tags,
+          };
+          sessionStorage.setItem(HOME_CACHE_KEY, JSON.stringify(cache));
+        } catch {
+          // sessionStorage unavailable (private browsing, quota) — fine to skip.
+        }
       } catch (error) {
         console.error('Error loading home page:', error);
       } finally {
@@ -129,6 +183,18 @@ export default function HomePage() {
       const result = await fetchDiscoverSection();
       setDiscoverStations(result.stations);
       setDiscoverGenre(result.genre);
+
+      try {
+        const cached = sessionStorage.getItem(HOME_CACHE_KEY);
+        if (cached) {
+          const parsed: HomeCache = JSON.parse(cached);
+          parsed.discoverStations = result.stations;
+          parsed.discoverGenre = result.genre;
+          sessionStorage.setItem(HOME_CACHE_KEY, JSON.stringify(parsed));
+        }
+      } catch {
+        // Not fatal — worst case the next cached load shows the pre-shuffle discover set.
+      }
     } catch (error) {
       console.error('Shuffle failed:', error);
     } finally {
