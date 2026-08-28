@@ -6,13 +6,14 @@ import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import {
   Play, Pause, Volume2, VolumeX, ExternalLink, Loader2,
-  SkipForward, SkipBack, PanelBottomClose, PanelBottomOpen, Expand, X, Cast, Airplay
+  SkipForward, SkipBack, PanelBottomClose, PanelBottomOpen, Expand, X, Cast, Airplay, Heart
 } from 'lucide-react';
 import React, { useRef, useEffect, useCallback, useState } from 'react';
 import Image from 'next/image';
 import { usePlayer } from '@/contexts/PlayerContext';
 import { cn } from '@/lib/utils';
 import { useChromecast } from '@/hooks/use-chromecast';
+import { useLikedStations } from '@/hooks/use-liked-stations';
 
 declare global {
   interface HTMLMediaElement {
@@ -37,6 +38,7 @@ export function RadioPlayer({ station, className }: RadioPlayerProps) {
   const [airPlayAvailable, setAirPlayAvailable] = useState(false);
   const streamUrl = station?.url_resolved || station?.url;
   const chromecast = useChromecast(streamUrl, station?.name, station?.codec);
+  const { isLiked, toggleLike } = useLikedStations();
 
 
   useEffect(() => {
@@ -347,6 +349,9 @@ export function RadioPlayer({ station, className }: RadioPlayerProps) {
                         </Button>
                         <Slider value={[player.isMuted ? 0 : player.volume]} max={1} step={0.01} onValueChange={handleVolumeChange} className="flex-grow" aria-label="Volume control" />
                     </div>
+                    <Button onClick={() => toggleLike(station)} variant="ghost" size="icon" className="w-9 h-9" title={isLiked(station.stationuuid) ? 'Unlike' : 'Like'}>
+                        <Heart className={cn("h-4 w-4", isLiked(station.stationuuid) && "fill-accent text-accent")} />
+                    </Button>
                     {chromecast.available && (
                         <Button onClick={chromecast.toggleCast} variant="ghost" size="icon" className="w-9 h-9" title={chromecast.isCasting ? `Casting to ${chromecast.deviceName || 'device'}` : 'Cast'}>
                             <Cast className={cn("h-4 w-4", chromecast.isCasting && "text-primary")} />
