@@ -110,7 +110,14 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
         ))}
       </nav>
 
-      <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
+      <main
+        className={cn(
+          "flex-1 overflow-y-auto p-4 md:p-6 lg:p-8",
+          // The fixed player bar overlays content instead of pushing it —
+          // without this, the bottom of the page is unreachable behind it.
+          player.isPlayerBarOpen && !player.isMaximizedViewOpen && !player.isPlayerMinimized && "pb-28 sm:pb-24"
+        )}
+      >
         {children}
       </main>
 
