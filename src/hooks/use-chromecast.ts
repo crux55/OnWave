@@ -11,7 +11,10 @@ declare global {
   }
 }
 
-const CAST_SDK_URL = 'https://www.gstatic.com/cv/js/sender/v1/cast_sender.js';
+// loadCastFramework=1 is required for the SDK to expose window.cast.framework
+// (the CAF namespace this hook uses) — without it only the legacy
+// window.chrome.cast API loads.
+const CAST_SDK_URL = 'https://www.gstatic.com/cv/js/sender/v1/cast_sender.js?loadCastFramework=1';
 
 let sdkLoadPromise: Promise<boolean> | null = null;
 
@@ -22,15 +25,19 @@ function loadCastSdk(): Promise<boolean> {
 
   sdkLoadPromise = new Promise((resolve) => {
     window.__onGCastApiAvailable = (isAvailable: boolean) => {
-      if (!isAvailable) {
+      if (!isAvailable || !window.cast?.framework) {
         resolve(false);
         return;
       }
-      window.cast.framework.CastContext.getInstance().setOptions({
-        receiverApplicationId: window.chrome.cast.media.DEFAULT_MEDIA_RECEIVER_APP_ID,
-        autoJoinPolicy: window.chrome.cast.AutoJoinPolicy.ORIGIN_SCOPED,
-      });
-      resolve(true);
+      try {
+        window.cast.framework.CastContext.getInstance().setOptions({
+          receiverApplicationId: window.chrome.cast.media.DEFAULT_MEDIA_RECEIVER_APP_ID,
+          autoJoinPolicy: window.chrome.cast.AutoJoinPolicy.ORIGIN_SCOPED,
+        });
+        resolve(true);
+      } catch {
+        resolve(false);
+      }
     };
 
     const script = document.createElement('script');
