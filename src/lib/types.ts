@@ -106,6 +106,7 @@ export interface Token {
   user_id: string;
   email: string;
   role: string;
+  is_admin: boolean;
   created_at: string | Date;
   updated_at: string | Date;
   exp: string | Date;

@@ -3,14 +3,15 @@
 
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { UserCircle2, Radio, Podcast, Users, FileText, Edit3, LogOut, Loader2, ShieldAlert, Bell, X, Heart, ChevronRight } from 'lucide-react';
+import { UserCircle2, Radio, Podcast, Users, FileText, Edit3, LogOut, Loader2, ShieldAlert, Bell, X, Heart, ChevronRight, Award, ShieldCheck, Plus } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { useEffect, useState } from "react";
-import { fetchCurrentUserProfile, fetchLikedStations } from "@/lib/api";
+import { fetchCurrentUserProfile, fetchLikedStations, fetchMyBadges, fetchBadges, createBadge, awardBadge, type Badge } from "@/lib/api";
 import { JWT, Profile, Token, User } from '@/lib/types';
 import { jwtDecode as jwt_decode } from "jwt-decode";
 import { useReminders } from '@/contexts/RemindersContext';
@@ -73,6 +74,14 @@ export default function ProfilePage() {
   const [token, setToken] = useState<Token | null>(null);
   const [deletingReminderId, setDeletingReminderId] = useState<string | null>(null);
   const [likedCount, setLikedCount] = useState<number | null>(null);
+  const [myBadges, setMyBadges] = useState<Badge[]>([]);
+  const [allBadges, setAllBadges] = useState<Badge[]>([]);
+  const [newBadgeName, setNewBadgeName] = useState('');
+  const [newBadgeIcon, setNewBadgeIcon] = useState('');
+  const [newBadgeDescription, setNewBadgeDescription] = useState('');
+  const [isCreatingBadge, setIsCreatingBadge] = useState(false);
+  const [awardEmail, setAwardEmail] = useState<Record<string, string>>({});
+  const [isAwarding, setIsAwarding] = useState<string | null>(null);
   const getAvatarUrl = (filename: string | undefined) => {
   const url = filename ? `${apiHost}${filename}` : undefined;
 
@@ -86,12 +95,13 @@ export default function ProfilePage() {
       return;
     }
 
+    let decodedToken: Token | null = null;
     try {
       const jwt = JSON.parse(tokenString);
-      const decodedToken = jwt_decode<Token>(jwt?.token || "");
+      decodedToken = jwt_decode<Token>(jwt?.token || "");
       setToken(decodedToken);
     } catch (error) {
-      console.error("Error decoding token:", error);  
+      console.error("Error decoding token:", error);
     }
 
     fetchCurrentUserProfile()
@@ -113,7 +123,50 @@ export default function ProfilePage() {
     fetchLikedStations()
       .then(stations => setLikedCount(stations.length))
       .catch(() => setLikedCount(null));
+
+    fetchMyBadges()
+      .then(setMyBadges)
+      .catch(() => setMyBadges([]));
+
+    if (decodedToken?.is_admin) {
+      fetchBadges()
+        .then(setAllBadges)
+        .catch(() => setAllBadges([]));
+    }
   }, []);
+
+  const handleCreateBadge = async () => {
+    if (!newBadgeName.trim() || !newBadgeIcon.trim()) return;
+    setIsCreatingBadge(true);
+    try {
+      await createBadge({ name: newBadgeName.trim(), icon: newBadgeIcon.trim(), description: newBadgeDescription.trim() });
+      toast({ title: 'Badge created', description: newBadgeName });
+      setNewBadgeName('');
+      setNewBadgeIcon('');
+      setNewBadgeDescription('');
+      const updated = await fetchBadges();
+      setAllBadges(updated);
+    } catch (error: any) {
+      toast({ title: 'Failed to create badge', description: error.message, variant: 'destructive' });
+    } finally {
+      setIsCreatingBadge(false);
+    }
+  };
+
+  const handleAward = async (badgeId: string) => {
+    const email = awardEmail[badgeId]?.trim();
+    if (!email) return;
+    setIsAwarding(badgeId);
+    try {
+      await awardBadge(email, badgeId);
+      toast({ title: 'Badge awarded', description: `${email} now has this badge.` });
+      setAwardEmail(prev => ({ ...prev, [badgeId]: '' }));
+    } catch (error: any) {
+      toast({ title: 'Failed to award badge', description: error.message, variant: 'destructive' });
+    } finally {
+      setIsAwarding(null);
+    }
+  };
 
 
 
@@ -228,6 +281,29 @@ export default function ProfilePage() {
                 {userProfile.bio || "You haven't added a bio yet."}
               </p>
             </section>
+
+            {myBadges.length > 0 && (
+              <>
+                <Separator />
+                <section>
+                  <h3 className="text-xl font-semibold text-foreground mb-3 flex items-center gap-2">
+                    <Award className="h-5 w-5 text-primary" /> Badges
+                  </h3>
+                  <div className="flex flex-wrap gap-2">
+                    {myBadges.map(badge => (
+                      <div
+                        key={badge.id}
+                        title={badge.description}
+                        className="flex items-center gap-1.5 rounded-full border border-border bg-muted/30 px-3 py-1.5 text-sm"
+                      >
+                        <span>{badge.icon}</span>
+                        <span className="font-medium text-foreground">{badge.name}</span>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              </>
+            )}
 
             <Separator />
 
@@ -367,6 +443,64 @@ export default function ProfilePage() {
               </div>
               <NotificationSettings />
             </section>
+
+            {token?.is_admin && (
+              <>
+                <Separator />
+                <section className="space-y-5 rounded-lg border border-accent/30 bg-accent/5 p-4">
+                  <h3 className="text-xl font-semibold text-foreground flex items-center gap-2">
+                    <ShieldCheck className="h-5 w-5 text-accent" /> Admin: Badges
+                  </h3>
+
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-foreground">Create a badge</p>
+                    <div className="grid grid-cols-[80px_1fr] gap-2">
+                      <Input placeholder="Icon" value={newBadgeIcon} onChange={e => setNewBadgeIcon(e.target.value)} maxLength={4} />
+                      <Input placeholder="Name" value={newBadgeName} onChange={e => setNewBadgeName(e.target.value)} />
+                    </div>
+                    <Input placeholder="Description (optional)" value={newBadgeDescription} onChange={e => setNewBadgeDescription(e.target.value)} />
+                    <Button
+                      size="sm"
+                      onClick={handleCreateBadge}
+                      disabled={isCreatingBadge || !newBadgeName.trim() || !newBadgeIcon.trim()}
+                    >
+                      {isCreatingBadge ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
+                      Create Badge
+                    </Button>
+                  </div>
+
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-foreground">Award a badge</p>
+                    {allBadges.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">No badges yet — create one above.</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {allBadges.map(badge => (
+                          <div key={badge.id} className="flex items-center gap-2 rounded-md border border-border bg-card/40 p-2">
+                            <span className="text-lg">{badge.icon}</span>
+                            <span className="flex-shrink-0 text-sm font-medium">{badge.name}</span>
+                            <Input
+                              placeholder="user@email.com"
+                              value={awardEmail[badge.id] || ''}
+                              onChange={e => setAwardEmail(prev => ({ ...prev, [badge.id]: e.target.value }))}
+                              className="h-8 text-sm"
+                            />
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleAward(badge.id)}
+                              disabled={isAwarding === badge.id || !awardEmail[badge.id]?.trim()}
+                            >
+                              {isAwarding === badge.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Award'}
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </section>
+              </>
+            )}
 
             <Separator />
             <div className="pt-2">

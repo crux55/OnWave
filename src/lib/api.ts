@@ -523,3 +523,119 @@ export async function unlikeStation(stationUuid: string): Promise<void> {
     throw new Error(errorData.message || 'Failed to unlike station');
   }
 }
+
+export interface Badge {
+  id: string;
+  name: string;
+  icon: string;
+  description: string;
+  created_at: string;
+}
+
+export async function fetchBadges(): Promise<Badge[]> {
+  const response = await fetch('/api/badges');
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Failed to fetch badges');
+  }
+  const result = await response.json();
+  return result.badges || [];
+}
+
+export async function fetchMyBadges(): Promise<Badge[]> {
+  const token = localStorage.getItem("token");
+  if (!token) {
+    throw new Error('User not authenticated');
+  }
+
+  const auth = JSON.parse(token);
+  const response = await fetch('/api/users/me/badges', {
+    headers: { 'Authorization': `Bearer ${auth.token}` },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    if (response.status === 401) {
+      throw new Error('UNAUTHORIZED');
+    }
+    throw new Error(errorData.message || 'Failed to fetch badges');
+  }
+
+  const result = await response.json();
+  return result.badges || [];
+}
+
+export async function createBadge(badge: { name: string; icon: string; description?: string }): Promise<void> {
+  const token = localStorage.getItem("token");
+  if (!token) {
+    throw new Error('User not authenticated');
+  }
+
+  const auth = JSON.parse(token);
+  const response = await fetch('/api/badges', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${auth.token}`,
+    },
+    body: JSON.stringify(badge),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    if (response.status === 401) {
+      throw new Error('UNAUTHORIZED');
+    }
+    throw new Error(errorData.message || 'Failed to create badge');
+  }
+}
+
+export async function awardBadge(email: string, badgeId: string): Promise<void> {
+  const token = localStorage.getItem("token");
+  if (!token) {
+    throw new Error('User not authenticated');
+  }
+
+  const auth = JSON.parse(token);
+  const response = await fetch('/api/badges/award', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${auth.token}`,
+    },
+    body: JSON.stringify({ email, badge_id: badgeId }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    if (response.status === 401) {
+      throw new Error('UNAUTHORIZED');
+    }
+    throw new Error(errorData.message || 'Failed to award badge');
+  }
+}
+
+export async function revokeBadge(email: string, badgeId: string): Promise<void> {
+  const token = localStorage.getItem("token");
+  if (!token) {
+    throw new Error('User not authenticated');
+  }
+
+  const auth = JSON.parse(token);
+  const response = await fetch('/api/badges/revoke', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${auth.token}`,
+    },
+    body: JSON.stringify({ email, badge_id: badgeId }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    if (response.status === 401) {
+      throw new Error('UNAUTHORIZED');
+    }
+    throw new Error(errorData.message || 'Failed to revoke badge');
+  }
+}
