@@ -256,11 +256,13 @@ export function RadioPlayer({ station, className }: RadioPlayerProps) {
   if (!station || !player.isPlayerBarOpen) return null; 
 
   const playerRootClasses = cn(
-    "fixed z-40 bg-card shadow-lg border-t transition-all duration-300 ease-in-out",
+    "fixed z-40 bg-card transition-all duration-300 ease-in-out",
     player.isPlayerMinimized
-      ? "bottom-16 right-4 w-72 rounded-lg"
-      : "left-0 right-0", // bottom position controlled by the className prop
-    className // Apply the className prop for positioning
+      ? "bottom-16 right-4 w-72 rounded-lg shadow-lg border"
+      // Inset pill, not a flush-edge bar — the rounding only reads as a
+      // pill with margin around it, and the glow is the point.
+      : "left-2 right-2 sm:left-4 sm:right-4 rounded-full border border-border/60 shadow-[0_0_0_1px_hsl(var(--accent)/0.15),0_12px_32px_-8px_hsl(var(--accent)/0.35),0_12px_32px_-12px_hsl(var(--accent-2)/0.25)]",
+    className // Apply the className prop for positioning (bottom offset)
   );
 
   const playerContainerClasses = cn(
@@ -328,7 +330,7 @@ export function RadioPlayer({ station, className }: RadioPlayerProps) {
         <div className={playerContainerClasses}>
             <div className={playerFlexClasses}>
                 <div className="flex items-center gap-3 md:gap-4 flex-grow overflow-hidden">
-                    <div className="hidden sm:block h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-gradient-to-br from-accent/25 to-[hsl(var(--accent-2))]/20">
+                    <div className="hidden sm:block h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-gradient-to-br from-accent/25 to-[hsl(var(--accent-2))]/20 shadow-[0_0_0_2px_hsl(var(--accent)/0.4)]">
                         <SafeImage
                             src={station.favicon}
                             alt={`${station.name} logo`}
@@ -339,6 +341,15 @@ export function RadioPlayer({ station, className }: RadioPlayerProps) {
                         />
                     </div>
                     <div className="flex-grow overflow-hidden space-y-1">
+                        {isPlayingDisplay && (
+                          <div className="flex items-center gap-1.5">
+                            <span className="relative flex h-1.5 w-1.5">
+                              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent opacity-75" />
+                              <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-accent" />
+                            </span>
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-accent">Live</span>
+                          </div>
+                        )}
                         <div className="flex items-baseline gap-2">
                             <h3 className="text-base font-semibold truncate text-foreground">{station.name}</h3>
                             <p className="text-xs text-muted-foreground truncate hidden md:block">
