@@ -6,6 +6,7 @@ import { PINNED_STATIONS } from '@/lib/pinned-stations';
 import type { RadioStation, TopTag } from '@/lib/types';
 import { RadioStationCard } from '@/components/RadioStationCard';
 import { usePlayer } from '@/contexts/PlayerContext';
+import { useLikedStations } from '@/hooks/use-liked-stations';
 import { Disc3, TrendingUp, RefreshCw, Sparkles, Shuffle } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -23,6 +24,8 @@ interface StationSectionProps {
   emptyMessage?: string;
   action?: React.ReactNode;
   isLoading?: boolean;
+  isLiked?: (stationuuid: string) => boolean;
+  onToggleLike?: (station: RadioStation) => void;
 }
 
 const StationSection: React.FC<StationSectionProps> = ({
@@ -30,6 +33,8 @@ const StationSection: React.FC<StationSectionProps> = ({
   emptyMessage = 'No stations available in this section right now.',
   action,
   isLoading = false,
+  isLiked,
+  onToggleLike,
 }) => {
   const header = (
     <div className="flex items-center justify-between mb-6">
@@ -72,6 +77,8 @@ const StationSection: React.FC<StationSectionProps> = ({
             key={station.stationuuid}
             station={station}
             onPlay={onPlay}
+            isLiked={isLiked?.(station.stationuuid)}
+            onToggleLike={onToggleLike}
           />
         ))}
       </div>
@@ -90,6 +97,7 @@ export default function HomePage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isShuffling, setIsShuffling] = useState(false);
   const player = usePlayer();
+  const { isLiked, toggleLike } = useLikedStations();
 
   useEffect(() => {
     const load = async () => {
@@ -166,6 +174,8 @@ export default function HomePage() {
         onPlay={handlePlayStation}
         icon={Sparkles}
         isLoading={isLoading}
+        isLiked={isLiked}
+        onToggleLike={toggleLike}
         emptyMessage="No featured stations available right now."
       />
 
@@ -175,6 +185,8 @@ export default function HomePage() {
         onPlay={handlePlayStation}
         icon={Disc3}
         isLoading={isLoading}
+        isLiked={isLiked}
+        onToggleLike={toggleLike}
         emptyMessage="No popular stations available right now."
       />
 
@@ -184,6 +196,8 @@ export default function HomePage() {
         onPlay={handlePlayStation}
         icon={TrendingUp}
         isLoading={isLoading}
+        isLiked={isLiked}
+        onToggleLike={toggleLike}
         emptyMessage="No trending stations right now. Check back later!"
       />
 
@@ -193,6 +207,8 @@ export default function HomePage() {
         onPlay={handlePlayStation}
         icon={Shuffle}
         isLoading={isLoading}
+        isLiked={isLiked}
+        onToggleLike={toggleLike}
         emptyMessage="Nothing to discover right now. Try shuffling!"
         action={
           <Button

@@ -7,12 +7,14 @@ import { usePlayer } from '@/contexts/PlayerContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ListMusic, Search as SearchIcon, AlertTriangle, PlayCircle, ExternalLink, SlidersHorizontal, ListPlus } from 'lucide-react';
+import { ListMusic, Search as SearchIcon, AlertTriangle, PlayCircle, ExternalLink, SlidersHorizontal, ListPlus, Heart } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { fetchFromApi } from '@/lib/api';
 import { useSearchParams } from 'next/navigation';
 import { SafeImage } from '@/components/SafeImage';
 import { useToast } from '@/hooks/use-toast';
+import { useLikedStations } from '@/hooks/use-liked-stations';
+import { cn } from '@/lib/utils';
 import {
   Select,
   SelectContent,
@@ -86,6 +88,7 @@ function SearchPageContent() {
   const searchParams = useSearchParams();
   const player = usePlayer();
   const { toast } = useToast();
+  const { isLiked, toggleLike } = useLikedStations();
   const initialSearch = searchParams.get('search') || '';
   const [searchTerm, setSearchTerm] = useState(initialSearch);
   const [stations, setStations] = useState<RadioStation[]>([]);
@@ -592,6 +595,15 @@ function SearchPageContent() {
                             title="Add to queue"
                           >
                             <ListPlus className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => toggleLike(toPlayerStation(station))}
+                            className="h-7 w-7"
+                            title={isLiked(station.stationuuid) ? 'Unlike' : 'Like'}
+                          >
+                            <Heart className={cn('h-4 w-4', isLiked(station.stationuuid) && 'fill-accent text-accent')} />
                           </Button>
                         </div>
                       </td>

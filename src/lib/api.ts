@@ -363,3 +363,109 @@ export async function deleteReminder(reminderId: string) {
 
   return response.ok;
 }
+
+export interface LikedStation {
+  stationuuid: string;
+  name: string;
+  url: string;
+  url_resolved: string;
+  favicon: string;
+  tags: string;
+  country: string;
+  codec: string;
+  bitrate: number;
+  created_at: string;
+}
+
+export async function fetchLikedStations(): Promise<LikedStation[]> {
+  const token = localStorage.getItem("token");
+
+  if (!token) {
+    throw new Error('User not authenticated');
+  }
+
+  const auth = JSON.parse(token);
+  const response = await fetch('/api/liked-stations', {
+    method: 'GET',
+    headers: {
+      'Authorization': `Bearer ${auth.token}`,
+    },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+
+    if (response.status === 401) {
+      throw new Error('UNAUTHORIZED');
+    }
+
+    throw new Error(errorData.message || 'Failed to fetch liked stations');
+  }
+
+  const result = await response.json();
+  return result.stations || [];
+}
+
+export async function likeStation(station: RadioStation): Promise<void> {
+  const token = localStorage.getItem("token");
+
+  if (!token) {
+    throw new Error('User not authenticated');
+  }
+
+  const auth = JSON.parse(token);
+  const response = await fetch('/api/liked-stations', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${auth.token}`,
+    },
+    body: JSON.stringify({
+      stationuuid: station.stationuuid,
+      name: station.name,
+      url: station.url,
+      url_resolved: station.url_resolved,
+      favicon: station.favicon,
+      tags: station.tags,
+      country: station.country,
+      codec: station.codec,
+      bitrate: station.bitrate,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+
+    if (response.status === 401) {
+      throw new Error('UNAUTHORIZED');
+    }
+
+    throw new Error(errorData.message || 'Failed to like station');
+  }
+}
+
+export async function unlikeStation(stationUuid: string): Promise<void> {
+  const token = localStorage.getItem("token");
+
+  if (!token) {
+    throw new Error('User not authenticated');
+  }
+
+  const auth = JSON.parse(token);
+  const response = await fetch(`/api/liked-stations/${stationUuid}`, {
+    method: 'DELETE',
+    headers: {
+      'Authorization': `Bearer ${auth.token}`,
+    },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+
+    if (response.status === 401) {
+      throw new Error('UNAUTHORIZED');
+    }
+
+    throw new Error(errorData.message || 'Failed to unlike station');
+  }
+}

@@ -1,14 +1,17 @@
 import type { RadioStation } from '@/lib/types';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Play } from 'lucide-react';
+import { Play, Heart } from 'lucide-react';
 import { SafeImage } from '@/components/SafeImage';
+import { cn } from '@/lib/utils';
 
 interface RadioStationCardProps {
   station: RadioStation;
   onPlay: (station: RadioStation) => void;
+  isLiked?: boolean;
+  onToggleLike?: (station: RadioStation) => void;
 }
 
-export function RadioStationCard({ station, onPlay }: RadioStationCardProps) {
+export function RadioStationCard({ station, onPlay, isLiked, onToggleLike }: RadioStationCardProps) {
   return (
     <Card className="flex h-full flex-col overflow-hidden border-border/80 bg-card/60 transition-colors duration-300 hover:border-accent/40">
       <CardHeader className="flex flex-row items-start gap-3 p-4">
@@ -28,6 +31,15 @@ export function RadioStationCard({ station, onPlay }: RadioStationCardProps) {
             {station.tags} &bull; {station.country}
           </CardDescription>
         </div>
+        {onToggleLike && (
+          <button
+            onClick={() => onToggleLike(station)}
+            aria-label={isLiked ? `Unlike ${station.name}` : `Like ${station.name}`}
+            className="shrink-0 text-muted-foreground/60 transition-colors hover:text-accent"
+          >
+            <Heart className={cn('h-4 w-4', isLiked && 'fill-accent text-accent')} />
+          </button>
+        )}
       </CardHeader>
       <CardContent className="flex-grow p-4 pt-0" />
       <CardFooter className="mt-auto flex items-center justify-between p-4 pt-0">
