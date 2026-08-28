@@ -429,6 +429,7 @@ function SearchPageContent() {
             <table className="min-w-full w-full border border-border border-collapse text-sm">
               <thead className="bg-muted/30">
                 <tr>
+                  <th className="p-2 border border-border text-left font-semibold text-foreground">Play</th>
                   <th className="p-2 border border-border text-left font-semibold text-foreground w-10"></th>
                   <th
                     className="p-2 border border-border text-left font-semibold text-foreground cursor-pointer"
@@ -470,7 +471,6 @@ function SearchPageContent() {
                     Status {sortKey === 'status' && (sortOrder === 'asc' ? '▲' : '▼')}
                   </th>
                   <th className="p-2 border border-border text-left font-semibold text-foreground">Links</th>
-                  <th className="p-2 border border-border text-left font-semibold text-foreground">Play</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -481,6 +481,17 @@ function SearchPageContent() {
 
                   return (
                     <tr key={station.stationuuid || `${station.name}-${station.bitrate}`} className="hover:bg-muted/20">
+                      <td className="p-2 border border-border text-center">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handlePlayStation(station)}
+                          className="text-accent hover:text-accent-foreground hover:bg-accent/90 h-7 px-2"
+                        >
+                          <PlayCircle className="mr-1.5 h-4 w-4" />
+                          Play
+                        </Button>
+                      </td>
                       <td className="p-2 border border-border">
                         <SafeImage
                           src={station.favicon}
@@ -519,17 +530,6 @@ function SearchPageContent() {
                             </a>
                           )}
                         </div>
-                      </td>
-                      <td className="p-2 border border-border text-center">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handlePlayStation(station)}
-                          className="text-accent hover:text-accent-foreground hover:bg-accent/90 h-7 px-2"
-                        >
-                          <PlayCircle className="mr-1.5 h-4 w-4" />
-                          Play
-                        </Button>
                       </td>
                     </tr>
                   );
