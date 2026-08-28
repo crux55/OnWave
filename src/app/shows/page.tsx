@@ -178,7 +178,7 @@ export default function ShowsPage() {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
             {currentShows.map(show => (
-              <PBSShowCard key={show.id} show={show} />
+              <PBSShowCard key={show.id} show={show} onTuneIn={handleListenLive} isTunedIn={isPbsPlaying} />
             ))}
           </div>
         </section>
