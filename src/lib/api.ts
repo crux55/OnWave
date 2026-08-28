@@ -1,4 +1,5 @@
 import type { RadioStation, TopTag, PBSShow, WebradioSearchResponse, TopStationsResponse } from '@/lib/types';
+import { PINNED_STATIONS } from '@/lib/pinned-stations';
 
 export async function fetchFromApi(params: Record<string, string> = {}): Promise<WebradioSearchResponse> {
   const queryString = new URLSearchParams(params).toString();
@@ -144,6 +145,17 @@ const DISCOVER_GENRES = [
   'drum and bass', 'world', 'latin', 'funk',
 ];
 
+// Narrower pool, matching the vibe of the curated PINNED_STATIONS list —
+// only used to backfill Editor's Picks if there aren't enough pinned
+// stations to fill the row. Discover keeps the full DISCOVER_GENRES pool
+// above since that section is meant to be broad/serendipitous.
+const EDITOR_PICK_GENRES = [
+  'electronic', 'house', 'techno', 'trance', 'chill', 'ambient',
+  'dance', 'indie', 'alternative', 'downtempo',
+];
+
+const EDITOR_PICKS_TARGET = 8;
+
 function isQualityStation(station: RadioStation): boolean {
   // Accept streams with no bitrate metadata (0) or at least 64 kbps, and recently verified online
   return station.lastcheckok === 1 && (station.bitrate === 0 || station.bitrate >= 64);
@@ -158,8 +170,8 @@ function fisherYatesShuffle<T>(arr: T[]): T[] {
   return a;
 }
 
-function pickGenre(exclude: string[] = []): string {
-  const available = DISCOVER_GENRES.filter(g => !exclude.includes(g));
+function pickGenre(exclude: string[] = [], pool: string[] = DISCOVER_GENRES): string {
+  const available = pool.filter(g => !exclude.includes(g));
   return available[Math.floor(Math.random() * available.length)];
 }
 
@@ -176,24 +188,30 @@ export async function fetchHomePageSections(): Promise<{
   featuredGenre: string;
   discoverGenre: string;
 }> {
-  const featuredGenre = pickGenre();
-  const discoverGenre = pickGenre([featuredGenre]);
+  // Editor's Picks is genuinely curated now — PINNED_STATIONS fills the row
+  // first, and a genre fetch only backfills remaining slots (from a narrow,
+  // taste-matched pool, not the broad Discover one) if the curated list is
+  // too short. With enough pinned stations, no genre fetch happens at all.
+  const needsBackfill = PINNED_STATIONS.length < EDITOR_PICKS_TARGET;
+  const featuredGenre = needsBackfill ? pickGenre([], EDITOR_PICK_GENRES) : '';
+  const discoverGenre = pickGenre(featuredGenre ? [featuredGenre] : []);
 
-  // These three don't depend on each other's data (only picking discoverGenre
-  // needed featuredGenre, done above) — fire them together instead of
-  // sequentially, which was tripling home page load latency for no reason.
   const [grouped, featuredResult, discoverResult] = await Promise.all([
     getTopStationsGrouped(),
-    fetchGenreStations(featuredGenre).catch(() => [] as RadioStation[]),
+    needsBackfill ? fetchGenreStations(featuredGenre).catch(() => [] as RadioStation[]) : Promise.resolve([] as RadioStation[]),
     fetchGenreStations(discoverGenre).catch(() => [] as RadioStation[]),
   ]);
 
   const popular = grouped.popular.slice(0, 4);
   const trending = grouped.trending.slice(0, 4);
 
-  const featured = featuredResult.length > 0
-    ? featuredResult.slice(0, 4)
-    : grouped.featured.slice(0, 4);
+  const pinnedUuids = new Set(PINNED_STATIONS.map(s => s.stationuuid));
+  let featured = [...PINNED_STATIONS];
+  if (featured.length < EDITOR_PICKS_TARGET) {
+    const backfillPool = featuredResult.length > 0 ? featuredResult : grouped.featured;
+    const backfill = backfillPool.filter(s => !pinnedUuids.has(s.stationuuid));
+    featured = [...featured, ...backfill].slice(0, EDITOR_PICKS_TARGET);
+  }
 
   // Collect IDs already shown so Discover doesn't repeat them
   const seen = new Set<string>([
