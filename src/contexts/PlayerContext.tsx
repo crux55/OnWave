@@ -20,6 +20,16 @@ interface PlayerContextType {
   setVolume: (volume: number) => void;
   isMuted: boolean;
   setIsMuted: (muted: boolean) => void;
+  queue: RadioStation[];
+  queueIndex: number;
+  addToQueue: (station: RadioStation) => void;
+  addManyToQueue: (stations: RadioStation[]) => void;
+  removeFromQueue: (index: number) => void;
+  clearQueue: () => void;
+  playNext: () => void;
+  playPrevious: () => void;
+  hasNext: boolean;
+  hasPrevious: boolean;
 }
 
 const PlayerContext = createContext<PlayerContextType | undefined>(undefined);
@@ -32,6 +42,8 @@ export const PlayerProvider = ({ children }: { children: ReactNode }) => {
   const [isMaximizedViewOpen, setIsMaximizedViewOpen] = useState(false);
   const [volume, setVolumeState] = useState(0.5);
   const [isMuted, setIsMutedState] = useState(false);
+  const [queue, setQueue] = useState<RadioStation[]>([]);
+  const [queueIndex, setQueueIndex] = useState(-1);
 
 
   const playStation = useCallback((station: RadioStation) => {
@@ -40,7 +52,56 @@ export const PlayerProvider = ({ children }: { children: ReactNode }) => {
     setIsPlayerMinimized(false);
     setIsMaximizedViewOpen(false);
     setIsPlayingState(true);
+    setQueueIndex(-1);
   }, []);
+
+  const addToQueue = useCallback((station: RadioStation) => {
+    setQueue(prev => [...prev, station]);
+  }, []);
+
+  const addManyToQueue = useCallback((stations: RadioStation[]) => {
+    setQueue(prev => [...prev, ...stations]);
+  }, []);
+
+  const removeFromQueue = useCallback((index: number) => {
+    setQueue(prev => prev.filter((_, i) => i !== index));
+    setQueueIndex(prev => {
+      if (index < prev) return prev - 1;
+      if (index === prev) return -1;
+      return prev;
+    });
+  }, []);
+
+  const clearQueue = useCallback(() => {
+    setQueue([]);
+    setQueueIndex(-1);
+  }, []);
+
+  const playAtQueueIndex = useCallback((index: number, list: RadioStation[]) => {
+    const station = list[index];
+    if (!station) return;
+    setCurrentStation(station);
+    setIsPlayerBarOpen(true);
+    setIsPlayerMinimized(false);
+    setIsMaximizedViewOpen(false);
+    setIsPlayingState(true);
+    setQueueIndex(index);
+  }, []);
+
+  const playNext = useCallback(() => {
+    const nextIndex = queueIndex + 1;
+    if (nextIndex >= queue.length) return;
+    playAtQueueIndex(nextIndex, queue);
+  }, [queue, queueIndex, playAtQueueIndex]);
+
+  const playPrevious = useCallback(() => {
+    const prevIndex = queueIndex - 1;
+    if (prevIndex < 0) return;
+    playAtQueueIndex(prevIndex, queue);
+  }, [queue, queueIndex, playAtQueueIndex]);
+
+  const hasNext = queueIndex + 1 < queue.length;
+  const hasPrevious = queueIndex - 1 >= 0;
 
   const closePlayerBar = useCallback(() => {
     setIsPlayerBarOpen(false);
@@ -102,7 +163,17 @@ export const PlayerProvider = ({ children }: { children: ReactNode }) => {
       volume,
       setVolume,
       isMuted,
-      setIsMuted
+      setIsMuted,
+      queue,
+      queueIndex,
+      addToQueue,
+      addManyToQueue,
+      removeFromQueue,
+      clearQueue,
+      playNext,
+      playPrevious,
+      hasNext,
+      hasPrevious
     }}>
       {children}
     </PlayerContext.Provider>

@@ -36,7 +36,7 @@ export function RadioPlayer({ station, className }: RadioPlayerProps) {
   const [lastVolumeBeforeMute, setLastVolumeBeforeMute] = useState(player.volume);
   const [airPlayAvailable, setAirPlayAvailable] = useState(false);
   const streamUrl = station?.url_resolved || station?.url;
-  const chromecast = useChromecast(streamUrl, station?.name);
+  const chromecast = useChromecast(streamUrl, station?.name, station?.codec);
 
 
   useEffect(() => {
@@ -270,8 +270,12 @@ export function RadioPlayer({ station, className }: RadioPlayerProps) {
               <Button onClick={togglePlayPause} variant="ghost" size="icon" className="w-8 h-8" disabled={isLoading || !streamUrl}>
                 {isLoading ? <Loader2 className="h-4 w-4 animate-spin text-primary" /> : player.isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
               </Button>
-              <Button variant="ghost" size="icon" className="w-8 h-8" disabled> <SkipBack className="h-4 w-4 text-muted-foreground/50" /> </Button>
-              <Button variant="ghost" size="icon" className="w-8 h-8" disabled> <SkipForward className="h-4 w-4 text-muted-foreground/50" /> </Button>
+              <Button onClick={player.playPrevious} variant="ghost" size="icon" className="w-8 h-8" disabled={!player.hasPrevious} title="Previous in queue">
+                <SkipBack className={cn("h-4 w-4", !player.hasPrevious && "text-muted-foreground/50")} />
+              </Button>
+              <Button onClick={player.playNext} variant="ghost" size="icon" className="w-8 h-8" disabled={!player.hasNext} title="Next in queue">
+                <SkipForward className={cn("h-4 w-4", !player.hasNext && "text-muted-foreground/50")} />
+              </Button>
               {chromecast.available && (
                 <Button onClick={chromecast.toggleCast} variant="ghost" size="icon" className="w-8 h-8" title={chromecast.isCasting ? `Casting to ${chromecast.deviceName || 'device'}` : 'Cast'}>
                   <Cast className={cn("h-4 w-4", chromecast.isCasting && "text-primary")} />
@@ -330,8 +334,14 @@ export function RadioPlayer({ station, className }: RadioPlayerProps) {
                      <Button onClick={player.openMaximizedPlayer} variant="ghost" size="icon" className="w-9 h-9" title="Open maximized player view">
                         <Expand className="h-4 w-4" /> <span className="sr-only">Maximize View</span>
                     </Button>
+                    <Button onClick={player.playPrevious} variant="ghost" size="icon" className="w-9 h-9" disabled={!player.hasPrevious} title="Previous in queue">
+                        <SkipBack className={cn("h-4 w-4", !player.hasPrevious && "text-muted-foreground/50")} />
+                    </Button>
                     <Button onClick={togglePlayPause} variant="ghost" size="icon" className="w-10 h-10" disabled={isLoading || !streamUrl}>
                         {isLoading ? <Loader2 className="h-5 w-5 animate-spin text-primary" /> : player.isPlaying ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
+                    </Button>
+                    <Button onClick={player.playNext} variant="ghost" size="icon" className="w-9 h-9" disabled={!player.hasNext} title="Next in queue">
+                        <SkipForward className={cn("h-4 w-4", !player.hasNext && "text-muted-foreground/50")} />
                     </Button>
                     <div className="items-center gap-2 w-24 sm:w-28 hidden md:flex">
                         <Button onClick={toggleMute} variant="ghost" size="icon" className="w-9 h-9">

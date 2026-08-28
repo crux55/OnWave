@@ -7,11 +7,12 @@ import { usePlayer } from '@/contexts/PlayerContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ListMusic, Search as SearchIcon, AlertTriangle, PlayCircle, ExternalLink, SlidersHorizontal } from 'lucide-react';
+import { ListMusic, Search as SearchIcon, AlertTriangle, PlayCircle, ExternalLink, SlidersHorizontal, ListPlus } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { fetchFromApi } from '@/lib/api';
 import { useSearchParams } from 'next/navigation';
 import { SafeImage } from '@/components/SafeImage';
+import { useToast } from '@/hooks/use-toast';
 import {
   Select,
   SelectContent,
@@ -51,6 +52,26 @@ type BitrateProfileKey = 'custom' | 'talk' | 'church' | 'music' | 'dj' | 'hifi';
 type SortOrder = 'asc' | 'desc';
 type SortKey = 'name' | 'bitrate' | 'country' | 'clickcount' | 'clicktrend' | 'status';
 
+const SEARCH_CACHE_KEY = 'onwave:search-cache';
+
+interface SearchCache {
+  searchTerm: string;
+  stations: RadioStation[];
+  totalResults: number;
+  limit: number;
+  minBitrate: number;
+  maxBitrate: number;
+  minClicks: number;
+  maxClicks: number;
+  minTrend: number;
+  maxTrend: number;
+  codec: string;
+  country: string;
+  bitrateProfile: BitrateProfileKey;
+  sortKey: SortKey | null;
+  sortOrder: SortOrder;
+}
+
 const BITRATE_PROFILES: Record<BitrateProfileKey, { label: string; min: number; max: number; codec: string }> = {
   custom: { label: 'Custom', min: 0, max: 999999, codec: 'any' },
   talk: { label: 'Talk Radio / Podcasts', min: 48, max: 64, codec: 'AAC+' },
@@ -64,6 +85,7 @@ const BITRATE_PROFILES: Record<BitrateProfileKey, { label: string; min: number; 
 function SearchPageContent() {
   const searchParams = useSearchParams();
   const player = usePlayer();
+  const { toast } = useToast();
   const initialSearch = searchParams.get('search') || '';
   const [searchTerm, setSearchTerm] = useState(initialSearch);
   const [stations, setStations] = useState<RadioStation[]>([]);
@@ -133,14 +155,61 @@ function SearchPageContent() {
     }
   }, [initialSearch, handleSearchStations]);
 
+  // Restore the last search from this tab's session on a plain refresh (no
+  // ?search= in the URL, which already drives its own fetch above).
+  useEffect(() => {
+    if (initialSearch) return;
+    try {
+      const cached = sessionStorage.getItem(SEARCH_CACHE_KEY);
+      if (!cached) return;
+      const parsed: SearchCache = JSON.parse(cached);
+      setSearchTerm(parsed.searchTerm ?? '');
+      setStations(parsed.stations ?? []);
+      setTotalResults(parsed.totalResults ?? 0);
+      setLimit(parsed.limit ?? DEFAULT_FILTERS.limit);
+      setMinBitrate(parsed.minBitrate ?? DEFAULT_FILTERS.minBitrate);
+      setMaxBitrate(parsed.maxBitrate ?? DEFAULT_FILTERS.maxBitrate);
+      setMinClicks(parsed.minClicks ?? DEFAULT_FILTERS.minClicks);
+      setMaxClicks(parsed.maxClicks ?? DEFAULT_FILTERS.maxClicks);
+      setMinTrend(parsed.minTrend ?? DEFAULT_FILTERS.minTrend);
+      setMaxTrend(parsed.maxTrend ?? DEFAULT_FILTERS.maxTrend);
+      setCodec(parsed.codec ?? DEFAULT_FILTERS.codec);
+      setCountry(parsed.country ?? DEFAULT_FILTERS.country);
+      setBitrateProfile(parsed.bitrateProfile ?? 'custom');
+      setSortKey(parsed.sortKey ?? null);
+      setSortOrder(parsed.sortOrder ?? 'asc');
+    } catch {
+      // Corrupt or inaccessible cache — ignore, page just starts blank.
+    }
+    // Only ever restore once, on mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Persist the current search + filters + results so a refresh can restore them.
+  useEffect(() => {
+    if (!searchTerm.trim()) return;
+    try {
+      const cache: SearchCache = {
+        searchTerm, stations, totalResults, limit, minBitrate, maxBitrate,
+        minClicks, maxClicks, minTrend, maxTrend, codec, country,
+        bitrateProfile, sortKey, sortOrder,
+      };
+      sessionStorage.setItem(SEARCH_CACHE_KEY, JSON.stringify(cache));
+    } catch {
+      // sessionStorage unavailable (private browsing, quota) — fine to skip.
+    }
+  }, [searchTerm, stations, totalResults, limit, minBitrate, maxBitrate, minClicks, maxClicks, minTrend, maxTrend, codec, country, bitrateProfile, sortKey, sortOrder]);
+
+  const toPlayerStation = (station: RadioStation): RadioStation => ({
+    ...station,
+    serveruuid: station.serveruuid || station.stationuuid || station.name,
+    url: station.url_resolved || station.url,
+    tags: station.tags?.split(', ')[0]?.trim() || station.tags || 'Unknown',
+    favicon: station.favicon || 'https://placehold.co/64x64.png',
+  });
+
   const handlePlayStation = (station: RadioStation) => {
-    const playerStation: RadioStation = {
-      ...station,
-      serveruuid: station.serveruuid || station.stationuuid || station.name,
-      url: station.url_resolved || station.url,
-      tags: station.tags?.split(', ')[0]?.trim() || station.tags || 'Unknown',
-      favicon: station.favicon || 'https://placehold.co/64x64.png',
-    };
+    const playerStation = toPlayerStation(station);
 
     if (!playerStation.url) {
       setError('This station does not have a playable stream URL.');
@@ -148,6 +217,23 @@ function SearchPageContent() {
     }
 
     player.playStation(playerStation);
+  };
+
+  const handleAddToQueue = (station: RadioStation) => {
+    const playerStation = toPlayerStation(station);
+    if (!playerStation.url) {
+      setError('This station does not have a playable stream URL.');
+      return;
+    }
+    player.addToQueue(playerStation);
+    toast({ title: 'Added to queue', description: playerStation.name });
+  };
+
+  const handleAddAllToQueue = () => {
+    const playable = sortedStations.filter(s => s.url_resolved || s.url).map(toPlayerStation);
+    if (playable.length === 0) return;
+    player.addManyToQueue(playable);
+    toast({ title: 'Added to queue', description: `${playable.length} station${playable.length === 1 ? '' : 's'} added.` });
   };
 
   const handleResetFilters = () => {
@@ -422,9 +508,15 @@ function SearchPageContent() {
 
       {stations.length > 0 && (
         <div className="space-y-2">
-          <p className="text-sm text-muted-foreground">
-            Showing {stations.length} of {totalResults} matching stations.
-          </p>
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <p className="text-sm text-muted-foreground">
+              Showing {stations.length} of {totalResults} matching stations.
+            </p>
+            <Button variant="outline" size="sm" onClick={handleAddAllToQueue}>
+              <ListPlus className="mr-1.5 h-4 w-4" />
+              Add All to Queue
+            </Button>
+          </div>
           <div className="overflow-x-auto bg-card p-1 rounded-lg shadow-md">
             <table className="min-w-full w-full border border-border border-collapse text-sm">
               <thead className="bg-muted/30">
@@ -482,15 +574,26 @@ function SearchPageContent() {
                   return (
                     <tr key={station.stationuuid || `${station.name}-${station.bitrate}`} className="hover:bg-muted/20">
                       <td className="p-2 border border-border text-center">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handlePlayStation(station)}
-                          className="text-accent hover:text-accent-foreground hover:bg-accent/90 h-7 px-2"
-                        >
-                          <PlayCircle className="mr-1.5 h-4 w-4" />
-                          Play
-                        </Button>
+                        <div className="flex items-center justify-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handlePlayStation(station)}
+                            className="text-accent hover:text-accent-foreground hover:bg-accent/90 h-7 px-2"
+                          >
+                            <PlayCircle className="mr-1.5 h-4 w-4" />
+                            Play
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleAddToQueue(station)}
+                            className="h-7 w-7"
+                            title="Add to queue"
+                          >
+                            <ListPlus className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </td>
                       <td className="p-2 border border-border">
                         <SafeImage

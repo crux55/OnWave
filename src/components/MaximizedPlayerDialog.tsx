@@ -97,20 +97,34 @@ export function MaximizedPlayerDialog({ station }: MaximizedPlayerDialogProps) {
           {/* Player Controls */}
           <div className="flex flex-col items-center space-y-4">
             <div className="flex items-center gap-4">
-              <Button variant="ghost" size="icon" className="w-12 h-12 text-muted-foreground/70" disabled>
+              <Button
+                onClick={player.playPrevious}
+                variant="ghost"
+                size="icon"
+                className={cn("w-12 h-12", !player.hasPrevious && "text-muted-foreground/70")}
+                disabled={!player.hasPrevious}
+                title="Previous in queue"
+              >
                 <SkipBack className="h-6 w-6" />
               </Button>
-              <Button 
-                onClick={togglePlayPause} 
-                variant="outline" 
-                size="icon" 
+              <Button
+                onClick={togglePlayPause}
+                variant="outline"
+                size="icon"
                 className="w-16 h-16 rounded-full border-2 border-primary hover:bg-primary/10"
                 disabled={!streamUrl /* || player.isLoading - if isLoading is in context */}
               >
                 {/* {player.isLoading ? <Loader2 className="h-8 w-8 animate-spin text-primary" /> : player.isPlaying ? <Pause className="h-8 w-8 text-primary" /> : <Play className="h-8 w-8 text-primary" />} */}
                  {player.isPlaying ? <Pause className="h-8 w-8 text-primary" /> : <Play className="h-8 w-8 text-primary" />}
               </Button>
-              <Button variant="ghost" size="icon" className="w-12 h-12 text-muted-foreground/70" disabled>
+              <Button
+                onClick={player.playNext}
+                variant="ghost"
+                size="icon"
+                className={cn("w-12 h-12", !player.hasNext && "text-muted-foreground/70")}
+                disabled={!player.hasNext}
+                title="Next in queue"
+              >
                 <SkipForward className="h-6 w-6" />
               </Button>
             </div>
