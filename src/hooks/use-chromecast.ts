@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { useToast } from '@/hooks/use-toast';
 
 // The Cast Web Sender SDK types aren't in DOM lib — declare just what's used.
 declare global {
@@ -50,11 +51,36 @@ function loadCastSdk(): Promise<boolean> {
   return sdkLoadPromise;
 }
 
-export function useChromecast(streamUrl: string | undefined, stationName: string | undefined) {
+// radio-browser.info's `codec` field values, mapped to the MIME type the
+// Cast default media receiver needs to pick the right decoder. An incorrect
+// content type (e.g. declaring an AAC+ stream as audio/mpeg) lets
+// session.loadMedia() resolve successfully while the receiver silently fails
+// to decode the audio — the sender sees no error at all.
+function codecToContentType(codec: string | undefined): string {
+  switch ((codec || '').toUpperCase().replace(/[^A-Z0-9]/g, '')) {
+    case 'AAC':
+    case 'AACP':
+      return 'audio/aac';
+    case 'OGG':
+    case 'VORBIS':
+    case 'OPUS':
+      return 'audio/ogg';
+    case 'FLAC':
+      return 'audio/flac';
+    case 'WMA':
+      return 'audio/x-ms-wma';
+    case 'MP3':
+    default:
+      return 'audio/mpeg';
+  }
+}
+
+export function useChromecast(streamUrl: string | undefined, stationName: string | undefined, codec: string | undefined) {
   const [available, setAvailable] = useState(false);
   const [isCasting, setIsCasting] = useState(false);
   const [deviceName, setDeviceName] = useState<string | null>(null);
   const sessionListenerRef = useRef<((event: any) => void) | null>(null);
+  const { toast } = useToast();
 
   useEffect(() => {
     let cancelled = false;
@@ -92,7 +118,7 @@ export function useChromecast(streamUrl: string | undefined, stationName: string
     const session = window.cast?.framework?.CastContext.getInstance().getCurrentSession();
     if (!session || !streamUrl) return;
 
-    const mediaInfo = new window.chrome.cast.media.MediaInfo(streamUrl, 'audio/mpeg');
+    const mediaInfo = new window.chrome.cast.media.MediaInfo(streamUrl, codecToContentType(codec));
     mediaInfo.streamType = window.chrome.cast.media.StreamType.LIVE;
     mediaInfo.metadata = new window.chrome.cast.media.GenericMediaMetadata();
     mediaInfo.metadata.title = stationName || 'OnWave';
@@ -100,10 +126,15 @@ export function useChromecast(streamUrl: string | undefined, stationName: string
     const request = new window.chrome.cast.media.LoadRequest(mediaInfo);
     session.loadMedia(request).catch(() => {
       // Casting session exists but the receiver rejected this stream (format/
-      // CORS/etc.) — leave the session open, just don't force an error state
-      // over what is otherwise a working local playback experience.
+      // CORS/etc.) — leave the session open, just surface it so it's not a
+      // silent failure.
+      toast({
+        title: 'Cast failed',
+        description: `${stationName || 'This station'} couldn't be played on the cast device.`,
+        variant: 'destructive',
+      });
     });
-  }, [streamUrl, stationName]);
+  }, [streamUrl, stationName, codec, toast]);
 
   const toggleCast = useCallback(async () => {
     if (!available) return;
