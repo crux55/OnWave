@@ -14,6 +14,7 @@ import {
 import { cn, isValidImageUrl } from '@/lib/utils';
 import { AudioVisualizer } from '@/components/AudioVisualizer';
 import { useAudioVisualizer } from '@/hooks/use-audio-visualizer';
+import { useChromecast } from '@/hooks/use-chromecast';
 
 interface MaximizedPlayerDialogProps {
   station: RadioStation;
@@ -26,12 +27,20 @@ export function MaximizedPlayerDialog({ station }: MaximizedPlayerDialogProps) {
   // For simplicity, we'll rely on context's isPlaying for now.
   const [lastVolumeBeforeMute, setLastVolumeBeforeMute] = React.useState(player.volume);
   const { mode: visualizerMode, getFrequencyData } = useAudioVisualizer(player.audioElementRef.current, player.isPlaying);
-
+  const chromecast = useChromecast(streamUrl, station.name, station.codec);
 
   const togglePlayPause = useCallback(() => {
     if (!streamUrl) return;
+    if (chromecast.isCasting) {
+      chromecast.toggleRemotePlayback();
+      return;
+    }
     player.togglePlayback();
-  }, [player]);
+  }, [player, streamUrl, chromecast]);
+
+  // While casting, this reflects and controls the remote session's state,
+  // not the (paused) local audio element.
+  const isPlayingDisplay = chromecast.isCasting ? !chromecast.isRemotePaused : player.isPlaying;
 
   const handleVolumeChange = useCallback((newVolume: number[]) => {
     const vol = newVolume[0];
@@ -65,7 +74,7 @@ export function MaximizedPlayerDialog({ station }: MaximizedPlayerDialogProps) {
 
   return (
     <Dialog open={player.isMaximizedViewOpen} onOpenChange={handleDialogClose}>
-      <DialogContent className="sm:max-w-2xl md:max-w-3xl lg:max-w-4xl p-0 overflow-hidden data-[state=open]:min-h-[70vh] flex flex-col">
+      <DialogContent hideCloseButton className="sm:max-w-2xl md:max-w-3xl lg:max-w-4xl p-0 overflow-hidden data-[state=open]:min-h-[70vh] flex flex-col">
         <div className="relative h-60 sm:h-80 md:h-96 w-full">
           <Image
             src={isValidImageUrl(station.favicon) ? station.favicon : `https://placehold.co/1200x800.png`}
@@ -119,7 +128,7 @@ export function MaximizedPlayerDialog({ station }: MaximizedPlayerDialogProps) {
                 disabled={!streamUrl /* || player.isLoading - if isLoading is in context */}
               >
                 {/* {player.isLoading ? <Loader2 className="h-8 w-8 animate-spin text-primary" /> : player.isPlaying ? <Pause className="h-8 w-8 text-primary" /> : <Play className="h-8 w-8 text-primary" />} */}
-                 {player.isPlaying ? <Pause className="h-8 w-8 text-primary" /> : <Play className="h-8 w-8 text-primary" />}
+                 {isPlayingDisplay ? <Pause className="h-8 w-8 text-primary" /> : <Play className="h-8 w-8 text-primary" />}
               </Button>
               <Button
                 onClick={player.playNext}
