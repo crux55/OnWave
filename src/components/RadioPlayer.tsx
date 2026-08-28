@@ -234,8 +234,8 @@ export function RadioPlayer({ station, className }: RadioPlayerProps) {
   const playerRootClasses = cn(
     "fixed z-40 bg-card shadow-lg border-t transition-all duration-300 ease-in-out",
     player.isPlayerMinimized
-      ? "bottom-16 right-4 w-72 rounded-lg sm:mb-0 mb-16" // Adjust for ticker when minimized
-      : "left-0 right-0 sm:mb-0 mb-16", // Remove bottom-0, will be controlled by className prop
+      ? "bottom-16 right-4 w-72 rounded-lg"
+      : "left-0 right-0", // bottom position controlled by the className prop
     className // Apply the className prop for positioning
   );
 
