@@ -1,13 +1,14 @@
 'use client';
 
 import { useParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { UserCircle2, Loader2, Award, FileText } from 'lucide-react';
+import { UserCircle2, Loader2, Award, FileText, Radio } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { fetchPublicProfile, fetchUserBadges, type Badge } from '@/lib/api';
+import { fetchPublicProfile, fetchUserBadges, fetchUserStations, type Badge, type Station } from '@/lib/api';
 import type { Profile } from '@/lib/types';
 
 export default function PublicProfilePage() {
@@ -17,6 +18,7 @@ export default function PublicProfilePage() {
   const [isLoading, setIsLoading] = useState(true);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [badges, setBadges] = useState<Badge[]>([]);
+  const [stations, setStations] = useState<Station[]>([]);
 
   const getAvatarUrl = (filename: string | undefined) => filename ? `${apiHost}${filename}` : undefined;
 
@@ -30,9 +32,12 @@ export default function PublicProfilePage() {
       .then(async (profileData) => {
         setProfile(profileData);
         // The URL segment may be a slug rather than the raw user ID — once
-        // resolved, badges are fetched by the profile's canonical user_id.
+        // resolved, badges/stations are fetched by the profile's canonical
+        // user_id.
         const badgeData = profileData ? await fetchUserBadges(profileData.user_id).catch(() => []) : [];
         setBadges(badgeData);
+        const stationData = profileData ? await fetchUserStations(profileData.user_id).catch(() => []) : [];
+        setStations(stationData);
         setIsLoading(false);
       });
   }, [params.userId]);
@@ -96,6 +101,28 @@ export default function PublicProfilePage() {
                       <span>{badge.icon}</span>
                       <span className="font-medium text-foreground">{badge.name}</span>
                     </div>
+                  ))}
+                </div>
+              </section>
+            </>
+          )}
+
+          {stations.length > 0 && (
+            <>
+              <Separator />
+              <section>
+                <h3 className="text-xl font-semibold text-foreground mb-3 flex items-center gap-2">
+                  <Radio className="h-5 w-5 text-primary" /> Stations
+                </h3>
+                <div className="flex flex-wrap gap-2">
+                  {stations.map(station => (
+                    <Link
+                      key={station.id}
+                      href={`/stations/${station.slug || station.id}`}
+                      className="flex items-center gap-1.5 rounded-full border border-border bg-muted/30 px-3 py-1.5 text-sm hover:bg-muted/60 transition-colors"
+                    >
+                      <span className="font-medium text-foreground">{station.name}</span>
+                    </Link>
                   ))}
                 </div>
               </section>

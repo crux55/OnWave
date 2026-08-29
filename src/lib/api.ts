@@ -641,6 +641,27 @@ export async function fetchMyStations(): Promise<Station[]> {
   return result.stations || [];
 }
 
+// The public station directory — every station, not just the caller's own.
+export async function fetchAllStations(): Promise<Station[]> {
+  const response = await fetch('/api/stations');
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Failed to fetch stations');
+  }
+  const result = await response.json();
+  return result.stations || [];
+}
+
+export async function fetchUserStations(userId: string): Promise<Station[]> {
+  const response = await fetch(`/api/users/${userId}/stations`);
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Failed to fetch stations');
+  }
+  const result = await response.json();
+  return result.stations || [];
+}
+
 export async function createBadge(badge: { name: string; icon: string; description?: string; station_id?: string }): Promise<void> {
   const token = localStorage.getItem("token");
   if (!token) {
