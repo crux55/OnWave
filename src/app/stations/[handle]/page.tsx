@@ -2,12 +2,15 @@
 
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { Radio, Loader2, Users, Heart, Calendar, Bell, UserCircle2, Clock } from 'lucide-react';
+import { jwtDecode as jwt_decode } from 'jwt-decode';
+import { Radio, Loader2, Users, Heart, Calendar, Bell, UserCircle2, Clock, Award, Plus, ShieldCheck } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { fetchStation, fetchMyFollows, followTarget, unfollowTarget, type StationDetail, type Follow, type ScrapedShowSummary } from '@/lib/api';
+import { fetchStation, fetchMyFollows, followTarget, unfollowTarget, createBadge, awardBadge, revokeBadge, type StationDetail, type Follow, type ScrapedShowSummary } from '@/lib/api';
+import type { Token } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -50,11 +53,16 @@ export default function StationPage() {
   const [isToggling, setIsToggling] = useState(false);
   const [followedShowIds, setFollowedShowIds] = useState<Set<string>>(new Set());
   const [togglingShowId, setTogglingShowId] = useState<string | null>(null);
+  const [token, setToken] = useState<Token | null>(null);
+  const [newBadgeIcon, setNewBadgeIcon] = useState('');
+  const [newBadgeName, setNewBadgeName] = useState('');
+  const [newBadgeDescription, setNewBadgeDescription] = useState('');
+  const [isCreatingBadge, setIsCreatingBadge] = useState(false);
+  const [awardEmail, setAwardEmail] = useState<Record<string, string>>({});
+  const [isAwarding, setIsAwarding] = useState<string | null>(null);
+  const [isRevoking, setIsRevoking] = useState<string | null>(null);
 
-  useEffect(() => {
-    const handle = params.handle;
-    if (!handle) return;
-
+  const loadStation = (handle: string) => {
     setIsLoading(true);
     fetchStation(handle)
       .then(async (data) => {
@@ -70,6 +78,23 @@ export default function StationPage() {
         setStation(null);
         setIsLoading(false);
       });
+  };
+
+  useEffect(() => {
+    const handle = params.handle;
+    if (!handle) return;
+
+    const tokenString = localStorage.getItem('token');
+    if (tokenString) {
+      try {
+        const jwt = JSON.parse(tokenString);
+        setToken(jwt_decode<Token>(jwt?.token || ''));
+      } catch (error) {
+        console.error('Error decoding token:', error);
+      }
+    }
+
+    loadStation(handle);
   }, [params.handle]);
 
   const requireLogin = (message: string) => {
@@ -132,6 +157,58 @@ export default function StationPage() {
     }
   };
 
+  const handleCreateBadge = async () => {
+    if (!station || !newBadgeName.trim() || !newBadgeIcon.trim()) return;
+    setIsCreatingBadge(true);
+    try {
+      await createBadge({
+        name: newBadgeName.trim(),
+        icon: newBadgeIcon.trim(),
+        description: newBadgeDescription.trim(),
+        station_id: station.id,
+      });
+      toast({ title: 'Badge created', description: newBadgeName });
+      setNewBadgeName('');
+      setNewBadgeIcon('');
+      setNewBadgeDescription('');
+      loadStation(station.id);
+    } catch (error: any) {
+      toast({ title: 'Failed to create badge', description: error.message, variant: 'destructive' });
+    } finally {
+      setIsCreatingBadge(false);
+    }
+  };
+
+  const handleAwardBadge = async (badgeId: string) => {
+    const email = awardEmail[badgeId]?.trim();
+    if (!email) return;
+    setIsAwarding(badgeId);
+    try {
+      await awardBadge(email, badgeId);
+      toast({ title: 'Badge awarded', description: `${email} now has this badge.` });
+      setAwardEmail(prev => ({ ...prev, [badgeId]: '' }));
+    } catch (error: any) {
+      toast({ title: 'Failed to award badge', description: error.message, variant: 'destructive' });
+    } finally {
+      setIsAwarding(null);
+    }
+  };
+
+  const handleRevokeBadge = async (badgeId: string) => {
+    const email = awardEmail[badgeId]?.trim();
+    if (!email) return;
+    setIsRevoking(badgeId);
+    try {
+      await revokeBadge(email, badgeId);
+      toast({ title: 'Badge revoked', description: `Removed from ${email}.` });
+      setAwardEmail(prev => ({ ...prev, [badgeId]: '' }));
+    } catch (error: any) {
+      toast({ title: 'Failed to revoke badge', description: error.message, variant: 'destructive' });
+    } finally {
+      setIsRevoking(null);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[calc(100vh-10rem)]">
@@ -150,6 +227,8 @@ export default function StationPage() {
       </div>
     );
   }
+
+  const canManageStationBadges = !!(token?.is_admin || station.members.some(m => m.user_id === token?.user_id));
 
   return (
     <div className="container mx-auto py-8 max-w-2xl">
@@ -243,6 +322,97 @@ export default function StationPage() {
               </section>
             </>
           )}
+
+          <Separator />
+
+          <section>
+            <h3 className="text-xl font-semibold text-foreground mb-3 flex items-center gap-2">
+              <Award className="h-5 w-5 text-primary" /> Badges
+            </h3>
+            {station.badges.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No badges yet.</p>
+            ) : (
+              <div className="flex flex-wrap gap-2 mb-4">
+                {station.badges.map(badge => (
+                  <div
+                    key={badge.id}
+                    title={badge.description}
+                    className="flex items-center gap-1.5 rounded-full border border-border bg-muted/30 px-3 py-1.5 text-sm"
+                  >
+                    <span>{badge.icon}</span>
+                    <span className="font-medium text-foreground">{badge.name}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {canManageStationBadges && (
+              <div className="space-y-5 rounded-lg border border-accent/30 bg-accent/5 p-4 mt-3">
+                <div>
+                  <h4 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                    <ShieldCheck className="h-4 w-4 text-accent" /> Manage This Station's Badges
+                  </h4>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    As a member of {station.name}, you can create badges and award or revoke them.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <p className="text-sm font-medium text-foreground">Create a badge</p>
+                  <div className="grid grid-cols-[80px_1fr] gap-2">
+                    <Input placeholder="Icon" value={newBadgeIcon} onChange={e => setNewBadgeIcon(e.target.value)} maxLength={4} />
+                    <Input placeholder="Name" value={newBadgeName} onChange={e => setNewBadgeName(e.target.value)} />
+                  </div>
+                  <Input placeholder="Description (optional)" value={newBadgeDescription} onChange={e => setNewBadgeDescription(e.target.value)} />
+                  <Button
+                    size="sm"
+                    onClick={handleCreateBadge}
+                    disabled={isCreatingBadge || !newBadgeName.trim() || !newBadgeIcon.trim()}
+                  >
+                    {isCreatingBadge ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
+                    Create Badge
+                  </Button>
+                </div>
+
+                {station.badges.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-foreground">Award or revoke a badge</p>
+                    <div className="space-y-2">
+                      {station.badges.map(badge => (
+                        <div key={badge.id} className="flex items-center gap-2 rounded-md border border-border bg-card/40 p-2">
+                          <span className="text-lg">{badge.icon}</span>
+                          <span className="flex-shrink-0 text-sm font-medium">{badge.name}</span>
+                          <Input
+                            placeholder="user@email.com"
+                            value={awardEmail[badge.id] || ''}
+                            onChange={e => setAwardEmail(prev => ({ ...prev, [badge.id]: e.target.value }))}
+                            className="h-8 text-sm"
+                          />
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleAwardBadge(badge.id)}
+                            disabled={isAwarding === badge.id || !awardEmail[badge.id]?.trim()}
+                          >
+                            {isAwarding === badge.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Award'}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="text-destructive hover:text-destructive"
+                            onClick={() => handleRevokeBadge(badge.id)}
+                            disabled={isRevoking === badge.id || !awardEmail[badge.id]?.trim()}
+                          >
+                            {isRevoking === badge.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Revoke'}
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </section>
 
           <Separator />
 

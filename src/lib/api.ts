@@ -827,6 +827,7 @@ export interface StationDetail {
   shows: ShowSummary[];
   scraped_shows: ScrapedShowSummary[];
   members: StationMember[];
+  badges: Pick<Badge, 'id' | 'name' | 'icon' | 'description'>[];
 }
 
 export async function fetchStation(handle: string): Promise<StationDetail | null> {

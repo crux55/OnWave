@@ -141,23 +141,25 @@ export default function ProfilePage() {
       })
       .catch(() => setMyBadges([]));
 
-    // Station membership can only be known after fetching it — an admin or
-    // DJ can manage badges regardless, but a "regular" account might still
-    // turn out to be a station member.
+    // myStations still feeds the "Create a Show" station picker below —
+    // station badge management itself lives on each station's own page now.
     fetchMyStations()
       .then(list => {
         setMyStations(list);
         if (list.length > 0) setCreateAsStationId(list[0].id);
         else if (decodedToken?.role === 'dj') setCreateAsStationId('self');
-
-        const canManageBadges = decodedToken?.is_admin || decodedToken?.role === 'dj' || list.length > 0;
-        if (canManageBadges) {
-          fetchManagedBadges()
-            .then(setManageableBadges)
-            .catch(() => setManageableBadges([]));
-        }
       })
       .catch(() => setMyStations([]));
+
+    // Personal badges only — a DJ's own issued badges. Station-issued badges
+    // are managed on the station's page instead, so they're filtered out
+    // here even for an admin (who'd otherwise see every station's badges via
+    // GET /badges/mine's admin-sees-all behavior).
+    if (decodedToken?.role === 'dj') {
+      fetchManagedBadges()
+        .then(list => setManageableBadges(list.filter(b => b.issuer_type === 'dj')))
+        .catch(() => setManageableBadges([]));
+    }
   }, []);
 
   // Not logged in once loading settles — go straight to login instead of
@@ -172,18 +174,19 @@ export default function ProfilePage() {
     if (!newBadgeName.trim() || !newBadgeIcon.trim()) return;
     setIsCreatingBadge(true);
     try {
+      // No station_id — badges created here are always personal/DJ-issued.
+      // Station badges are created from the station's own page instead.
       await createBadge({
         name: newBadgeName.trim(),
         icon: newBadgeIcon.trim(),
         description: newBadgeDescription.trim(),
-        station_id: createAsStationId && createAsStationId !== 'self' ? createAsStationId : undefined,
       });
       toast({ title: 'Badge created', description: newBadgeName });
       setNewBadgeName('');
       setNewBadgeIcon('');
       setNewBadgeDescription('');
       const updated = await fetchManagedBadges();
-      setManageableBadges(updated);
+      setManageableBadges(updated.filter(b => b.issuer_type === 'dj'));
     } catch (error: any) {
       toast({ title: 'Failed to create badge', description: error.message, variant: 'destructive' });
     } finally {
@@ -288,8 +291,12 @@ export default function ProfilePage() {
     }
   };
 
-  const canManageBadges = !!(token?.is_admin || token?.role === 'dj' || myStations.length > 0);
-  const canCreateBadge = myStations.length > 0 || token?.role === 'dj';
+  // Personal badges only — station badges are managed on the station's own
+  // page now, gated by that station's membership instead of this.
+  const canManagePersonalBadges = token?.role === 'dj';
+  // Still gates the "Create a Show" section below, which does span both DJs
+  // and station members.
+  const canCreateShow = myStations.length > 0 || token?.role === 'dj';
 
   if (isLoading) {
     return (
@@ -548,59 +555,34 @@ export default function ProfilePage() {
               <NotificationSettings />
             </section>
 
-            {canManageBadges && (
+            {canManagePersonalBadges && (
               <>
                 <Separator />
                 <section className="space-y-5 rounded-lg border border-accent/30 bg-accent/5 p-4">
                   <div>
                     <h3 className="text-xl font-semibold text-foreground flex items-center gap-2">
-                      <ShieldCheck className="h-5 w-5 text-accent" /> Manage Badges
+                      <ShieldCheck className="h-5 w-5 text-accent" /> Manage Your Badges
                     </h3>
                     <p className="text-sm text-muted-foreground mt-1">
-                      {token?.is_admin
-                        ? 'You can award or revoke any badge, including ones created by DJs and stations.'
-                        : 'You can award or revoke badges you created, and badges belonging to any station you\'re a member of.'}
+                      Badges you create and award yourself, as a DJ. Station badges are managed from the station's own page instead.
                     </p>
                   </div>
 
                   <div className="space-y-2">
                     <p className="text-sm font-medium text-foreground">Create a badge</p>
-                    {canCreateBadge ? (
-                      <>
-                        {myStations.length > 0 && (
-                          <Select value={createAsStationId} onValueChange={setCreateAsStationId}>
-                            <SelectTrigger className="h-9 text-sm">
-                              <SelectValue placeholder="Create as..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {myStations.map(station => (
-                                <SelectItem key={station.id} value={station.id}>{station.name}</SelectItem>
-                              ))}
-                              {token?.role === 'dj' && (
-                                <SelectItem value="self">Myself (DJ)</SelectItem>
-                              )}
-                            </SelectContent>
-                          </Select>
-                        )}
-                        <div className="grid grid-cols-[80px_1fr] gap-2">
-                          <Input placeholder="Icon" value={newBadgeIcon} onChange={e => setNewBadgeIcon(e.target.value)} maxLength={4} />
-                          <Input placeholder="Name" value={newBadgeName} onChange={e => setNewBadgeName(e.target.value)} />
-                        </div>
-                        <Input placeholder="Description (optional)" value={newBadgeDescription} onChange={e => setNewBadgeDescription(e.target.value)} />
-                        <Button
-                          size="sm"
-                          onClick={handleCreateBadge}
-                          disabled={isCreatingBadge || !newBadgeName.trim() || !newBadgeIcon.trim()}
-                        >
-                          {isCreatingBadge ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
-                          Create Badge
-                        </Button>
-                      </>
-                    ) : (
-                      <p className="text-sm text-muted-foreground">
-                        You need to be a DJ or a member of a station to create badges.
-                      </p>
-                    )}
+                    <div className="grid grid-cols-[80px_1fr] gap-2">
+                      <Input placeholder="Icon" value={newBadgeIcon} onChange={e => setNewBadgeIcon(e.target.value)} maxLength={4} />
+                      <Input placeholder="Name" value={newBadgeName} onChange={e => setNewBadgeName(e.target.value)} />
+                    </div>
+                    <Input placeholder="Description (optional)" value={newBadgeDescription} onChange={e => setNewBadgeDescription(e.target.value)} />
+                    <Button
+                      size="sm"
+                      onClick={handleCreateBadge}
+                      disabled={isCreatingBadge || !newBadgeName.trim() || !newBadgeIcon.trim()}
+                    >
+                      {isCreatingBadge ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
+                      Create Badge
+                    </Button>
                   </div>
 
                   <div className="space-y-2">
@@ -613,9 +595,6 @@ export default function ProfilePage() {
                           <div key={badge.id} className="flex items-center gap-2 rounded-md border border-border bg-card/40 p-2">
                             <span className="text-lg">{badge.icon}</span>
                             <span className="flex-shrink-0 text-sm font-medium">{badge.name}</span>
-                            {badge.issuer_name && (
-                              <span className="flex-shrink-0 text-xs text-muted-foreground">by {badge.issuer_name}</span>
-                            )}
                             <Input
                               placeholder="user@email.com"
                               value={awardEmail[badge.id] || ''}
@@ -648,13 +627,28 @@ export default function ProfilePage() {
               </>
             )}
 
-            {canCreateBadge && (
+            {canCreateShow && (
               <>
                 <Separator />
                 <section className="space-y-3 rounded-lg border border-accent/30 bg-accent/5 p-4">
                   <h3 className="text-xl font-semibold text-foreground flex items-center gap-2">
                     <Calendar className="h-5 w-5 text-accent" /> Create a Show
                   </h3>
+                  {myStations.length > 0 && (
+                    <Select value={createAsStationId} onValueChange={setCreateAsStationId}>
+                      <SelectTrigger className="h-9 text-sm">
+                        <SelectValue placeholder="Create as..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {myStations.map(station => (
+                          <SelectItem key={station.id} value={station.id}>{station.name}</SelectItem>
+                        ))}
+                        {token?.role === 'dj' && (
+                          <SelectItem value="self">Myself (DJ)</SelectItem>
+                        )}
+                      </SelectContent>
+                    </Select>
+                  )}
                   <p className="text-sm text-muted-foreground">
                     {createAsStationId && createAsStationId !== 'self'
                       ? `Creating for ${myStations.find(s => s.id === createAsStationId)?.name || 'your station'}. It'll appear on that station's page.`
