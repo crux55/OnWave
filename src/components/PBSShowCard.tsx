@@ -11,7 +11,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Clock, Calendar, User, ExternalLink, Bell, Play, Pause } from 'lucide-react';
-import { useSubscriptions } from '@/hooks/use-subscriptions';
 import { useReminders } from '@/contexts/RemindersContext';
 import { useToast } from '@/hooks/use-toast';
 
@@ -19,40 +18,22 @@ interface PBSShowCardProps {
   show: PBSShow;
   onTuneIn?: () => void;
   isTunedIn?: boolean;
+  isFollowing?: boolean;
+  onToggleFollow?: () => void;
+  isTogglingFollow?: boolean;
 }
 
-export const PBSShowCard: React.FC<PBSShowCardProps> = ({ show, onTuneIn, isTunedIn }) => {
-  const { subscribeToShow, isLoading: isSubscribing } = useSubscriptions();
+export const PBSShowCard: React.FC<PBSShowCardProps> = ({ show, onTuneIn, isTunedIn, isFollowing, onToggleFollow, isTogglingFollow }) => {
   const { addReminder, allReminders } = useReminders();
   const { toast } = useToast();
   const [isCreatingReminder, setIsCreatingReminder] = useState(false);
 
   const hasExistingReminder = allReminders.some(
-    reminder => 
+    reminder =>
       reminder.show_name === show.name &&
       reminder.show_date === show.date &&
       reminder.show_start_time === show.start_time
   );
-
-  const handleSubscription = async (type: 'subscribe' | 'remind') => {
-    try {
-      await subscribeToShow(show, type);
-      
-      toast({
-        title: "Success!",
-        description: type === 'subscribe' 
-          ? `You've subscribed to the "${show.name}" series!` 
-          : `You'll be reminded about "${show.name}"`,
-      });
-      
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : `Failed to ${type}`,
-        variant: "destructive",
-      });
-    }
-  };
 
   const handleCreateReminder = async () => {
     setIsCreatingReminder(true);
@@ -171,16 +152,18 @@ export const PBSShowCard: React.FC<PBSShowCardProps> = ({ show, onTuneIn, isTune
                 variant="ghost"
                 size="sm"
                 className="h-8 w-8 p-0 hover:bg-accent rounded-full"
-                disabled={isSubscribing || isCreatingReminder}
+                disabled={isTogglingFollow || isCreatingReminder}
               >
                 <Bell className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-56">
-              <DropdownMenuItem onClick={() => handleSubscription('subscribe')}>
-                <Bell className="h-4 w-4 mr-2" />
-                Subscribe to Series
-              </DropdownMenuItem>
+              {onToggleFollow && (
+                <DropdownMenuItem onClick={onToggleFollow}>
+                  <Bell className="h-4 w-4 mr-2" />
+                  {isFollowing ? 'Unfollow This Show' : 'Follow This Show'}
+                </DropdownMenuItem>
+              )}
               {canSetReminder && (
                 <>
                   <DropdownMenuSeparator />

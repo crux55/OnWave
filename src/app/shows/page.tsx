@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { fetchPBSShowsByDateRange, fetchFromApi } from '@/lib/api';
+import { fetchPBSShowsByDateRange, fetchFromApi, fetchMyFollows, followTarget, unfollowTarget } from '@/lib/api';
 import type { PBSShow, RadioStation } from '@/lib/types';
 import { PBSShowCard } from '@/components/PBSShowCard';
 import { Tv, Calendar, Clock, Radio, Play, Pause, Loader2 } from 'lucide-react';
@@ -9,13 +9,17 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { usePlayer } from '@/contexts/PlayerContext';
+import { useToast } from '@/hooks/use-toast';
 
 export default function ShowsPage() {
   const [allShows, setAllShows] = useState<PBSShow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [pbsStation, setPbsStation] = useState<RadioStation | null>(null);
   const [isLoadingStation, setIsLoadingStation] = useState(true);
+  const [followedShowNames, setFollowedShowNames] = useState<Set<string>>(new Set());
+  const [togglingShowName, setTogglingShowName] = useState<string | null>(null);
   const player = usePlayer();
+  const { toast } = useToast();
 
   const { currentShows, upcomingShows } = useMemo(() => ({
     currentShows: allShows.filter(show => show.status === 'live'),
@@ -40,7 +44,52 @@ export default function ShowsPage() {
     };
 
     fetchAllShows();
+
+    if (localStorage.getItem('token')) {
+      fetchMyFollows()
+        .then(follows => setFollowedShowNames(new Set(follows.filter(f => f.target_type === 'show').map(f => f.target_id))))
+        .catch(() => setFollowedShowNames(new Set()));
+    }
   }, []);
+
+  const handleToggleFollow = useCallback(async (showName: string) => {
+    if (!localStorage.getItem('token')) {
+      toast({
+        title: 'Login Required',
+        description: 'Please log in to follow shows',
+        action: <a href="/auth/login" className="text-primary hover:underline">Login here</a>,
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setTogglingShowName(showName);
+    const alreadyFollowing = followedShowNames.has(showName);
+    try {
+      if (alreadyFollowing) {
+        await unfollowTarget('show', showName);
+      } else {
+        await followTarget('show', showName);
+      }
+      setFollowedShowNames(prev => {
+        const next = new Set(prev);
+        if (alreadyFollowing) next.delete(showName); else next.add(showName);
+        return next;
+      });
+      toast({
+        title: alreadyFollowing ? 'Unfollowed' : 'Following',
+        description: alreadyFollowing ? `You'll no longer see updates for "${showName}"` : `You'll see updates for "${showName}"`,
+      });
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to update follow status',
+        variant: 'destructive',
+      });
+    } finally {
+      setTogglingShowName(null);
+    }
+  }, [followedShowNames, toast]);
 
   useEffect(() => {
     const loadPbsStation = async () => {
@@ -178,7 +227,15 @@ export default function ShowsPage() {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
             {currentShows.map(show => (
-              <PBSShowCard key={show.id} show={show} onTuneIn={handleListenLive} isTunedIn={isPbsPlaying} />
+              <PBSShowCard
+                key={show.id}
+                show={show}
+                onTuneIn={handleListenLive}
+                isTunedIn={isPbsPlaying}
+                isFollowing={followedShowNames.has(show.name)}
+                onToggleFollow={() => handleToggleFollow(show.name)}
+                isTogglingFollow={togglingShowName === show.name}
+              />
             ))}
           </div>
         </section>
@@ -192,7 +249,13 @@ export default function ShowsPage() {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
             {upcomingShows.map(show => (
-              <PBSShowCard key={show.id} show={show} />
+              <PBSShowCard
+                key={show.id}
+                show={show}
+                isFollowing={followedShowNames.has(show.name)}
+                onToggleFollow={() => handleToggleFollow(show.name)}
+                isTogglingFollow={togglingShowName === show.name}
+              />
             ))}
           </div>
         </section>

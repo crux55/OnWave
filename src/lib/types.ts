@@ -99,6 +99,8 @@ export interface Profile {
   bio?: string;
   avatar?: string;
   website?: string;
+  is_public: boolean;
+  slug?: string;
   last_updated: Date;
 }
 
@@ -118,25 +120,6 @@ export type JWT = {
   userId: string;
   message: string;
 };
-
-export interface SubscriptionRequest {
-  showId: number;
-  showName: string;
-  djName: string;
-  day: string;
-  date: string;
-  startTime: string;
-  endTime: string;
-}
-
-export interface SubscriptionResponse {
-  id: string;
-  userId: string;
-  showId: number;
-  type: 'subscribe' | 'remind';
-  createdAt: string;
-  message: string;
-}
 
 export interface Reminder {
   id: string;

@@ -1,4 +1,4 @@
-import type { RadioStation, TopTag, PBSShow, WebradioSearchResponse, TopStationsResponse } from '@/lib/types';
+import type { RadioStation, TopTag, PBSShow, WebradioSearchResponse, TopStationsResponse, Profile } from '@/lib/types';
 import { PINNED_STATIONS } from '@/lib/pinned-stations';
 
 export async function fetchFromApi(params: Record<string, string> = {}): Promise<WebradioSearchResponse> {
@@ -529,7 +529,21 @@ export interface Badge {
   name: string;
   icon: string;
   description: string;
+  issuer_id?: string | null;
+  issuer_type?: 'dj' | 'station' | null;
+  issuer_name?: string | null;
   created_at: string;
+}
+
+export interface Station {
+  id: string;
+  name: string;
+  slug?: string | null;
+  created_at: string;
+}
+
+export interface MyBadge extends Badge {
+  is_new: boolean;
 }
 
 export async function fetchBadges(): Promise<Badge[]> {
@@ -542,7 +556,7 @@ export async function fetchBadges(): Promise<Badge[]> {
   return result.badges || [];
 }
 
-export async function fetchMyBadges(): Promise<Badge[]> {
+export async function fetchMyBadges(): Promise<MyBadge[]> {
   const token = localStorage.getItem("token");
   if (!token) {
     throw new Error('User not authenticated');
@@ -565,7 +579,69 @@ export async function fetchMyBadges(): Promise<Badge[]> {
   return result.badges || [];
 }
 
-export async function createBadge(badge: { name: string; icon: string; description?: string }): Promise<void> {
+// Clears the "new" indicator on every badge the caller currently holds —
+// call once they've had a chance to see it (e.g. after loading /profile).
+export async function markBadgesSeen(): Promise<void> {
+  const token = localStorage.getItem("token");
+  if (!token) return;
+
+  const auth = JSON.parse(token);
+  await fetch('/api/users/me/badges/seen', {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${auth.token}` },
+  }).catch(() => {});
+}
+
+// fetchManagedBadges returns the badges the caller can award/revoke — every
+// badge for an admin, or just their own DJ badges plus any station they
+// belong to otherwise.
+export async function fetchManagedBadges(): Promise<Badge[]> {
+  const token = localStorage.getItem("token");
+  if (!token) {
+    throw new Error('User not authenticated');
+  }
+
+  const auth = JSON.parse(token);
+  const response = await fetch('/api/badges/mine', {
+    headers: { 'Authorization': `Bearer ${auth.token}` },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    if (response.status === 401) {
+      throw new Error('UNAUTHORIZED');
+    }
+    throw new Error(errorData.message || 'Failed to fetch badges');
+  }
+
+  const result = await response.json();
+  return result.badges || [];
+}
+
+export async function fetchMyStations(): Promise<Station[]> {
+  const token = localStorage.getItem("token");
+  if (!token) {
+    throw new Error('User not authenticated');
+  }
+
+  const auth = JSON.parse(token);
+  const response = await fetch('/api/users/me/stations', {
+    headers: { 'Authorization': `Bearer ${auth.token}` },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    if (response.status === 401) {
+      throw new Error('UNAUTHORIZED');
+    }
+    throw new Error(errorData.message || 'Failed to fetch stations');
+  }
+
+  const result = await response.json();
+  return result.stations || [];
+}
+
+export async function createBadge(badge: { name: string; icon: string; description?: string; station_id?: string }): Promise<void> {
   const token = localStorage.getItem("token");
   if (!token) {
     throw new Error('User not authenticated');
@@ -638,4 +714,116 @@ export async function revokeBadge(email: string, badgeId: string): Promise<void>
     }
     throw new Error(errorData.message || 'Failed to revoke badge');
   }
+}
+
+export interface Follow {
+  target_type: 'station' | 'show';
+  target_id: string;
+  name: string;
+  created_at: string;
+}
+
+export async function fetchMyFollows(): Promise<Follow[]> {
+  const token = localStorage.getItem("token");
+  if (!token) {
+    throw new Error('User not authenticated');
+  }
+
+  const auth = JSON.parse(token);
+  const response = await fetch('/api/users/me/follows', {
+    headers: { 'Authorization': `Bearer ${auth.token}` },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    if (response.status === 401) {
+      throw new Error('UNAUTHORIZED');
+    }
+    throw new Error(errorData.message || 'Failed to fetch follows');
+  }
+
+  const result = await response.json();
+  return result.follows || [];
+}
+
+export async function followTarget(targetType: 'station' | 'show', targetId: string): Promise<void> {
+  const token = localStorage.getItem("token");
+  if (!token) {
+    throw new Error('User not authenticated');
+  }
+
+  const auth = JSON.parse(token);
+  const response = await fetch('/api/follows', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${auth.token}` },
+    body: JSON.stringify({ target_type: targetType, target_id: targetId }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    if (response.status === 401) {
+      throw new Error('UNAUTHORIZED');
+    }
+    throw new Error(errorData.message || 'Failed to follow');
+  }
+}
+
+export async function unfollowTarget(targetType: 'station' | 'show', targetId: string): Promise<void> {
+  const token = localStorage.getItem("token");
+  if (!token) {
+    throw new Error('User not authenticated');
+  }
+
+  const auth = JSON.parse(token);
+  const response = await fetch('/api/follows/unfollow', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${auth.token}` },
+    body: JSON.stringify({ target_type: targetType, target_id: targetId }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    if (response.status === 401) {
+      throw new Error('UNAUTHORIZED');
+    }
+    throw new Error(errorData.message || 'Failed to unfollow');
+  }
+}
+
+export interface StationDetail {
+  id: string;
+  name: string;
+  slug?: string | null;
+  follower_count: number;
+  created_at: string;
+}
+
+export async function fetchStation(handle: string): Promise<StationDetail | null> {
+  const response = await fetch(`/api/stations/${handle}`);
+  if (!response.ok) {
+    if (response.status === 404) return null;
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Failed to fetch station');
+  }
+  return response.json();
+}
+
+export async function fetchPublicProfile(userId: string): Promise<Profile | null> {
+  const response = await fetch(`/api/users/${userId}/profile`);
+  if (!response.ok) {
+    if (response.status === 404) return null;
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Failed to fetch profile');
+  }
+  return response.json();
+}
+
+export async function fetchUserBadges(userId: string): Promise<Badge[]> {
+  const response = await fetch(`/api/users/${userId}/badges`);
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Failed to fetch badges');
+  }
+  const result = await response.json();
+  return result.badges || [];
 }

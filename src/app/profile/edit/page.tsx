@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { ArrowLeft, Save, Upload, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Profile } from '@/lib/types';
@@ -30,6 +31,9 @@ export default function EditProfilePage() {
     bio: '',
     website: '',
   });
+  const [isPublic, setIsPublic] = useState(false);
+  const [slug, setSlug] = useState('');
+  const [slugError, setSlugError] = useState('');
 
   useEffect(() => {
     fetchCurrentUserProfile()
@@ -43,6 +47,8 @@ export default function EditProfilePage() {
             website: data.website || '',
           });
           setAvatarPreview(data.avatar || '');
+          setIsPublic(!!data.is_public);
+          setSlug(data.slug || '');
         }
         setLoading(false);
       })
@@ -115,7 +121,18 @@ export default function EditProfilePage() {
     return result.avatarUrl;
   };
 
+  const handleSlugChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const cleaned = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '');
+    setSlug(cleaned);
+    setSlugError('');
+  };
+
   const handleSave = async () => {
+    if (slug && (slug.length < 3 || slug.length > 30)) {
+      setSlugError('Profile URL must be 3-30 characters.');
+      return;
+    }
+
     setSaving(true);
     try {
       let avatarUrl = profile?.avatar || '';
@@ -134,6 +151,8 @@ export default function EditProfilePage() {
         body: JSON.stringify({
           ...form,
           avatar: avatarUrl,
+          is_public: isPublic,
+          slug,
         }),
       });
 
@@ -143,6 +162,10 @@ export default function EditProfilePage() {
           description: 'Your profile has been successfully updated.',
         });
         router.push('/profile');
+      } else if (response.status === 409) {
+        setSlugError('That profile URL is already taken.');
+      } else if (response.status === 400) {
+        setSlugError('Profile URL must be 3-30 characters: lowercase letters, numbers, and hyphens only.');
       } else {
         throw new Error('Failed to update profile');
       }
@@ -277,6 +300,39 @@ export default function EditProfilePage() {
               onChange={handleChange}
               placeholder="https://..."
             />
+          </div>
+
+          <div>
+            <Label htmlFor="slug">Profile URL</Label>
+            <div className="flex items-center gap-1 mt-1">
+              <span className="text-sm text-muted-foreground whitespace-nowrap">onwave.andruquinn.com/profile/</span>
+              <Input
+                id="slug"
+                value={slug}
+                onChange={handleSlugChange}
+                placeholder={profile?.user_id || 'your-name'}
+                maxLength={30}
+              />
+            </div>
+            {slugError ? (
+              <p className="text-xs text-destructive mt-1">{slugError}</p>
+            ) : (
+              <p className="text-xs text-muted-foreground mt-1">
+                Optional. Leave blank to keep your default link. Lowercase letters, numbers, and hyphens only.
+              </p>
+            )}
+          </div>
+
+          <div className="flex items-center justify-between rounded-lg border border-border p-4">
+            <div className="space-y-0.5">
+              <Label htmlFor="is-public">Public Profile</Label>
+              <p className="text-xs text-muted-foreground">
+                {isPublic
+                  ? 'Anyone with your profile link can view your name, bio, and badges.'
+                  : 'Only you can see your profile. Turn this on to let others view it.'}
+              </p>
+            </div>
+            <Switch id="is-public" checked={isPublic} onCheckedChange={setIsPublic} />
           </div>
 
           <div className="flex gap-2 pt-4">
