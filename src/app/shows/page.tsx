@@ -42,6 +42,7 @@ export default function ShowsPage() {
   // whichever stations actually have a live show right now, not just PBS.
   const [stationStreams, setStationStreams] = useState<Record<string, RadioStation | null>>({});
   const stationLookupsStarted = useRef<Set<string>>(new Set());
+  const [excludedStations, setExcludedStations] = useState<Set<string>>(new Set());
   const [followedShowNames, setFollowedShowNames] = useState<Set<string>>(new Set());
   const [togglingShowName, setTogglingShowName] = useState<string | null>(null);
   const [followedProgramIds, setFollowedProgramIds] = useState<Set<string>>(new Set());
@@ -49,24 +50,37 @@ export default function ShowsPage() {
   const player = usePlayer();
   const { toast } = useToast();
 
-  const { currentInternalShows, upcomingInternalShows } = useMemo(() => ({
-    currentInternalShows: internalShows.filter(show => showStatus(show) === 'live'),
-    upcomingInternalShows: internalShows.filter(show => showStatus(show) !== 'live' && showStatus(show) !== 'expired'),
-  }), [internalShows]);
-
-  const { currentShows, upcomingShows } = useMemo(() => ({
-    currentShows: allShows.filter(show => show.status === 'live'),
-    upcomingShows: allShows.filter(show => show.status === 'upcoming')
-  }), [allShows]);
-
-  const totalShowCount = allShows.length + internalShows.length;
-
   const stationNames = useMemo(() => {
     const names = new Set<string>();
     allShows.forEach(s => { if (s.station_name) names.add(s.station_name); });
     internalShows.forEach(s => { if (s.station_name) names.add(s.station_name); });
     return Array.from(names).sort();
   }, [allShows, internalShows]);
+
+  const toggleStationFilter = useCallback((name: string) => {
+    setExcludedStations(prev => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name); else next.add(name);
+      return next;
+    });
+  }, []);
+
+  const isStationVisible = useCallback(
+    (stationName: string | null | undefined) => !stationName || !excludedStations.has(stationName),
+    [excludedStations]
+  );
+
+  const { currentInternalShows, upcomingInternalShows } = useMemo(() => ({
+    currentInternalShows: internalShows.filter(show => showStatus(show) === 'live' && isStationVisible(show.station_name)),
+    upcomingInternalShows: internalShows.filter(show => showStatus(show) !== 'live' && showStatus(show) !== 'expired' && isStationVisible(show.station_name)),
+  }), [internalShows, isStationVisible]);
+
+  const { currentShows, upcomingShows } = useMemo(() => ({
+    currentShows: allShows.filter(show => show.status === 'live' && isStationVisible(show.station_name)),
+    upcomingShows: allShows.filter(show => show.status === 'upcoming' && isStationVisible(show.station_name))
+  }), [allShows, isStationVisible]);
+
+  const totalShowCount = currentShows.length + upcomingShows.length + currentInternalShows.length + upcomingInternalShows.length;
 
   useEffect(() => {
     const fetchAllShows = async () => {
@@ -225,12 +239,31 @@ export default function ShowsPage() {
       </div>
 
       <div className="flex flex-wrap items-center gap-3 mb-8">
-        {stationNames.map(name => (
-          <Badge key={name} variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-            <Tv className="h-3 w-3 mr-1" />
-            {name}
-          </Badge>
-        ))}
+        {stationNames.map(name => {
+          const isActive = !excludedStations.has(name);
+          return (
+            <button
+              key={name}
+              type="button"
+              onClick={() => toggleStationFilter(name)}
+              aria-pressed={isActive}
+              title={isActive ? `Hide ${name}` : `Show ${name}`}
+              className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-full"
+            >
+              <Badge
+                variant="outline"
+                className={
+                  isActive
+                    ? 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100 cursor-pointer'
+                    : 'bg-transparent text-muted-foreground border-border opacity-50 hover:opacity-75 cursor-pointer'
+                }
+              >
+                <Tv className="h-3 w-3 mr-1" />
+                {name}
+              </Badge>
+            </button>
+          );
+        })}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">

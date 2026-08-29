@@ -96,6 +96,21 @@ export const PBSShowCard: React.FC<PBSShowCardProps> = ({ show, onTuneIn, isFoll
     });
   };
 
+  // Some sources (KEXP, NTS, FBi Radio) don't report a duration string —
+  // derive one from start/end so every card shows one, not just PBS/4ZZZ.
+  const formatDuration = (start: string, end: string) => {
+    const [sh, sm] = start.split(':').map(Number);
+    const [eh, em] = end.split(':').map(Number);
+    if ([sh, sm, eh, em].some(Number.isNaN)) return null;
+    let minutes = (eh * 60 + em) - (sh * 60 + sm);
+    if (minutes <= 0) minutes += 24 * 60;
+    const h = Math.floor(minutes / 60);
+    const m = minutes % 60;
+    return h > 0 ? (m > 0 ? `${h}h ${m}m` : `${h}h`) : `${m}m`;
+  };
+
+  const durationLabel = show.duration || formatDuration(show.start_time, show.end_time);
+
   return (
     <Card className="h-full hover:shadow-lg transition-shadow duration-200 relative">
       <CardHeader className="pb-3">
@@ -117,24 +132,26 @@ export const PBSShowCard: React.FC<PBSShowCardProps> = ({ show, onTuneIn, isFoll
           </div>
         )}
 
-        <div className="flex items-center text-sm text-muted-foreground">
-          <User className="h-4 w-4 mr-2" />
-          <span className="truncate">{show.dj}</span>
-        </div>
+        {show.dj && (
+          <div className="flex items-center text-sm text-muted-foreground">
+            <User className="h-4 w-4 mr-2" />
+            <span className="truncate">{show.dj}</span>
+          </div>
+        )}
 
         <div className="flex items-center text-sm text-muted-foreground">
           <Calendar className="h-4 w-4 mr-2" />
           <span>{show.day} • {formatDate(show.date)}</span>
         </div>
-        
+
         <div className="flex items-center text-sm text-muted-foreground">
           <Clock className="h-4 w-4 mr-2" />
           <span>{show.start_time} - {show.end_time}</span>
         </div>
-        
-        {show.duration && (
+
+        {durationLabel && (
           <div className="text-sm text-muted-foreground">
-            Duration: {show.duration}
+            Duration: {durationLabel}
           </div>
         )}
         
