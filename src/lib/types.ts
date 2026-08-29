@@ -96,6 +96,7 @@ export interface PBSShow {
   status: "upcoming" | "live" | "expired";
   program_url: string;
   station_name?: string;
+  station_slug?: string;
   created_at: string;
   updated_at: string;
 }

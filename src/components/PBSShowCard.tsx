@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import Link from 'next/link';
 import type { PBSShow } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -127,8 +128,14 @@ export const PBSShowCard: React.FC<PBSShowCardProps> = ({ show, onTuneIn, isFoll
       <CardContent className="space-y-3 pb-12">
         {show.station_name && (
           <div className="flex items-center text-sm text-muted-foreground">
-            <Radio className="h-4 w-4 mr-2" />
-            <span className="truncate">{show.station_name}</span>
+            <Radio className="h-4 w-4 mr-2 shrink-0" />
+            {show.station_slug ? (
+              <Link href={`/stations/${show.station_slug}`} className="truncate hover:text-foreground hover:underline">
+                {show.station_name}
+              </Link>
+            ) : (
+              <span className="truncate">{show.station_name}</span>
+            )}
           </div>
         )}
 

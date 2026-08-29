@@ -2,11 +2,12 @@
 
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { Radio, Loader2, Users, Heart, Calendar, Bell, UserCircle2 } from 'lucide-react';
+import { Radio, Loader2, Users, Heart, Calendar, Bell, UserCircle2, Clock } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { fetchStation, fetchMyFollows, followTarget, unfollowTarget, type StationDetail, type Follow } from '@/lib/api';
+import { Badge } from '@/components/ui/badge';
+import { fetchStation, fetchMyFollows, followTarget, unfollowTarget, type StationDetail, type Follow, type ScrapedShowSummary } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -29,6 +30,14 @@ function formatSchedule(show: { day_of_week?: number | null; one_off_date?: stri
     return `${new Date(show.one_off_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} at ${time}`;
   }
   return time;
+}
+
+function scrapedStatusColor(status: ScrapedShowSummary['status']): string {
+  switch (status) {
+    case 'live': return 'bg-red-500 text-white';
+    case 'upcoming': return 'bg-green-500 text-white';
+    default: return 'bg-gray-500 text-white';
+  }
 }
 
 export default function StationPage() {
@@ -207,6 +216,33 @@ export default function StationPage() {
               </div>
             )}
           </section>
+
+          {station.scraped_shows.length > 0 && (
+            <>
+              <Separator />
+              <section>
+                <h3 className="text-xl font-semibold text-foreground mb-3 flex items-center gap-2">
+                  <Clock className="h-5 w-5 text-primary" /> Broadcast Schedule
+                </h3>
+                <div className="space-y-2">
+                  {station.scraped_shows.map((show, i) => (
+                    <div key={`${show.name}-${show.date}-${show.start_time}-${i}`} className="flex items-center justify-between gap-3 rounded-md border border-border bg-muted/30 p-3">
+                      <div className="min-w-0">
+                        <p className="font-medium text-foreground truncate">{show.name}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {show.day} {formatTime(show.start_time)}–{formatTime(show.end_time)}
+                          {show.dj && ` — with ${show.dj}`}
+                        </p>
+                      </div>
+                      <Badge className={`flex-shrink-0 text-xs ${scrapedStatusColor(show.status)}`}>
+                        {show.status}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            </>
+          )}
 
           <Separator />
 

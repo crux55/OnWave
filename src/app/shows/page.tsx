@@ -25,6 +25,16 @@ function resolveBestStream(stations: RadioStation[]): RadioStation | null {
   return { ...best, url: toHttps(best.url) ?? best.url, url_resolved: toHttps(best.url_resolved) ?? best.url_resolved };
 }
 
+// Scraped shows are followed by name, not a stable id (scraped_shows.id
+// isn't stable across refreshes — see PBSRepository.RefreshShowsForStation).
+// Now that multiple stations share the same scraped_shows table, two
+// different stations can coincidentally have same-named shows ("Breakfast",
+// "Drive"), so the follow key must be station-qualified or following one
+// would silently also match the other. See project_r#13.
+function showFollowKey(show: PBSShow): string {
+  return `${show.station_name ?? ''}::${show.name}`;
+}
+
 // The scraper's station_name doesn't always match radio-browser's naming —
 // verified against the live API: "NTS 1"/"NTS 2" either mismatch to an
 // unrelated station ("Northants 1") or return nothing, while "NTS Radio 1"/
@@ -151,7 +161,7 @@ export default function ShowsPage() {
     }
   }, [followedProgramIds, toast]);
 
-  const handleToggleFollow = useCallback(async (showName: string) => {
+  const handleToggleFollow = useCallback(async (show: PBSShow) => {
     if (!localStorage.getItem('token')) {
       toast({
         title: 'Login Required',
@@ -162,22 +172,23 @@ export default function ShowsPage() {
       return;
     }
 
-    setTogglingShowName(showName);
-    const alreadyFollowing = followedShowNames.has(showName);
+    const key = showFollowKey(show);
+    setTogglingShowName(key);
+    const alreadyFollowing = followedShowNames.has(key);
     try {
       if (alreadyFollowing) {
-        await unfollowTarget('show', showName);
+        await unfollowTarget('show', key);
       } else {
-        await followTarget('show', showName);
+        await followTarget('show', key);
       }
       setFollowedShowNames(prev => {
         const next = new Set(prev);
-        if (alreadyFollowing) next.delete(showName); else next.add(showName);
+        if (alreadyFollowing) next.delete(key); else next.add(key);
         return next;
       });
       toast({
         title: alreadyFollowing ? 'Unfollowed' : 'Following',
-        description: alreadyFollowing ? `You'll no longer see updates for "${showName}"` : `You'll see updates for "${showName}"`,
+        description: alreadyFollowing ? `You'll no longer see updates for "${show.name}"` : `You'll see updates for "${show.name}"`,
       });
     } catch (error) {
       toast({
@@ -321,9 +332,9 @@ export default function ShowsPage() {
                   key={show.id}
                   show={show}
                   onTuneIn={stream ? () => handleTuneIn(stream) : undefined}
-                  isFollowing={followedShowNames.has(show.name)}
-                  onToggleFollow={() => handleToggleFollow(show.name)}
-                  isTogglingFollow={togglingShowName === show.name}
+                  isFollowing={followedShowNames.has(showFollowKey(show))}
+                  onToggleFollow={() => handleToggleFollow(show)}
+                  isTogglingFollow={togglingShowName === showFollowKey(show)}
                 />
               );
             })}
@@ -351,9 +362,9 @@ export default function ShowsPage() {
               <PBSShowCard
                 key={show.id}
                 show={show}
-                isFollowing={followedShowNames.has(show.name)}
-                onToggleFollow={() => handleToggleFollow(show.name)}
-                isTogglingFollow={togglingShowName === show.name}
+                isFollowing={followedShowNames.has(showFollowKey(show))}
+                onToggleFollow={() => handleToggleFollow(show)}
+                isTogglingFollow={togglingShowName === showFollowKey(show)}
               />
             ))}
             {upcomingInternalShows.map(show => (

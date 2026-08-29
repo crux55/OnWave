@@ -807,6 +807,17 @@ export interface StationMember {
   name: string;
 }
 
+export interface ScrapedShowSummary {
+  name: string;
+  dj?: string;
+  day: string;
+  date: string;
+  start_time: string;
+  end_time: string;
+  status: 'upcoming' | 'live' | 'expired' | 'unknown';
+  program_url?: string;
+}
+
 export interface StationDetail {
   id: string;
   name: string;
@@ -814,6 +825,7 @@ export interface StationDetail {
   follower_count: number;
   created_at: string;
   shows: ShowSummary[];
+  scraped_shows: ScrapedShowSummary[];
   members: StationMember[];
 }
 
