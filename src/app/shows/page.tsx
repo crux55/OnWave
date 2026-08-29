@@ -1,29 +1,24 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { fetchPBSShowsByDateRange, fetchFromApi, fetchMyFollows, followTarget, unfollowTarget, fetchAllShows as fetchAllInternalShows } from '@/lib/api';
-import type { PBSShow, RadioStation, InternalShow } from '@/lib/types';
+import { fetchPBSShowsByDateRange, fetchMyFollows, followTarget, unfollowTarget, fetchAllShows as fetchAllInternalShows } from '@/lib/api';
+import type { PBSShow, InternalShow } from '@/lib/types';
 import { PBSShowCard } from '@/components/PBSShowCard';
 import { InternalShowCard } from '@/components/InternalShowCard';
 import { showStatus } from '@/lib/show-schedule';
-import { Tv, Calendar, Clock, Radio, Play, Pause, Loader2 } from 'lucide-react';
+import { Tv, Calendar, Clock, Radio } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { usePlayer } from '@/contexts/PlayerContext';
 import { useToast } from '@/hooks/use-toast';
 
 export default function ShowsPage() {
   const [allShows, setAllShows] = useState<PBSShow[]>([]);
   const [internalShows, setInternalShows] = useState<InternalShow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [pbsStation, setPbsStation] = useState<RadioStation | null>(null);
-  const [isLoadingStation, setIsLoadingStation] = useState(true);
   const [followedShowNames, setFollowedShowNames] = useState<Set<string>>(new Set());
   const [togglingShowName, setTogglingShowName] = useState<string | null>(null);
   const [followedProgramIds, setFollowedProgramIds] = useState<Set<string>>(new Set());
   const [togglingProgramId, setTogglingProgramId] = useState<string | null>(null);
-  const player = usePlayer();
   const { toast } = useToast();
 
   const { currentInternalShows, upcomingInternalShows } = useMemo(() => ({
@@ -44,8 +39,6 @@ export default function ShowsPage() {
     internalShows.forEach(s => { if (s.station_name) names.add(s.station_name); });
     return Array.from(names).sort();
   }, [allShows, internalShows]);
-
-  const isPbsPlaying = player.isPlaying && !!pbsStation && player.currentStation?.stationuuid === pbsStation.stationuuid;
 
   useEffect(() => {
     const fetchAllShows = async () => {
@@ -155,47 +148,6 @@ export default function ShowsPage() {
     }
   }, [followedShowNames, toast]);
 
-  useEffect(() => {
-    const loadPbsStation = async () => {
-      try {
-        const result = await fetchFromApi({ term: 'PBS FM' });
-        // Prefer a direct stream over HLS (.m3u8) — plain <audio> elements
-        // only play HLS natively in Safari, not Chrome/Firefox.
-        const candidates = result.stations.filter(s => s.lastcheckok === 1);
-        const best =
-          candidates.find(s => !s.url_resolved?.includes('.m3u8')) ||
-          candidates[0] ||
-          result.stations[0] ||
-          null;
-        // Some redirect-based stream hosts (e.g. StreamTheWorld, which serves
-        // PBS FM) resolve to an http:// or https:// final stream depending on
-        // the scheme of the *request*, not a fixed value. Since this site is
-        // served over https, force https on the initial request so the
-        // resulting stream isn't blocked as mixed content.
-        const toHttps = (url: string | undefined) => url?.replace(/^http:\/\//i, 'https://');
-        const secureBest = best
-          ? { ...best, url: toHttps(best.url) ?? best.url, url_resolved: toHttps(best.url_resolved) ?? best.url_resolved }
-          : null;
-        setPbsStation(secureBest);
-      } catch (error) {
-        setPbsStation(null);
-      } finally {
-        setIsLoadingStation(false);
-      }
-    };
-
-    loadPbsStation();
-  }, []);
-
-  const handleListenLive = useCallback(() => {
-    if (!pbsStation) return;
-    if (isPbsPlaying) {
-      player.togglePlayback();
-    } else {
-      player.playStation(pbsStation);
-    }
-  }, [pbsStation, isPbsPlaying, player]);
-
   if (isLoading) {
     return (
       <div className="container mx-auto px-4 py-8">
@@ -219,20 +171,6 @@ export default function ShowsPage() {
       </div>
 
       <div className="flex flex-wrap items-center gap-3 mb-8">
-        <Button
-          onClick={handleListenLive}
-          disabled={isLoadingStation || !pbsStation}
-          className="gap-2"
-        >
-          {isLoadingStation ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : isPbsPlaying ? (
-            <Pause className="h-4 w-4" />
-          ) : (
-            <Play className="h-4 w-4" />
-          )}
-          {isPbsPlaying ? 'Playing PBS FM' : 'Listen Live to PBS FM'}
-        </Button>
         {stationNames.map(name => (
           <Badge key={name} variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
             <Tv className="h-3 w-3 mr-1" />
@@ -293,8 +231,6 @@ export default function ShowsPage() {
               <PBSShowCard
                 key={show.id}
                 show={show}
-                onTuneIn={handleListenLive}
-                isTunedIn={isPbsPlaying}
                 isFollowing={followedShowNames.has(show.name)}
                 onToggleFollow={() => handleToggleFollow(show.name)}
                 isTogglingFollow={togglingShowName === show.name}
