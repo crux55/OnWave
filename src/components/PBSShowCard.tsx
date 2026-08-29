@@ -10,20 +10,19 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Clock, Calendar, User, ExternalLink, Bell, Play, Pause, Radio } from 'lucide-react';
+import { Clock, Calendar, User, ExternalLink, Bell, Play, Radio } from 'lucide-react';
 import { useReminders } from '@/contexts/RemindersContext';
 import { useToast } from '@/hooks/use-toast';
 
 interface PBSShowCardProps {
   show: PBSShow;
   onTuneIn?: () => void;
-  isTunedIn?: boolean;
   isFollowing?: boolean;
   onToggleFollow?: () => void;
   isTogglingFollow?: boolean;
 }
 
-export const PBSShowCard: React.FC<PBSShowCardProps> = ({ show, onTuneIn, isTunedIn, isFollowing, onToggleFollow, isTogglingFollow }) => {
+export const PBSShowCard: React.FC<PBSShowCardProps> = ({ show, onTuneIn, isFollowing, onToggleFollow, isTogglingFollow }) => {
   const { addReminder, allReminders } = useReminders();
   const { toast } = useToast();
   const [isCreatingReminder, setIsCreatingReminder] = useState(false);
@@ -190,13 +189,13 @@ export const PBSShowCard: React.FC<PBSShowCardProps> = ({ show, onTuneIn, isTune
       {onTuneIn && (
         <div className="absolute bottom-2 right-2">
           <Button
-            variant={isTunedIn ? 'secondary' : 'default'}
+            variant="default"
             size="sm"
             className="h-8 gap-1.5"
             onClick={onTuneIn}
           >
-            {isTunedIn ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
-            {isTunedIn ? 'Playing' : 'Tune In'}
+            <Play className="h-3.5 w-3.5" />
+            Tune In
           </Button>
         </div>
       )}

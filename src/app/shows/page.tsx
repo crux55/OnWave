@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { fetchPBSShowsByDateRange, fetchFromApi, fetchMyFollows, followTarget, unfollowTarget, fetchAllShows as fetchAllInternalShows } from '@/lib/api';
 import type { PBSShow, RadioStation, InternalShow } from '@/lib/types';
 import { PBSShowCard } from '@/components/PBSShowCard';
@@ -12,23 +12,42 @@ import { Badge } from '@/components/ui/badge';
 import { usePlayer } from '@/contexts/PlayerContext';
 import { useToast } from '@/hooks/use-toast';
 
-// The only source with a real, playable live stream wired up right now —
-// KEXP/NTS/4ZZZ/FBi are schedule data only, no stream URL to tune into.
-const PLAYABLE_STATION_NAME = 'PBS FM';
+// Picks the best playable stream for a station search result — prefers a
+// direct stream over HLS (plain <audio> elements only play HLS natively in
+// Safari, not Chrome/Firefox) and forces https so a redirect-based stream
+// host (StreamTheWorld etc., which resolves http/https based on the scheme
+// of the request) doesn't get blocked as mixed content on this https site.
+function resolveBestStream(stations: RadioStation[]): RadioStation | null {
+  const candidates = stations.filter(s => s.lastcheckok === 1);
+  const best = candidates.find(s => !s.url_resolved?.includes('.m3u8')) || candidates[0] || stations[0] || null;
+  if (!best) return null;
+  const toHttps = (url: string | undefined) => url?.replace(/^http:\/\//i, 'https://');
+  return { ...best, url: toHttps(best.url) ?? best.url, url_resolved: toHttps(best.url_resolved) ?? best.url_resolved };
+}
+
+// The scraper's station_name doesn't always match radio-browser's naming —
+// verified against the live API: "NTS 1"/"NTS 2" either mismatch to an
+// unrelated station ("Northants 1") or return nothing, while "NTS Radio 1"/
+// "NTS Radio 2" resolve correctly. Everything else matches its own name.
+const STATION_SEARCH_TERM_OVERRIDES: Record<string, string> = {
+  'NTS 1': 'NTS Radio 1',
+  'NTS 2': 'NTS Radio 2',
+};
 
 export default function ShowsPage() {
   const [allShows, setAllShows] = useState<PBSShow[]>([]);
   const [internalShows, setInternalShows] = useState<InternalShow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [pbsStation, setPbsStation] = useState<RadioStation | null>(null);
+  // Resolved live stream per station name — looked up on demand for
+  // whichever stations actually have a live show right now, not just PBS.
+  const [stationStreams, setStationStreams] = useState<Record<string, RadioStation | null>>({});
+  const stationLookupsStarted = useRef<Set<string>>(new Set());
   const [followedShowNames, setFollowedShowNames] = useState<Set<string>>(new Set());
   const [togglingShowName, setTogglingShowName] = useState<string | null>(null);
   const [followedProgramIds, setFollowedProgramIds] = useState<Set<string>>(new Set());
   const [togglingProgramId, setTogglingProgramId] = useState<string | null>(null);
   const player = usePlayer();
   const { toast } = useToast();
-
-  const isPbsPlaying = player.isPlaying && !!pbsStation && player.currentStation?.stationuuid === pbsStation.stationuuid;
 
   const { currentInternalShows, upcomingInternalShows } = useMemo(() => ({
     currentInternalShows: internalShows.filter(show => showStatus(show) === 'live'),
@@ -157,44 +176,31 @@ export default function ShowsPage() {
     }
   }, [followedShowNames, toast]);
 
+  const liveStationNames = useMemo(() => {
+    const names = new Set<string>();
+    currentShows.forEach(s => { if (s.station_name) names.add(s.station_name); });
+    return Array.from(names);
+  }, [currentShows]);
+
   useEffect(() => {
-    const loadPbsStation = async () => {
+    const namesToResolve = liveStationNames.filter(name => !stationLookupsStarted.current.has(name));
+    if (namesToResolve.length === 0) return;
+    namesToResolve.forEach(name => stationLookupsStarted.current.add(name));
+
+    namesToResolve.forEach(async (name) => {
       try {
-        const result = await fetchFromApi({ term: 'PBS FM' });
-        // Prefer a direct stream over HLS (.m3u8) — plain <audio> elements
-        // only play HLS natively in Safari, not Chrome/Firefox.
-        const candidates = result.stations.filter(s => s.lastcheckok === 1);
-        const best =
-          candidates.find(s => !s.url_resolved?.includes('.m3u8')) ||
-          candidates[0] ||
-          result.stations[0] ||
-          null;
-        // Some redirect-based stream hosts (e.g. StreamTheWorld, which serves
-        // PBS FM) resolve to an http:// or https:// final stream depending on
-        // the scheme of the *request*, not a fixed value. Since this site is
-        // served over https, force https on the initial request so the
-        // resulting stream isn't blocked as mixed content.
-        const toHttps = (url: string | undefined) => url?.replace(/^http:\/\//i, 'https://');
-        const secureBest = best
-          ? { ...best, url: toHttps(best.url) ?? best.url, url_resolved: toHttps(best.url_resolved) ?? best.url_resolved }
-          : null;
-        setPbsStation(secureBest);
+        const term = STATION_SEARCH_TERM_OVERRIDES[name] ?? name;
+        const result = await fetchFromApi({ term });
+        setStationStreams(prev => ({ ...prev, [name]: resolveBestStream(result.stations) }));
       } catch (error) {
-        setPbsStation(null);
+        setStationStreams(prev => ({ ...prev, [name]: null }));
       }
-    };
+    });
+  }, [liveStationNames]);
 
-    loadPbsStation();
-  }, []);
-
-  const handleListenLive = useCallback(() => {
-    if (!pbsStation) return;
-    if (isPbsPlaying) {
-      player.togglePlayback();
-    } else {
-      player.playStation(pbsStation);
-    }
-  }, [pbsStation, isPbsPlaying, player]);
+  const handleTuneIn = useCallback((station: RadioStation) => {
+    player.playStation(station);
+  }, [player]);
 
   if (isLoading) {
     return (
@@ -276,13 +282,12 @@ export default function ShowsPage() {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
             {currentShows.map(show => {
-              const isPlayable = show.station_name === PLAYABLE_STATION_NAME;
+              const stream = show.station_name ? stationStreams[show.station_name] : null;
               return (
                 <PBSShowCard
                   key={show.id}
                   show={show}
-                  onTuneIn={isPlayable ? handleListenLive : undefined}
-                  isTunedIn={isPlayable && isPbsPlaying}
+                  onTuneIn={stream ? () => handleTuneIn(stream) : undefined}
                   isFollowing={followedShowNames.has(show.name)}
                   onToggleFollow={() => handleToggleFollow(show.name)}
                   isTogglingFollow={togglingShowName === show.name}
