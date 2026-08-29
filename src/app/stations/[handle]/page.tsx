@@ -2,11 +2,34 @@
 
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { Radio, Loader2, Users, Heart } from 'lucide-react';
+import { Radio, Loader2, Users, Heart, Calendar, Bell, UserCircle2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { fetchStation, fetchMyFollows, followTarget, unfollowTarget, type StationDetail } from '@/lib/api';
+import { Separator } from '@/components/ui/separator';
+import { fetchStation, fetchMyFollows, followTarget, unfollowTarget, type StationDetail, type Follow } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
+
+const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+function formatTime(time: string): string {
+  const [hourStr, minuteStr] = time.split(':');
+  const hour = parseInt(hourStr, 10);
+  const minute = minuteStr;
+  const period = hour >= 12 ? 'PM' : 'AM';
+  const displayHour = hour % 12 === 0 ? 12 : hour % 12;
+  return `${displayHour}:${minute}${period}`;
+}
+
+function formatSchedule(show: { day_of_week?: number | null; one_off_date?: string | null; start_time: string }): string {
+  const time = formatTime(show.start_time);
+  if (show.day_of_week !== undefined && show.day_of_week !== null) {
+    return `${DAY_NAMES[show.day_of_week]}s ${time}`;
+  }
+  if (show.one_off_date) {
+    return `${new Date(show.one_off_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} at ${time}`;
+  }
+  return time;
+}
 
 export default function StationPage() {
   const params = useParams<{ handle: string }>();
@@ -16,6 +39,8 @@ export default function StationPage() {
   const [station, setStation] = useState<StationDetail | null>(null);
   const [isFollowing, setIsFollowing] = useState(false);
   const [isToggling, setIsToggling] = useState(false);
+  const [followedShowIds, setFollowedShowIds] = useState<Set<string>>(new Set());
+  const [togglingShowId, setTogglingShowId] = useState<string | null>(null);
 
   useEffect(() => {
     const handle = params.handle;
@@ -26,8 +51,9 @@ export default function StationPage() {
       .then(async (data) => {
         setStation(data);
         if (data && localStorage.getItem('token')) {
-          const follows = await fetchMyFollows().catch(() => []);
+          const follows: Follow[] = await fetchMyFollows().catch(() => []);
           setIsFollowing(follows.some(f => f.target_type === 'station' && f.target_id === data.id));
+          setFollowedShowIds(new Set(follows.filter(f => f.target_type === 'program').map(f => f.target_id)));
         }
         setIsLoading(false);
       })
@@ -37,15 +63,19 @@ export default function StationPage() {
       });
   }, [params.handle]);
 
+  const requireLogin = (message: string) => {
+    toast({
+      title: 'Login Required',
+      description: message,
+      action: <a href="/auth/login" className="text-primary hover:underline">Login here</a>,
+      variant: 'destructive',
+    });
+  };
+
   const handleToggleFollow = async () => {
     if (!station) return;
     if (!localStorage.getItem('token')) {
-      toast({
-        title: 'Login Required',
-        description: 'Please log in to follow stations',
-        action: <a href="/auth/login" className="text-primary hover:underline">Login here</a>,
-        variant: 'destructive',
-      });
+      requireLogin('Please log in to follow stations');
       return;
     }
 
@@ -64,6 +94,32 @@ export default function StationPage() {
       toast({ title: 'Something went wrong', description: error.message, variant: 'destructive' });
     } finally {
       setIsToggling(false);
+    }
+  };
+
+  const handleToggleShowFollow = async (showId: string) => {
+    if (!localStorage.getItem('token')) {
+      requireLogin('Please log in to follow shows');
+      return;
+    }
+
+    setTogglingShowId(showId);
+    const alreadyFollowing = followedShowIds.has(showId);
+    try {
+      if (alreadyFollowing) {
+        await unfollowTarget('program', showId);
+      } else {
+        await followTarget('program', showId);
+      }
+      setFollowedShowIds(prev => {
+        const next = new Set(prev);
+        if (alreadyFollowing) next.delete(showId); else next.add(showId);
+        return next;
+      });
+    } catch (error: any) {
+      toast({ title: 'Something went wrong', description: error.message, variant: 'destructive' });
+    } finally {
+      setTogglingShowId(null);
     }
   };
 
@@ -99,7 +155,7 @@ export default function StationPage() {
             {station.follower_count} {station.follower_count === 1 ? 'follower' : 'followers'}
           </CardDescription>
         </CardHeader>
-        <CardContent className="p-6 md:p-8">
+        <CardContent className="p-6 md:p-8 space-y-8">
           <Button
             className="w-full"
             variant={isFollowing ? 'secondary' : 'default'}
@@ -113,6 +169,63 @@ export default function StationPage() {
             )}
             {isFollowing ? 'Following' : 'Follow'}
           </Button>
+
+          <Separator />
+
+          <section>
+            <h3 className="text-xl font-semibold text-foreground mb-3 flex items-center gap-2">
+              <Calendar className="h-5 w-5 text-primary" /> Shows
+            </h3>
+            {station.shows.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No shows scheduled yet.</p>
+            ) : (
+              <div className="space-y-2">
+                {station.shows.map(show => (
+                  <div key={show.id} className="flex items-center justify-between gap-3 rounded-md border border-border bg-muted/30 p-3">
+                    <div className="min-w-0">
+                      <p className="font-medium text-foreground truncate">{show.name}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {formatSchedule(show)}
+                        {show.dj_name && ` — with ${show.dj_name}`}
+                      </p>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="flex-shrink-0"
+                      onClick={() => handleToggleShowFollow(show.id)}
+                      disabled={togglingShowId === show.id}
+                    >
+                      {togglingShowId === show.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Bell className={`h-4 w-4 ${followedShowIds.has(show.id) ? 'fill-current text-accent' : ''}`} />
+                      )}
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+
+          <Separator />
+
+          <section>
+            <h3 className="text-xl font-semibold text-foreground mb-3 flex items-center gap-2">
+              <UserCircle2 className="h-5 w-5 text-primary" /> DJs
+            </h3>
+            {station.members.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No members yet.</p>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {station.members.map(member => (
+                  <div key={member.user_id} className="rounded-full border border-border bg-muted/30 px-3 py-1.5 text-sm text-foreground">
+                    {member.name || 'Unnamed'}
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
         </CardContent>
       </Card>
     </div>

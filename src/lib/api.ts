@@ -1,4 +1,4 @@
-import type { RadioStation, TopTag, PBSShow, WebradioSearchResponse, TopStationsResponse, Profile } from '@/lib/types';
+import type { RadioStation, TopTag, PBSShow, InternalShow, WebradioSearchResponse, TopStationsResponse, Profile } from '@/lib/types';
 import { PINNED_STATIONS } from '@/lib/pinned-stations';
 
 export async function fetchFromApi(params: Record<string, string> = {}): Promise<WebradioSearchResponse> {
@@ -717,7 +717,7 @@ export async function revokeBadge(email: string, badgeId: string): Promise<void>
 }
 
 export interface Follow {
-  target_type: 'station' | 'show';
+  target_type: 'station' | 'show' | 'program';
   target_id: string;
   name: string;
   created_at: string;
@@ -746,7 +746,7 @@ export async function fetchMyFollows(): Promise<Follow[]> {
   return result.follows || [];
 }
 
-export async function followTarget(targetType: 'station' | 'show', targetId: string): Promise<void> {
+export async function followTarget(targetType: 'station' | 'show' | 'program', targetId: string): Promise<void> {
   const token = localStorage.getItem("token");
   if (!token) {
     throw new Error('User not authenticated');
@@ -768,7 +768,7 @@ export async function followTarget(targetType: 'station' | 'show', targetId: str
   }
 }
 
-export async function unfollowTarget(targetType: 'station' | 'show', targetId: string): Promise<void> {
+export async function unfollowTarget(targetType: 'station' | 'show' | 'program', targetId: string): Promise<void> {
   const token = localStorage.getItem("token");
   if (!token) {
     throw new Error('User not authenticated');
@@ -790,12 +790,31 @@ export async function unfollowTarget(targetType: 'station' | 'show', targetId: s
   }
 }
 
+export interface ShowSummary {
+  id: string;
+  name: string;
+  description: string;
+  dj_id?: string | null;
+  dj_name?: string | null;
+  day_of_week?: number | null;
+  one_off_date?: string | null;
+  start_time: string;
+  duration_minutes: number;
+}
+
+export interface StationMember {
+  user_id: string;
+  name: string;
+}
+
 export interface StationDetail {
   id: string;
   name: string;
   slug?: string | null;
   follower_count: number;
   created_at: string;
+  shows: ShowSummary[];
+  members: StationMember[];
 }
 
 export async function fetchStation(handle: string): Promise<StationDetail | null> {
@@ -826,4 +845,68 @@ export async function fetchUserBadges(userId: string): Promise<Badge[]> {
   }
   const result = await response.json();
   return result.badges || [];
+}
+
+export async function fetchAllShows(): Promise<InternalShow[]> {
+  const response = await fetch('/api/shows');
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Failed to fetch shows');
+  }
+  const result = await response.json();
+  return result.shows || [];
+}
+
+export async function createShow(show: {
+  name: string;
+  description?: string;
+  station_id?: string;
+  day_of_week?: number;
+  one_off_date?: string;
+  start_time: string;
+  duration_minutes?: number;
+}): Promise<void> {
+  const token = localStorage.getItem("token");
+  if (!token) {
+    throw new Error('User not authenticated');
+  }
+
+  const auth = JSON.parse(token);
+  const response = await fetch('/api/shows', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${auth.token}`,
+    },
+    body: JSON.stringify(show),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    if (response.status === 401) {
+      throw new Error('UNAUTHORIZED');
+    }
+    throw new Error(errorData.message || 'Failed to create show');
+  }
+}
+
+export async function deleteShow(showId: string): Promise<void> {
+  const token = localStorage.getItem("token");
+  if (!token) {
+    throw new Error('User not authenticated');
+  }
+
+  const auth = JSON.parse(token);
+  const response = await fetch(`/api/shows/${showId}`, {
+    method: 'DELETE',
+    headers: { 'Authorization': `Bearer ${auth.token}` },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    if (response.status === 401) {
+      throw new Error('UNAUTHORIZED');
+    }
+    throw new Error(errorData.message || 'Failed to delete show');
+  }
 }

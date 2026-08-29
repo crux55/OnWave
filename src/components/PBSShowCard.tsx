@@ -10,7 +10,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Clock, Calendar, User, ExternalLink, Bell, Play, Pause } from 'lucide-react';
+import { Clock, Calendar, User, ExternalLink, Bell, Play, Pause, Radio } from 'lucide-react';
 import { useReminders } from '@/contexts/RemindersContext';
 import { useToast } from '@/hooks/use-toast';
 
@@ -111,11 +111,18 @@ export const PBSShowCard: React.FC<PBSShowCardProps> = ({ show, onTuneIn, isTune
       </CardHeader>
       
       <CardContent className="space-y-3 pb-12">
+        {show.station_name && (
+          <div className="flex items-center text-sm text-muted-foreground">
+            <Radio className="h-4 w-4 mr-2" />
+            <span className="truncate">{show.station_name}</span>
+          </div>
+        )}
+
         <div className="flex items-center text-sm text-muted-foreground">
           <User className="h-4 w-4 mr-2" />
           <span className="truncate">{show.dj}</span>
         </div>
-        
+
         <div className="flex items-center text-sm text-muted-foreground">
           <Calendar className="h-4 w-4 mr-2" />
           <span>{show.day} • {formatDate(show.date)}</span>

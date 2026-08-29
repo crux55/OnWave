@@ -1,9 +1,11 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { fetchPBSShowsByDateRange, fetchFromApi, fetchMyFollows, followTarget, unfollowTarget } from '@/lib/api';
-import type { PBSShow, RadioStation } from '@/lib/types';
+import { fetchPBSShowsByDateRange, fetchFromApi, fetchMyFollows, followTarget, unfollowTarget, fetchAllShows as fetchAllInternalShows } from '@/lib/api';
+import type { PBSShow, RadioStation, InternalShow } from '@/lib/types';
 import { PBSShowCard } from '@/components/PBSShowCard';
+import { InternalShowCard } from '@/components/InternalShowCard';
+import { showStatus } from '@/lib/show-schedule';
 import { Tv, Calendar, Clock, Radio, Play, Pause, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -13,18 +15,35 @@ import { useToast } from '@/hooks/use-toast';
 
 export default function ShowsPage() {
   const [allShows, setAllShows] = useState<PBSShow[]>([]);
+  const [internalShows, setInternalShows] = useState<InternalShow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [pbsStation, setPbsStation] = useState<RadioStation | null>(null);
   const [isLoadingStation, setIsLoadingStation] = useState(true);
   const [followedShowNames, setFollowedShowNames] = useState<Set<string>>(new Set());
   const [togglingShowName, setTogglingShowName] = useState<string | null>(null);
+  const [followedProgramIds, setFollowedProgramIds] = useState<Set<string>>(new Set());
+  const [togglingProgramId, setTogglingProgramId] = useState<string | null>(null);
   const player = usePlayer();
   const { toast } = useToast();
+
+  const { currentInternalShows, upcomingInternalShows } = useMemo(() => ({
+    currentInternalShows: internalShows.filter(show => showStatus(show) === 'live'),
+    upcomingInternalShows: internalShows.filter(show => showStatus(show) !== 'live' && showStatus(show) !== 'expired'),
+  }), [internalShows]);
 
   const { currentShows, upcomingShows } = useMemo(() => ({
     currentShows: allShows.filter(show => show.status === 'live'),
     upcomingShows: allShows.filter(show => show.status === 'upcoming')
   }), [allShows]);
+
+  const totalShowCount = allShows.length + internalShows.length;
+
+  const stationNames = useMemo(() => {
+    const names = new Set<string>();
+    allShows.forEach(s => { if (s.station_name) names.add(s.station_name); });
+    internalShows.forEach(s => { if (s.station_name) names.add(s.station_name); });
+    return Array.from(names).sort();
+  }, [allShows, internalShows]);
 
   const isPbsPlaying = player.isPlaying && !!pbsStation && player.currentStation?.stationuuid === pbsStation.stationuuid;
 
@@ -45,12 +64,57 @@ export default function ShowsPage() {
 
     fetchAllShows();
 
+    fetchAllInternalShows()
+      .then(setInternalShows)
+      .catch(() => setInternalShows([]));
+
     if (localStorage.getItem('token')) {
       fetchMyFollows()
-        .then(follows => setFollowedShowNames(new Set(follows.filter(f => f.target_type === 'show').map(f => f.target_id))))
-        .catch(() => setFollowedShowNames(new Set()));
+        .then(follows => {
+          setFollowedShowNames(new Set(follows.filter(f => f.target_type === 'show').map(f => f.target_id)));
+          setFollowedProgramIds(new Set(follows.filter(f => f.target_type === 'program').map(f => f.target_id)));
+        })
+        .catch(() => {
+          setFollowedShowNames(new Set());
+          setFollowedProgramIds(new Set());
+        });
     }
   }, []);
+
+  const handleToggleProgramFollow = useCallback(async (showId: string) => {
+    if (!localStorage.getItem('token')) {
+      toast({
+        title: 'Login Required',
+        description: 'Please log in to follow shows',
+        action: <a href="/auth/login" className="text-primary hover:underline">Login here</a>,
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setTogglingProgramId(showId);
+    const alreadyFollowing = followedProgramIds.has(showId);
+    try {
+      if (alreadyFollowing) {
+        await unfollowTarget('program', showId);
+      } else {
+        await followTarget('program', showId);
+      }
+      setFollowedProgramIds(prev => {
+        const next = new Set(prev);
+        if (alreadyFollowing) next.delete(showId); else next.add(showId);
+        return next;
+      });
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to update follow status',
+        variant: 'destructive',
+      });
+    } finally {
+      setTogglingProgramId(null);
+    }
+  }, [followedProgramIds, toast]);
 
   const handleToggleFollow = useCallback(async (showName: string) => {
     if (!localStorage.getItem('token')) {
@@ -169,13 +233,12 @@ export default function ShowsPage() {
           )}
           {isPbsPlaying ? 'Playing PBS FM' : 'Listen Live to PBS FM'}
         </Button>
-        <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-          <Tv className="h-3 w-3 mr-1" />
-          PBS Radio
-        </Badge>
-        <Badge variant="outline" className="bg-gray-50 text-gray-500 border-gray-200">
-          More stations coming soon...
-        </Badge>
+        {stationNames.map(name => (
+          <Badge key={name} variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+            <Tv className="h-3 w-3 mr-1" />
+            {name}
+          </Badge>
+        ))}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
@@ -185,7 +248,7 @@ export default function ShowsPage() {
             <Clock className="h-4 w-4 text-red-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{currentShows.length}</div>
+            <div className="text-2xl font-bold">{currentShows.length + currentInternalShows.length}</div>
             <p className="text-xs text-muted-foreground">Currently broadcasting</p>
           </CardContent>
         </Card>
@@ -196,7 +259,7 @@ export default function ShowsPage() {
             <Calendar className="h-4 w-4 text-blue-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{upcomingShows.length}</div>
+            <div className="text-2xl font-bold">{upcomingShows.length + upcomingInternalShows.length}</div>
             <p className="text-xs text-muted-foreground">Shows scheduled</p>
           </CardContent>
         </Card>
@@ -207,13 +270,13 @@ export default function ShowsPage() {
             <Radio className="h-4 w-4 text-accent" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{allShows.length}</div>
+            <div className="text-2xl font-bold">{totalShowCount}</div>
             <p className="text-xs text-muted-foreground">In the next 30 days</p>
           </CardContent>
         </Card>
       </div>
 
-      {currentShows.length > 0 && (
+      {(currentShows.length > 0 || currentInternalShows.length > 0) && (
         <section className="mb-12">
           <div className="flex items-center mb-6">
             <Clock className="h-6 w-6 text-red-500 mr-3" />
@@ -237,11 +300,20 @@ export default function ShowsPage() {
                 isTogglingFollow={togglingShowName === show.name}
               />
             ))}
+            {currentInternalShows.map(show => (
+              <InternalShowCard
+                key={show.id}
+                show={show}
+                isFollowing={followedProgramIds.has(show.id)}
+                onToggleFollow={() => handleToggleProgramFollow(show.id)}
+                isTogglingFollow={togglingProgramId === show.id}
+              />
+            ))}
           </div>
         </section>
       )}
 
-      {upcomingShows.length > 0 && (
+      {(upcomingShows.length > 0 || upcomingInternalShows.length > 0) && (
         <section className="mb-12">
           <div className="flex items-center mb-6">
             <Calendar className="h-6 w-6 text-blue-500 mr-3" />
@@ -257,11 +329,20 @@ export default function ShowsPage() {
                 isTogglingFollow={togglingShowName === show.name}
               />
             ))}
+            {upcomingInternalShows.map(show => (
+              <InternalShowCard
+                key={show.id}
+                show={show}
+                isFollowing={followedProgramIds.has(show.id)}
+                onToggleFollow={() => handleToggleProgramFollow(show.id)}
+                isTogglingFollow={togglingProgramId === show.id}
+              />
+            ))}
           </div>
         </section>
       )}
 
-      {allShows.length === 0 && !isLoading && (
+      {totalShowCount === 0 && !isLoading && (
         <div className="text-center py-16">
           <Radio className="h-24 w-24 text-muted-foreground/50 mx-auto mb-6" />
           <h3 className="text-2xl font-semibold mb-2">No Shows Available</h3>

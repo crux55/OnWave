@@ -3,7 +3,7 @@
 
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { UserCircle2, Radio, Podcast, Users, FileText, Edit3, LogOut, Loader2, Bell, X, Heart, ChevronRight, Award, ShieldCheck, Plus } from 'lucide-react';
+import { UserCircle2, Radio, Podcast, Users, FileText, Edit3, LogOut, Loader2, Bell, X, Heart, ChevronRight, Award, ShieldCheck, Plus, Calendar } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { useEffect, useState } from "react";
-import { fetchCurrentUserProfile, fetchLikedStations, fetchMyBadges, fetchManagedBadges, fetchMyStations, fetchMyFollows, createBadge, awardBadge, revokeBadge, markBadgesSeen, type Badge, type MyBadge, type Station, type Follow } from "@/lib/api";
+import { fetchCurrentUserProfile, fetchLikedStations, fetchMyBadges, fetchManagedBadges, fetchMyStations, fetchMyFollows, createBadge, awardBadge, revokeBadge, markBadgesSeen, createShow, type Badge, type MyBadge, type Station, type Follow } from "@/lib/api";
 import { JWT, Profile, Token, User } from '@/lib/types';
 import { jwtDecode as jwt_decode } from "jwt-decode";
 import { useReminders } from '@/contexts/RemindersContext';
@@ -76,6 +76,12 @@ export default function ProfilePage() {
   const [awardEmail, setAwardEmail] = useState<Record<string, string>>({});
   const [isAwarding, setIsAwarding] = useState<string | null>(null);
   const [isRevoking, setIsRevoking] = useState<string | null>(null);
+  const [newShowName, setNewShowName] = useState('');
+  const [newShowDay, setNewShowDay] = useState('2'); // Tuesday-ish default; '-1' means one-off
+  const [newShowOneOffDate, setNewShowOneOffDate] = useState('');
+  const [newShowTime, setNewShowTime] = useState('21:00');
+  const [newShowDuration, setNewShowDuration] = useState('60');
+  const [isCreatingShow, setIsCreatingShow] = useState(false);
   const getAvatarUrl = (filename: string | undefined) => {
   const url = filename ? `${apiHost}${filename}` : undefined;
 
@@ -135,19 +141,23 @@ export default function ProfilePage() {
       })
       .catch(() => setMyBadges([]));
 
-    const canManageBadges = decodedToken?.is_admin || decodedToken?.role === 'dj' || decodedToken?.role === 'station';
-    if (canManageBadges) {
-      fetchManagedBadges()
-        .then(setManageableBadges)
-        .catch(() => setManageableBadges([]));
-      fetchMyStations()
-        .then(list => {
-          setMyStations(list);
-          if (list.length > 0) setCreateAsStationId(list[0].id);
-          else if (decodedToken?.role === 'dj') setCreateAsStationId('self');
-        })
-        .catch(() => setMyStations([]));
-    }
+    // Station membership can only be known after fetching it — an admin or
+    // DJ can manage badges regardless, but a "regular" account might still
+    // turn out to be a station member.
+    fetchMyStations()
+      .then(list => {
+        setMyStations(list);
+        if (list.length > 0) setCreateAsStationId(list[0].id);
+        else if (decodedToken?.role === 'dj') setCreateAsStationId('self');
+
+        const canManageBadges = decodedToken?.is_admin || decodedToken?.role === 'dj' || list.length > 0;
+        if (canManageBadges) {
+          fetchManagedBadges()
+            .then(setManageableBadges)
+            .catch(() => setManageableBadges([]));
+        }
+      })
+      .catch(() => setMyStations([]));
   }, []);
 
   // Not logged in once loading settles — go straight to login instead of
@@ -178,6 +188,29 @@ export default function ProfilePage() {
       toast({ title: 'Failed to create badge', description: error.message, variant: 'destructive' });
     } finally {
       setIsCreatingBadge(false);
+    }
+  };
+
+  const handleCreateShow = async () => {
+    if (!newShowName.trim() || !newShowTime) return;
+    if (newShowDay === '-1' && !newShowOneOffDate) return;
+    setIsCreatingShow(true);
+    try {
+      await createShow({
+        name: newShowName.trim(),
+        station_id: createAsStationId && createAsStationId !== 'self' ? createAsStationId : undefined,
+        day_of_week: newShowDay === '-1' ? undefined : parseInt(newShowDay, 10),
+        one_off_date: newShowDay === '-1' ? newShowOneOffDate : undefined,
+        start_time: `${newShowTime}:00`,
+        duration_minutes: parseInt(newShowDuration, 10) || 60,
+      });
+      toast({ title: 'Show created', description: newShowName });
+      setNewShowName('');
+      setNewShowOneOffDate('');
+    } catch (error: any) {
+      toast({ title: 'Failed to create show', description: error.message, variant: 'destructive' });
+    } finally {
+      setIsCreatingShow(false);
     }
   };
 
@@ -255,7 +288,7 @@ export default function ProfilePage() {
     }
   };
 
-  const canManageBadges = !!(token?.is_admin || token?.role === 'dj' || token?.role === 'station');
+  const canManageBadges = !!(token?.is_admin || token?.role === 'dj' || myStations.length > 0);
   const canCreateBadge = myStations.length > 0 || token?.role === 'dj';
 
   if (isLoading) {
@@ -611,6 +644,67 @@ export default function ProfilePage() {
                       </div>
                     )}
                   </div>
+                </section>
+              </>
+            )}
+
+            {canCreateBadge && (
+              <>
+                <Separator />
+                <section className="space-y-3 rounded-lg border border-accent/30 bg-accent/5 p-4">
+                  <h3 className="text-xl font-semibold text-foreground flex items-center gap-2">
+                    <Calendar className="h-5 w-5 text-accent" /> Create a Show
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    {createAsStationId && createAsStationId !== 'self'
+                      ? `Creating for ${myStations.find(s => s.id === createAsStationId)?.name || 'your station'}. It'll appear on that station's page.`
+                      : 'Creating under your own DJ name.'}
+                  </p>
+                  <Input placeholder="Show name" value={newShowName} onChange={e => setNewShowName(e.target.value)} />
+                  <div className="grid grid-cols-2 gap-2">
+                    <Select value={newShowDay} onValueChange={setNewShowDay}>
+                      <SelectTrigger className="h-9 text-sm">
+                        <SelectValue placeholder="Day" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="0">Sundays</SelectItem>
+                        <SelectItem value="1">Mondays</SelectItem>
+                        <SelectItem value="2">Tuesdays</SelectItem>
+                        <SelectItem value="3">Wednesdays</SelectItem>
+                        <SelectItem value="4">Thursdays</SelectItem>
+                        <SelectItem value="5">Fridays</SelectItem>
+                        <SelectItem value="6">Saturdays</SelectItem>
+                        <SelectItem value="-1">One-off date</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {newShowDay === '-1' ? (
+                      <Input type="date" value={newShowOneOffDate} onChange={e => setNewShowOneOffDate(e.target.value)} />
+                    ) : (
+                      <Input type="time" value={newShowTime} onChange={e => setNewShowTime(e.target.value)} />
+                    )}
+                  </div>
+                  {newShowDay === '-1' && (
+                    <Input type="time" value={newShowTime} onChange={e => setNewShowTime(e.target.value)} />
+                  )}
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="number"
+                      min={15}
+                      step={15}
+                      value={newShowDuration}
+                      onChange={e => setNewShowDuration(e.target.value)}
+                      className="w-24"
+                    />
+                    <span className="text-sm text-muted-foreground">minutes</span>
+                  </div>
+                  <Button
+                    size="sm"
+                    onClick={handleCreateShow}
+                    disabled={isCreatingShow || !newShowName.trim() || !newShowTime || (newShowDay === '-1' && !newShowOneOffDate)}
+                  >
+                    {isCreatingShow ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
+                    Create Show
+                  </Button>
                 </section>
               </>
             )}

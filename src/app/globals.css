@@ -96,5 +96,11 @@ body {
   body {
     @apply bg-background text-foreground;
     min-height: 100vh;
+    /* Tells the browser this page is intentionally dark-themed — without
+       it, some mobile browsers' forced-dark heuristics (e.g. Android
+       Chrome's "Automatically darken web pages") can override form control
+       text/placeholder colors independently of our own CSS, making input
+       text unreadable even though it looks fine on desktop. */
+    color-scheme: dark;
   }
 }

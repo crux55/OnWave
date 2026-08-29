@@ -66,6 +66,24 @@ export type TopTag = {
   stationcount: number;
 };
 
+// InternalShow is a station- or DJ-created show (as opposed to PBSShow,
+// which is scraped). Recurring shows carry day_of_week + start_time; a
+// one-off carries one_off_date instead.
+export interface InternalShow {
+  id: string;
+  name: string;
+  description: string;
+  station_id?: string | null;
+  station_name?: string | null;
+  dj_id?: string | null;
+  dj_name?: string | null;
+  day_of_week?: number | null;
+  one_off_date?: string | null;
+  start_time: string;
+  duration_minutes: number;
+  created_at: string;
+}
+
 export interface PBSShow {
   id: number;
   name: string;
@@ -77,6 +95,7 @@ export interface PBSShow {
   duration: string;
   status: "upcoming" | "live" | "expired";
   program_url: string;
+  station_name?: string;
   created_at: string;
   updated_at: string;
 }
@@ -86,7 +105,7 @@ export interface User {
   username: string;
   email: string;
   password: string;
-  role: 'regular' | 'station' | 'dj';
+  role: 'regular' | 'dj';
   created_at: Date;
   updated_at: Date;
 }
