@@ -49,8 +49,8 @@ export function RadioStationCard({ station, onPlay, isLiked, onToggleLike, varia
         </button>
         <div className="flex flex-1 items-start justify-between gap-1.5 p-2.5">
           <div className="min-w-0">
-            <p className="truncate text-[13px] font-semibold leading-tight text-foreground">{station.name}</p>
-            <p className="mt-0.5 truncate text-[11px] text-muted-foreground">{station.country || 'Unknown'}</p>
+            <p className="truncate text-[13px] font-semibold leading-tight text-foreground" title={station.name}>{station.name}</p>
+            <p className="mt-0.5 truncate text-[11px] text-muted-foreground" title={station.country || 'Unknown'}>{station.country || 'Unknown'}</p>
           </div>
           {likeButton}
         </div>
@@ -72,8 +72,8 @@ export function RadioStationCard({ station, onPlay, isLiked, onToggleLike, varia
           />
         </div>
         <div className="min-w-0 flex-1">
-          <CardTitle className="truncate text-[15px] leading-tight">{station.name}</CardTitle>
-          <CardDescription className="mt-1 line-clamp-2 text-xs">
+          <CardTitle className="truncate text-[15px] leading-tight" title={station.name}>{station.name}</CardTitle>
+          <CardDescription className="mt-1 line-clamp-2 text-xs" title={`${station.tags} • ${station.country}`}>
             {station.tags} &bull; {station.country}
           </CardDescription>
         </div>

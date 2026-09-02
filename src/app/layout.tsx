@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Search, UserCircle2, ListMusic, Bell, Radio, Users } from 'lucide-react';
+import { Home, Search, UserCircle2, ListMusic, Bell, Radio, CalendarDays } from 'lucide-react';
 import { Sora, Manrope } from 'next/font/google';
 import React from 'react';
 
@@ -23,10 +23,10 @@ const manrope = Manrope({ subsets: ['latin'], weight: ['400', '500', '600'], var
 
 const navItems = [
   { href: '/', label: 'Home', icon: Home },
-  { href: '/search', label: 'Search', icon: Search },
-  { href: '/shows', label: 'Shows', icon: Radio },
-  { href: '/stations', label: 'Stations', icon: Users },
-  // { href: '/profile', label: 'Profile', icon: UserCircle2 },
+  { href: '/discover', label: 'Discover', icon: Search },
+  { href: '/live', label: 'Live', icon: Radio },
+  { href: '/shows', label: 'Shows', icon: CalendarDays },
+  { href: '/profile', label: 'Profile', icon: UserCircle2 },
 ];
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {

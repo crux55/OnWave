@@ -1,11 +1,11 @@
 import type { RadioStation, TopTag, PBSShow, InternalShow, WebradioSearchResponse, TopStationsResponse, Profile } from '@/lib/types';
 import { PINNED_STATIONS } from '@/lib/pinned-stations';
 
-export async function fetchFromApi(params: Record<string, string> = {}): Promise<WebradioSearchResponse> {
+export async function fetchFromApi(params: Record<string, string> = {}, signal?: AbortSignal): Promise<WebradioSearchResponse> {
   const queryString = new URLSearchParams(params).toString();
   const url = `/api/webradio/search${queryString ? `?${queryString}` : ''}`;
 
-  const response = await fetch(url);
+  const response = await fetch(url, { signal });
   if (!response.ok) {
     const errorText = await response.text();
     throw new Error(`Failed to fetch: ${response.status} ${errorText || response.statusText}`);
@@ -37,6 +37,23 @@ export async function fetchFromApi(params: Record<string, string> = {}): Promise
   }
 
   return data as WebradioSearchResponse;
+}
+
+// toPlayerStation normalizes a raw catalog RadioStation into the shape the
+// player/queue/liked-stations flow expects — a stable id (serveruuid,
+// falling back through stationuuid to name), a resolved playable url, a
+// single clean tag, and a favicon fallback. Shared so every entry point
+// that hands a station to the player does the same normalization; previously
+// only the search page did this and Home's play handler passed stations
+// through raw (see OnWave health-check #12).
+export function toPlayerStation(station: RadioStation): RadioStation {
+  return {
+    ...station,
+    serveruuid: station.serveruuid || station.stationuuid || station.name,
+    url: station.url_resolved || station.url,
+    tags: station.tags?.split(', ')[0]?.trim() || station.tags || 'Unknown',
+    favicon: station.favicon || 'https://placehold.co/64x64.png',
+  };
 }
 
 export async function getTopStationsGrouped(): Promise<TopStationsResponse> {
