@@ -1,12 +1,12 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { fetchTopTags, fetchHomePageSections, fetchDiscoverSection, fetchLikedStations, likedStationToRadioStation } from '@/lib/api';
+import { fetchTopTags, fetchHomePageSections, fetchDiscoverSection, fetchLikedStations, likedStationToRadioStation, extractPreferredGenres, rebalanceTopTags } from '@/lib/api';
 import type { RadioStation, TopTag } from '@/lib/types';
 import { RadioStationCard } from '@/components/RadioStationCard';
 import { usePlayer } from '@/contexts/PlayerContext';
 import { useLikedStations } from '@/hooks/use-liked-stations';
-import { Disc3, TrendingUp, RefreshCw, Sparkles, Shuffle, Heart, Play } from 'lucide-react';
+import { Disc3, TrendingUp, RefreshCw, Sparkles, Shuffle, Heart, Play, Flame } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -31,6 +31,7 @@ interface HomeCache {
   discoverGenre2: string;
   likedStations: RadioStation[];
   topTags: TopTag[];
+  preferredGenres: string[];
 }
 
 interface HeroCardProps {
@@ -163,6 +164,7 @@ export default function HomePage() {
   const [discoverGenre2, setDiscoverGenre2] = useState<string>('');
   const [likedStations, setLikedStations] = useState<RadioStation[]>([]);
   const [topTags, setTopTags] = useState<TopTag[]>([]);
+  const [preferredGenres, setPreferredGenres] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isShuffling, setIsShuffling] = useState(false);
   const player = usePlayer();
@@ -187,6 +189,7 @@ export default function HomePage() {
           setDiscoverGenre2(parsed.discoverGenre2 ?? '');
           setLikedStations(parsed.likedStations ?? []);
           setTopTags(parsed.topTags);
+          setPreferredGenres(parsed.preferredGenres ?? []);
           setIsLoading(false);
           return;
         }
@@ -198,13 +201,27 @@ export default function HomePage() {
     const load = async () => {
       setIsLoading(true);
       try {
-        const [sections, tags, discover2, liked] = await Promise.all([
-          fetchHomePageSections(),
+        // Liked stations + tags first, since the Discover row's genre pick
+        // needs to know what the viewer already likes before it can be
+        // biased toward it — fetchHomePageSections/fetchDiscoverSection
+        // below depend on this resolving first, which does add one extra
+        // round-trip to the initial load (liked-stations is small/fast,
+        // but not zero) in exchange for genuine personalization.
+        const [liked, tags] = await Promise.all([
+          fetchLikedStations().catch(() => []),
           fetchTopTags(),
+        ]);
+        const likedAsStations = liked.map(likedStationToRadioStation);
+        const preferred = extractPreferredGenres(likedAsStations);
+        setLikedStations(likedAsStations);
+        setTopTags(tags);
+        setPreferredGenres(preferred);
+
+        const [sections, discover2] = await Promise.all([
+          fetchHomePageSections(preferred),
           // A second, distinct genre so Discover reads as two real rows,
           // not one row plus an empty one.
-          fetchDiscoverSection([]).catch(() => ({ stations: [] as RadioStation[], genre: '' })),
-          fetchLikedStations().catch(() => []),
+          fetchDiscoverSection([], 8, preferred).catch(() => ({ stations: [] as RadioStation[], genre: '' })),
         ]);
         const featured = sections.featured;
         setFeaturedStations(featured);
@@ -215,9 +232,6 @@ export default function HomePage() {
         setDiscoverGenre(sections.discoverGenre);
         setDiscoverStations2(discover2.stations);
         setDiscoverGenre2(discover2.genre);
-        const likedAsStations = liked.map(likedStationToRadioStation);
-        setLikedStations(likedAsStations);
-        setTopTags(tags);
 
         try {
           const cache: HomeCache = {
@@ -232,6 +246,7 @@ export default function HomePage() {
             discoverGenre2: discover2.genre,
             likedStations: likedAsStations,
             topTags: tags,
+            preferredGenres: preferred,
           };
           sessionStorage.setItem(HOME_CACHE_KEY, JSON.stringify(cache));
         } catch {
@@ -249,7 +264,7 @@ export default function HomePage() {
   const handleShuffle = useCallback(async () => {
     setIsShuffling(true);
     try {
-      const result = await fetchDiscoverSection();
+      const result = await fetchDiscoverSection([], 8, preferredGenres);
       setDiscoverStations(result.stations);
       setDiscoverGenre(result.genre);
 
@@ -269,7 +284,7 @@ export default function HomePage() {
     } finally {
       setIsShuffling(false);
     }
-  }, []);
+  }, [preferredGenres]);
 
   const handlePlayStation = (station: RadioStation) => {
     player.playStation(station);
@@ -293,7 +308,7 @@ export default function HomePage() {
         <section className="mb-10">
           <h2 className="font-display text-2xl font-semibold mb-3 text-foreground">Top Tags</h2>
           <div className="flex flex-wrap gap-2">
-            {topTags.slice(0, 30).map(tagObj => (
+            {rebalanceTopTags(topTags).map(tagObj => (
               <Link
                 key={tagObj.name}
                 href={`/search?search=${encodeURIComponent(tagObj.name)}`}
@@ -322,7 +337,7 @@ export default function HomePage() {
         emptyMessage="No featured stations available right now."
       />
 
-      {likedStations.length > 0 && (
+      {likedStations.length > 0 ? (
         <StationSection
           title="Liked Stations"
           stations={likedStations}
@@ -331,6 +346,20 @@ export default function HomePage() {
           isLoading={isLoading}
           isLiked={isLiked}
           onToggleLike={toggleLike}
+        />
+      ) : (
+        // No likes yet — this slot shouldn't just be empty. Substitute
+        // already-fetched trending stations rather than leaving nothing
+        // here until the viewer actually likes something.
+        <StationSection
+          title="Popular Right Now"
+          stations={trending.slice(0, 6)}
+          onPlay={handlePlayStation}
+          icon={Flame}
+          isLoading={isLoading}
+          isLiked={isLiked}
+          onToggleLike={toggleLike}
+          emptyMessage="Nothing popular to show right now — check back soon."
         />
       )}
 

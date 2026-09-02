@@ -110,6 +110,32 @@ export async function fetchTopTags(): Promise<TopTag[]> {
   return response.json();
 }
 
+const DECADE_TAG_PATTERN = /^(19|20)?\d{2}s?$/i;
+
+// rebalanceTopTags fixes the raw catalog's tag-frequency data being
+// dominated by decade tags (70s, 1970, 80s, ...) — so many stations tag
+// themselves by decade that genre tags get crowded out of a plain
+// frequency sort. Decades stay (browsing "80s" radio is legitimate), just
+// capped, with genre matches sorted to the front so they aren't drowned
+// out by raw frequency.
+export function rebalanceTopTags(tags: TopTag[], maxDecadeTags: number = 6, total: number = 30): TopTag[] {
+  const decadeTags: TopTag[] = [];
+  const otherTags: TopTag[] = [];
+  for (const tag of tags) {
+    if (DECADE_TAG_PATTERN.test(tag.name.trim())) {
+      decadeTags.push(tag);
+    } else {
+      otherTags.push(tag);
+    }
+  }
+
+  const genreSet = new Set(DISCOVER_GENRES);
+  const genreMatches = otherTags.filter(tag => genreSet.has(tag.name.trim().toLowerCase()));
+  const otherNonGenre = otherTags.filter(tag => !genreSet.has(tag.name.trim().toLowerCase()));
+
+  return [...genreMatches, ...otherNonGenre, ...decadeTags.slice(0, maxDecadeTags)].slice(0, total);
+}
+
 export async function fetchCurrentUserProfile() {
   if (typeof window === "undefined") return null;
 
@@ -187,9 +213,33 @@ function fisherYatesShuffle<T>(arr: T[]): T[] {
   return a;
 }
 
-function pickGenre(exclude: string[] = [], pool: string[] = DISCOVER_GENRES): string {
+// preferred is a bias, not a restriction — most of the time (70%) prefer a
+// genre the caller says the user already likes, but still fall back to a
+// fully random pick from the whole pool the rest of the time, so Discover
+// keeps surfacing genres outside what someone's already liked instead of
+// narrowing to just those.
+function pickGenre(exclude: string[] = [], pool: string[] = DISCOVER_GENRES, preferred: string[] = []): string {
+  const preferredAvailable = preferred.filter(g => !exclude.includes(g));
+  if (preferredAvailable.length > 0 && Math.random() < 0.7) {
+    return preferredAvailable[Math.floor(Math.random() * preferredAvailable.length)];
+  }
   const available = pool.filter(g => !exclude.includes(g));
   return available[Math.floor(Math.random() * available.length)];
+}
+
+// extractPreferredGenres reads a user's liked stations' tags and returns
+// whichever of DISCOVER_GENRES they actually overlap with — the signal
+// pickGenre above uses to bias the Discover row. Empty if there are no
+// liked stations or none of their tags match a known genre.
+export function extractPreferredGenres(stations: RadioStation[]): string[] {
+  const tagSet = new Set<string>();
+  for (const station of stations) {
+    (station.tags || '').split(',').forEach(tag => {
+      const trimmed = tag.trim().toLowerCase();
+      if (trimmed) tagSet.add(trimmed);
+    });
+  }
+  return DISCOVER_GENRES.filter(genre => tagSet.has(genre));
 }
 
 async function fetchGenreStations(genre: string): Promise<RadioStation[]> {
@@ -197,7 +247,7 @@ async function fetchGenreStations(genre: string): Promise<RadioStation[]> {
   return fisherYatesShuffle(result.stations.filter(isQualityStation));
 }
 
-export async function fetchHomePageSections(): Promise<{
+export async function fetchHomePageSections(preferredGenres: string[] = []): Promise<{
   featured: RadioStation[];
   popular: RadioStation[];
   trending: RadioStation[];
@@ -209,9 +259,11 @@ export async function fetchHomePageSections(): Promise<{
   // first, and a genre fetch only backfills remaining slots (from a narrow,
   // taste-matched pool, not the broad Discover one) if the curated list is
   // too short. With enough pinned stations, no genre fetch happens at all.
+  // Deliberately NOT biased by preferredGenres — Editor's Picks stays
+  // exactly as curated regardless of what the viewer has liked.
   const needsBackfill = PINNED_STATIONS.length < EDITOR_PICKS_TARGET;
   const featuredGenre = needsBackfill ? pickGenre([], EDITOR_PICK_GENRES) : '';
-  const discoverGenre = pickGenre(featuredGenre ? [featuredGenre] : []);
+  const discoverGenre = pickGenre(featuredGenre ? [featuredGenre] : [], DISCOVER_GENRES, preferredGenres);
 
   const [grouped, featuredResult, discoverResult] = await Promise.all([
     getTopStationsGrouped(),
@@ -251,11 +303,11 @@ export async function fetchHomePageSections(): Promise<{
   };
 }
 
-export async function fetchDiscoverSection(exclude: string[] = [], count: number = 8): Promise<{
+export async function fetchDiscoverSection(exclude: string[] = [], count: number = 8, preferredGenres: string[] = []): Promise<{
   stations: RadioStation[];
   genre: string;
 }> {
-  const genre = pickGenre(exclude);
+  const genre = pickGenre(exclude, DISCOVER_GENRES, preferredGenres);
   try {
     return { stations: (await fetchGenreStations(genre)).slice(0, count), genre };
   } catch {

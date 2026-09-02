@@ -53,6 +53,7 @@ export default function ShowsPage() {
   const [stationStreams, setStationStreams] = useState<Record<string, RadioStation | null>>({});
   const stationLookupsStarted = useRef<Set<string>>(new Set());
   const [excludedStations, setExcludedStations] = useState<Set<string>>(new Set());
+  const [showAllStationFilters, setShowAllStationFilters] = useState(false);
   const [followedShowNames, setFollowedShowNames] = useState<Set<string>>(new Set());
   const [togglingShowName, setTogglingShowName] = useState<string | null>(null);
   const [followedProgramIds, setFollowedProgramIds] = useState<Set<string>>(new Set());
@@ -250,7 +251,7 @@ export default function ShowsPage() {
       </div>
 
       <div className="flex flex-wrap items-center gap-3 mb-8">
-        {stationNames.map(name => {
+        {(showAllStationFilters ? stationNames : stationNames.slice(0, 12)).map(name => {
           const isActive = !excludedStations.has(name);
           return (
             <button
@@ -265,7 +266,7 @@ export default function ShowsPage() {
                 variant="outline"
                 className={
                   isActive
-                    ? 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100 cursor-pointer'
+                    ? 'bg-accent/10 text-accent border-accent/30 hover:bg-accent/20 cursor-pointer'
                     : 'bg-transparent text-muted-foreground border-border opacity-50 hover:opacity-75 cursor-pointer'
                 }
               >
@@ -275,39 +276,50 @@ export default function ShowsPage() {
             </button>
           );
         })}
+        {stationNames.length > 12 && (
+          <button
+            type="button"
+            onClick={() => setShowAllStationFilters(prev => !prev)}
+            className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-full"
+          >
+            <Badge variant="outline" className="bg-transparent text-muted-foreground border-border cursor-pointer hover:bg-muted/40">
+              {showAllStationFilters ? 'Show fewer' : `+${stationNames.length - 12} more`}
+            </Badge>
+          </button>
+        )}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+      <div className="grid grid-cols-3 gap-2 sm:gap-4 md:gap-6 mb-8">
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Live Now</CardTitle>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 pb-1 md:p-6 md:pb-2">
+            <CardTitle className="text-xs sm:text-sm font-medium">Live Now</CardTitle>
             <Clock className="h-4 w-4 text-red-500" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{currentShows.length + currentInternalShows.length}</div>
-            <p className="text-xs text-muted-foreground">Currently broadcasting</p>
+          <CardContent className="p-3 pt-0 md:p-6 md:pt-0">
+            <div className="text-lg md:text-2xl font-bold">{currentShows.length + currentInternalShows.length}</div>
+            <p className="hidden sm:block text-xs text-muted-foreground">Currently broadcasting</p>
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Upcoming</CardTitle>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 pb-1 md:p-6 md:pb-2">
+            <CardTitle className="text-xs sm:text-sm font-medium">Upcoming</CardTitle>
             <Calendar className="h-4 w-4 text-blue-500" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{upcomingShows.length + upcomingInternalShows.length}</div>
-            <p className="text-xs text-muted-foreground">Shows scheduled</p>
+          <CardContent className="p-3 pt-0 md:p-6 md:pt-0">
+            <div className="text-lg md:text-2xl font-bold">{upcomingShows.length + upcomingInternalShows.length}</div>
+            <p className="hidden sm:block text-xs text-muted-foreground">Shows scheduled</p>
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Shows</CardTitle>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 pb-1 md:p-6 md:pb-2">
+            <CardTitle className="text-xs sm:text-sm font-medium">Total Shows</CardTitle>
             <Radio className="h-4 w-4 text-accent" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totalShowCount}</div>
-            <p className="text-xs text-muted-foreground">In the next 30 days</p>
+          <CardContent className="p-3 pt-0 md:p-6 md:pt-0">
+            <div className="text-lg md:text-2xl font-bold">{totalShowCount}</div>
+            <p className="hidden sm:block text-xs text-muted-foreground">In the next 30 days</p>
           </CardContent>
         </Card>
       </div>
