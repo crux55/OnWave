@@ -806,6 +806,271 @@ export async function revokeBadge(email: string, badgeId: string): Promise<void>
   }
 }
 
+export interface StationRequest {
+  id: string;
+  requester_id: string;
+  name: string;
+  description: string;
+  requested_handle?: string | null;
+  status: 'pending' | 'approved' | 'denied';
+  reviewed_by?: string | null;
+  reviewed_at?: string | null;
+  created_at: string;
+}
+
+export interface DJRequest {
+  id: string;
+  requester_id: string;
+  message?: string | null;
+  source: 'self_apply' | 'admin_grant';
+  status: 'pending' | 'approved' | 'denied';
+  reviewed_by?: string | null;
+  reviewed_at?: string | null;
+  created_at: string;
+}
+
+export async function createStationRequest(request: { name: string; description?: string; requested_handle?: string }): Promise<void> {
+  const token = localStorage.getItem("token");
+  if (!token) {
+    throw new Error('User not authenticated');
+  }
+
+  const auth = JSON.parse(token);
+  const response = await fetch('/api/station-requests', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${auth.token}`,
+    },
+    body: JSON.stringify(request),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    if (response.status === 401) {
+      throw new Error('UNAUTHORIZED');
+    }
+    throw new Error(errorData.message || 'Failed to submit station request');
+  }
+}
+
+export async function createDJRequest(request: { message?: string }): Promise<void> {
+  const token = localStorage.getItem("token");
+  if (!token) {
+    throw new Error('User not authenticated');
+  }
+
+  const auth = JSON.parse(token);
+  const response = await fetch('/api/dj-requests', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${auth.token}`,
+    },
+    body: JSON.stringify(request),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    if (response.status === 401) {
+      throw new Error('UNAUTHORIZED');
+    }
+    throw new Error(errorData.message || 'Failed to submit DJ request');
+  }
+}
+
+export async function fetchPendingStationRequests(): Promise<StationRequest[]> {
+  const token = localStorage.getItem("token");
+  if (!token) {
+    throw new Error('User not authenticated');
+  }
+
+  const auth = JSON.parse(token);
+  const response = await fetch('/api/admin/station-requests', {
+    headers: { 'Authorization': `Bearer ${auth.token}` },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    if (response.status === 401) {
+      throw new Error('UNAUTHORIZED');
+    }
+    throw new Error(errorData.message || 'Failed to fetch station requests');
+  }
+
+  const result = await response.json();
+  return result.station_requests || [];
+}
+
+export async function fetchPendingDJRequests(): Promise<DJRequest[]> {
+  const token = localStorage.getItem("token");
+  if (!token) {
+    throw new Error('User not authenticated');
+  }
+
+  const auth = JSON.parse(token);
+  const response = await fetch('/api/admin/dj-requests', {
+    headers: { 'Authorization': `Bearer ${auth.token}` },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    if (response.status === 401) {
+      throw new Error('UNAUTHORIZED');
+    }
+    throw new Error(errorData.message || 'Failed to fetch DJ requests');
+  }
+
+  const result = await response.json();
+  return result.dj_requests || [];
+}
+
+export async function approveStationRequest(id: string): Promise<string> {
+  const token = localStorage.getItem("token");
+  if (!token) {
+    throw new Error('User not authenticated');
+  }
+
+  const auth = JSON.parse(token);
+  const response = await fetch(`/api/admin/station-requests/${id}/approve`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${auth.token}` },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    if (response.status === 401) {
+      throw new Error('UNAUTHORIZED');
+    }
+    throw new Error(errorData.message || 'Failed to approve station request');
+  }
+
+  const result = await response.json();
+  return result.station_id;
+}
+
+export async function denyStationRequest(id: string): Promise<void> {
+  const token = localStorage.getItem("token");
+  if (!token) {
+    throw new Error('User not authenticated');
+  }
+
+  const auth = JSON.parse(token);
+  const response = await fetch(`/api/admin/station-requests/${id}/deny`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${auth.token}` },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    if (response.status === 401) {
+      throw new Error('UNAUTHORIZED');
+    }
+    throw new Error(errorData.message || 'Failed to deny station request');
+  }
+}
+
+export async function approveDJRequest(id: string): Promise<string> {
+  const token = localStorage.getItem("token");
+  if (!token) {
+    throw new Error('User not authenticated');
+  }
+
+  const auth = JSON.parse(token);
+  const response = await fetch(`/api/admin/dj-requests/${id}/approve`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${auth.token}` },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    if (response.status === 401) {
+      throw new Error('UNAUTHORIZED');
+    }
+    throw new Error(errorData.message || 'Failed to approve DJ request');
+  }
+
+  const result = await response.json();
+  return result.user_id;
+}
+
+export async function denyDJRequest(id: string): Promise<void> {
+  const token = localStorage.getItem("token");
+  if (!token) {
+    throw new Error('User not authenticated');
+  }
+
+  const auth = JSON.parse(token);
+  const response = await fetch(`/api/admin/dj-requests/${id}/deny`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${auth.token}` },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    if (response.status === 401) {
+      throw new Error('UNAUTHORIZED');
+    }
+    throw new Error(errorData.message || 'Failed to deny DJ request');
+  }
+}
+
+export async function grantDJByUsername(username: string): Promise<string> {
+  const token = localStorage.getItem("token");
+  if (!token) {
+    throw new Error('User not authenticated');
+  }
+
+  const auth = JSON.parse(token);
+  const response = await fetch('/api/admin/dj-requests/grant', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${auth.token}`,
+    },
+    body: JSON.stringify({ username }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    if (response.status === 401) {
+      throw new Error('UNAUTHORIZED');
+    }
+    throw new Error(errorData.message || 'Failed to grant DJ role');
+  }
+
+  const result = await response.json();
+  return result.user_id;
+}
+
+export async function inviteStationMember(stationId: string, invite: { username?: string; email?: string }): Promise<string> {
+  const token = localStorage.getItem("token");
+  if (!token) {
+    throw new Error('User not authenticated');
+  }
+
+  const auth = JSON.parse(token);
+  const response = await fetch(`/api/stations/${stationId}/members`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${auth.token}`,
+    },
+    body: JSON.stringify(invite),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    if (response.status === 401) {
+      throw new Error('UNAUTHORIZED');
+    }
+    throw new Error(errorData.message || 'Failed to invite member');
+  }
+
+  const result = await response.json();
+  return result.message;
+}
+
 export interface Follow {
   target_type: 'station' | 'show' | 'program';
   target_id: string;
@@ -895,6 +1160,7 @@ export interface ShowSummary {
 export interface StationMember {
   user_id: string;
   name: string;
+  role: string;
 }
 
 export interface ScrapedShowSummary {

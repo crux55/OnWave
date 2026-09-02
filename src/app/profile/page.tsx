@@ -3,7 +3,7 @@
 
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { UserCircle2, Radio, Podcast, Users, FileText, Edit3, LogOut, Loader2, Bell, X, Heart, ChevronRight, Award, ShieldCheck, Plus, Calendar } from 'lucide-react';
+import { UserCircle2, Radio, Podcast, Users, FileText, Edit3, LogOut, Loader2, Bell, X, Heart, ChevronRight, Award, ShieldCheck, Plus, Calendar, Mic2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { useEffect, useState } from "react";
-import { fetchCurrentUserProfile, fetchLikedStations, fetchMyBadges, fetchManagedBadges, fetchMyStations, fetchMyFollows, createBadge, awardBadge, revokeBadge, markBadgesSeen, createShow, type Badge, type MyBadge, type Station, type Follow } from "@/lib/api";
+import { fetchCurrentUserProfile, fetchLikedStations, fetchMyBadges, fetchManagedBadges, fetchMyStations, fetchMyFollows, createBadge, awardBadge, revokeBadge, markBadgesSeen, createShow, createStationRequest, createDJRequest, type Badge, type MyBadge, type Station, type Follow } from "@/lib/api";
 import { JWT, Profile, Token, User } from '@/lib/types';
 import { jwtDecode as jwt_decode } from "jwt-decode";
 import { useReminders } from '@/contexts/RemindersContext';
@@ -82,6 +82,14 @@ export default function ProfilePage() {
   const [newShowTime, setNewShowTime] = useState('21:00');
   const [newShowDuration, setNewShowDuration] = useState('60');
   const [isCreatingShow, setIsCreatingShow] = useState(false);
+  const [newStationName, setNewStationName] = useState('');
+  const [newStationDescription, setNewStationDescription] = useState('');
+  const [newStationHandle, setNewStationHandle] = useState('');
+  const [isSubmittingStationRequest, setIsSubmittingStationRequest] = useState(false);
+  const [hasSubmittedStationRequest, setHasSubmittedStationRequest] = useState(false);
+  const [djRequestMessage, setDjRequestMessage] = useState('');
+  const [isSubmittingDJRequest, setIsSubmittingDJRequest] = useState(false);
+  const [hasSubmittedDJRequest, setHasSubmittedDJRequest] = useState(false);
   const getAvatarUrl = (filename: string | undefined) => {
   const url = filename ? `${apiHost}${filename}` : undefined;
 
@@ -214,6 +222,41 @@ export default function ProfilePage() {
       toast({ title: 'Failed to create show', description: error.message, variant: 'destructive' });
     } finally {
       setIsCreatingShow(false);
+    }
+  };
+
+  const handleCreateStationRequest = async () => {
+    if (!newStationName.trim()) return;
+    setIsSubmittingStationRequest(true);
+    try {
+      await createStationRequest({
+        name: newStationName.trim(),
+        description: newStationDescription.trim(),
+        requested_handle: newStationHandle.trim() || undefined,
+      });
+      toast({ title: 'Request submitted', description: "An admin will review it shortly." });
+      setNewStationName('');
+      setNewStationDescription('');
+      setNewStationHandle('');
+      setHasSubmittedStationRequest(true);
+    } catch (error: any) {
+      toast({ title: 'Failed to submit request', description: error.message, variant: 'destructive' });
+    } finally {
+      setIsSubmittingStationRequest(false);
+    }
+  };
+
+  const handleCreateDJRequest = async () => {
+    setIsSubmittingDJRequest(true);
+    try {
+      await createDJRequest({ message: djRequestMessage.trim() || undefined });
+      toast({ title: 'Request submitted', description: "An admin will review it shortly." });
+      setDjRequestMessage('');
+      setHasSubmittedDJRequest(true);
+    } catch (error: any) {
+      toast({ title: 'Failed to submit request', description: error.message, variant: 'destructive' });
+    } finally {
+      setIsSubmittingDJRequest(false);
     }
   };
 
@@ -409,6 +452,54 @@ export default function ProfilePage() {
                       </Link>
                     ))}
                   </div>
+                </section>
+              </>
+            )}
+
+            {token && !hasSubmittedStationRequest && (
+              <>
+                <Separator />
+                <section className="space-y-3 rounded-lg border border-accent/30 bg-accent/5 p-4">
+                  <h3 className="text-xl font-semibold text-foreground flex items-center gap-2">
+                    <Radio className="h-5 w-5 text-accent" /> Create a Station
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    Requests are reviewed by an admin before your station goes live.
+                  </p>
+                  <Input placeholder="Station name" value={newStationName} onChange={e => setNewStationName(e.target.value)} />
+                  <Input placeholder="Description" value={newStationDescription} onChange={e => setNewStationDescription(e.target.value)} />
+                  <Input placeholder="Requested handle (optional)" value={newStationHandle} onChange={e => setNewStationHandle(e.target.value)} />
+                  <Button
+                    size="sm"
+                    onClick={handleCreateStationRequest}
+                    disabled={isSubmittingStationRequest || !newStationName.trim()}
+                  >
+                    {isSubmittingStationRequest ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
+                    Request a Station
+                  </Button>
+                </section>
+              </>
+            )}
+
+            {token?.role !== 'dj' && !hasSubmittedDJRequest && (
+              <>
+                <Separator />
+                <section className="space-y-3 rounded-lg border border-accent/30 bg-accent/5 p-4">
+                  <h3 className="text-xl font-semibold text-foreground flex items-center gap-2">
+                    <Mic2 className="h-5 w-5 text-accent" /> Become a DJ
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    DJs can create shows and go live independently, with or without a station. Requests are reviewed by an admin.
+                  </p>
+                  <Input placeholder="Tell us why you want to DJ (optional)" value={djRequestMessage} onChange={e => setDjRequestMessage(e.target.value)} />
+                  <Button
+                    size="sm"
+                    onClick={handleCreateDJRequest}
+                    disabled={isSubmittingDJRequest}
+                  >
+                    {isSubmittingDJRequest ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
+                    Request DJ Access
+                  </Button>
                 </section>
               </>
             )}
@@ -721,6 +812,23 @@ export default function ProfilePage() {
                     {isCreatingShow ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
                     Create Show
                   </Button>
+                </section>
+              </>
+            )}
+
+            {token?.is_admin && (
+              <>
+                <Separator />
+                <section>
+                  <Link
+                    href="/admin"
+                    className="flex items-center justify-between gap-3 p-3 -mx-3 rounded-md hover:bg-muted/30 transition-colors"
+                  >
+                    <h3 className="text-xl font-semibold text-foreground flex items-center gap-2">
+                      <ShieldCheck className="h-5 w-5 text-accent" /> Admin Review Queue
+                    </h3>
+                    <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                  </Link>
                 </section>
               </>
             )}
