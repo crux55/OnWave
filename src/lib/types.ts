@@ -121,6 +121,7 @@ export interface Profile {
   website?: string;
   is_public: boolean;
   slug?: string;
+  favorite_genre?: string;
   last_updated: Date;
 }
 
@@ -133,6 +134,8 @@ export interface Token {
   updated_at: string | Date;
   exp: string | Date;
   last_login: string | Date;
+  is_founding_member: boolean;
+  has_password: boolean;
 }
 
 export type JWT = {

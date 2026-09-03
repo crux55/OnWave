@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useForm, type SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { GoogleOAuthProvider, GoogleLogin, type CredentialResponse } from '@react-oauth/google';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -16,7 +17,7 @@ import { AppLogo } from '@/components/AppLogo';
 import { Loader2, LogIn } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
-import { getUserReminders } from '@/lib/api';
+import { getUserReminders, signInWithGoogle } from '@/lib/api';
 
 
 const commonPasswordSchema = z.string().min(6, { message: "Password must be at least 6 characters." });
@@ -61,27 +62,36 @@ export default function LoginPage() {
     defaultValues: { email: '', password: '', confirmPassword: '', username: '' },
   });
 
-  // const handleGoogleSignIn = async () => {
-  //   setIsLoadingGoogle(true);
-  //   try {
-  //     const result = await signInWithPopup(auth, googleProvider);
-  //     const user = result.user;
-  //     toast({
-  //       title: 'Sign In Successful!',
-  //       description: `Welcome back, ${user.displayName || user.email}!`,
-  //     });
-  //     router.push('/');
-  //   } catch (error: any) {
-  //     console.error('Google Sign-In Error:', error);
-  //     toast({
-  //       title: 'Sign In Failed',
-  //       description: error.message || 'An unexpected error occurred. Please try again.',
-  //       variant: 'destructive',
-  //     });
-  //   } finally {
-  //     setIsLoadingGoogle(false);
-  //   }
-  // };
+  const handleGoogleSignIn = async (credentialResponse: CredentialResponse) => {
+    if (!credentialResponse.credential) {
+      toast({ title: 'Sign In Failed', description: 'No credential returned from Google.', variant: 'destructive' });
+      return;
+    }
+
+    setIsLoadingGoogle(true);
+    try {
+      await signInWithGoogle(credentialResponse.credential);
+      window.dispatchEvent(new Event('authChange'));
+
+      try {
+        const reminders = await getUserReminders();
+        localStorage.setItem('reminders', JSON.stringify(reminders));
+      } catch (error) {
+        console.warn('Failed to preload reminders:', error);
+      }
+
+      toast({ title: 'Sign In Successful!', description: 'Welcome to OnWave!' });
+      router.push('/profile');
+    } catch (error: any) {
+      toast({
+        title: 'Sign In Failed',
+        description: error.message || 'An unexpected error occurred. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoadingGoogle(false);
+    }
+  };
 
     const handleRegister = async (data: RegisterFormValues) => {
     setRegisterMessage("");
@@ -221,22 +231,22 @@ export default function LoginPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          <Button 
-            onClick={() => {}} 
-            disabled={true}
-            variant="outline"
-            className="w-full py-3 text-base border-input hover:bg-accent/10"
-          >
-            {isLoadingGoogle ? (
-              <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-            ) : (
-              <svg className="mr-2 h-5 w-5" aria-hidden="true" focusable="false" data-prefix="fab" data-icon="google" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 488 512">
-                <path fill="currentColor" d="M488 261.8C488 403.3 381.7 512 244 512 110.3 512 0 398.8 0 256S110.3 0 244 0c69.8 0 130.8 28.1 174.9 73.2L370.3 141.1C339.2 112.4 295.3 95.2 244 95.2c-79.9 0-146.2 65.2-146.2 145.5S164.1 396.2 244 396.2c46.4 0 80.4-19.1 103.2-40.3 19.5-18.1 32.4-44.1 36.1-78.1H244V261.8h244z"></path>
-              </svg>
-            )}
-            Sign In with Google
-          </Button>
-          
+          {isLoadingGoogle ? (
+            <Button disabled variant="outline" className="w-full py-3 text-base border-input">
+              <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Signing in...
+            </Button>
+          ) : process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ? (
+            <GoogleOAuthProvider clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID}>
+              <div className="flex justify-center">
+                <GoogleLogin onSuccess={handleGoogleSignIn} onError={() => toast({ title: 'Sign In Failed', description: 'Google sign-in was unsuccessful.', variant: 'destructive' })} width="384" />
+              </div>
+            </GoogleOAuthProvider>
+          ) : (
+            <Button disabled variant="outline" className="w-full py-3 text-base border-input">
+              Sign In with Google (not configured)
+            </Button>
+          )}
+
           <div className="relative my-2">
             <div className="absolute inset-0 flex items-center">
               <span className="w-full border-t" />

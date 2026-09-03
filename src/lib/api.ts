@@ -158,6 +158,68 @@ export async function fetchCurrentUserProfile() {
   }
 }
 
+export async function updateProfile(fields: {
+  name: string;
+  location: string;
+  bio: string;
+  website: string;
+  avatar: string;
+  is_public: boolean;
+  slug: string;
+  favorite_genre: string;
+}): Promise<void> {
+  const token = localStorage.getItem("token");
+  if (!token) {
+    throw new Error('User not authenticated');
+  }
+
+  const auth = JSON.parse(token);
+  const response = await fetch('/api/profile', {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${auth.token}`,
+    },
+    body: JSON.stringify(fields),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    if (response.status === 401) {
+      throw new Error('UNAUTHORIZED');
+    }
+    throw new Error(errorData.error || 'Failed to update profile');
+  }
+}
+
+export async function uploadAvatar(file: File): Promise<string> {
+  const token = localStorage.getItem("token");
+  if (!token) {
+    throw new Error('User not authenticated');
+  }
+
+  const auth = JSON.parse(token);
+  const formData = new FormData();
+  formData.append('avatar', file);
+
+  const response = await fetch('/api/profile/avatar', {
+    method: 'PUT',
+    headers: { 'Authorization': `Bearer ${auth.token}` },
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    if (response.status === 401) {
+      throw new Error('UNAUTHORIZED');
+    }
+    throw new Error(errorData.error || 'Failed to upload avatar');
+  }
+
+  const result = await response.json();
+  return result.avatarUrl;
+}
+
 
 export async function sortStationsByClickTrend(params: Record<string, string> = {}): Promise<RadioStation[]> {
   const stations = await getTopStations();
@@ -181,7 +243,7 @@ export async function fetchStationByRandom(params: Record<string, string> = {}):
 
 // ---------- Home page section helpers ----------
 
-const DISCOVER_GENRES = [
+export const DISCOVER_GENRES = [
   'jazz', 'classical', 'electronic', 'ambient', 'chill', 'lofi',
   'rock', 'indie', 'pop', 'news', 'hip hop', 'country', 'metal',
   'reggae', 'soul', 'blues', 'folk', 'dance', 'techno', 'house',
@@ -1277,5 +1339,216 @@ export async function deleteShow(showId: string): Promise<void> {
       throw new Error('UNAUTHORIZED');
     }
     throw new Error(errorData.message || 'Failed to delete show');
+  }
+}
+
+export async function signInWithGoogle(idToken: string): Promise<void> {
+  const response = await fetch('/api/auth/google', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id_token: idToken }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Failed to sign in with Google');
+  }
+
+  const result = await response.json();
+  localStorage.setItem('token', JSON.stringify({ token: result.token, userId: result.userId }));
+}
+
+export async function changeUsername(username: string): Promise<void> {
+  const token = localStorage.getItem("token");
+  if (!token) {
+    throw new Error('User not authenticated');
+  }
+
+  const auth = JSON.parse(token);
+  const response = await fetch('/api/users/me/change-username', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${auth.token}`,
+    },
+    body: JSON.stringify({ username }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    if (response.status === 401) {
+      throw new Error('UNAUTHORIZED');
+    }
+    throw new Error(errorData.error || 'Failed to change username');
+  }
+}
+
+export async function changeEmail(newEmail: string): Promise<void> {
+  const token = localStorage.getItem("token");
+  if (!token) {
+    throw new Error('User not authenticated');
+  }
+
+  const auth = JSON.parse(token);
+  const response = await fetch('/api/users/me/change-email', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${auth.token}`,
+    },
+    body: JSON.stringify({ new_email: newEmail }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    if (response.status === 401) {
+      throw new Error('UNAUTHORIZED');
+    }
+    throw new Error(errorData.error || 'Failed to change email');
+  }
+}
+
+export async function verifyEmailChange(verifyToken: string): Promise<void> {
+  const response = await fetch('/api/users/verify-email-change', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token: verifyToken }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Failed to confirm email change');
+  }
+}
+
+export async function changePassword(currentPassword: string, newPassword: string): Promise<void> {
+  const token = localStorage.getItem("token");
+  if (!token) {
+    throw new Error('User not authenticated');
+  }
+
+  const auth = JSON.parse(token);
+  const response = await fetch('/api/users/me/change-password', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${auth.token}`,
+    },
+    body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    if (response.status === 401) {
+      throw new Error('UNAUTHORIZED');
+    }
+    throw new Error(errorData.error || 'Failed to change password');
+  }
+}
+
+export async function exportAccountData(): Promise<void> {
+  const token = localStorage.getItem("token");
+  if (!token) {
+    throw new Error('User not authenticated');
+  }
+
+  const auth = JSON.parse(token);
+  const response = await fetch('/api/users/me/export', {
+    headers: { 'Authorization': `Bearer ${auth.token}` },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    if (response.status === 401) {
+      throw new Error('UNAUTHORIZED');
+    }
+    throw new Error(errorData.error || 'Failed to export data');
+  }
+
+  const data = await response.json();
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = 'onwave-data-export.json';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+export interface MemberRef {
+  user_id: string;
+  name: string;
+}
+
+export interface StationNeedingTransfer {
+  station_id: string;
+  station_name: string;
+  other_members: MemberRef[];
+}
+
+export interface StationToArchive {
+  station_id: string;
+  station_name: string;
+}
+
+export interface DeletionPreview {
+  stations_needing_transfer: StationNeedingTransfer[];
+  stations_to_archive: StationToArchive[];
+}
+
+export async function fetchDeletionPreview(): Promise<DeletionPreview> {
+  const token = localStorage.getItem("token");
+  if (!token) {
+    throw new Error('User not authenticated');
+  }
+
+  const auth = JSON.parse(token);
+  const response = await fetch('/api/users/me/deletion-preview', {
+    headers: { 'Authorization': `Bearer ${auth.token}` },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    if (response.status === 401) {
+      throw new Error('UNAUTHORIZED');
+    }
+    throw new Error(errorData.error || 'Failed to load deletion preview');
+  }
+
+  return response.json();
+}
+
+export async function deleteAccount(confirmation: {
+  currentPassword?: string;
+  confirmationPhrase?: string;
+  ownershipTransfers: { station_id: string; new_owner_user_id: string }[];
+}): Promise<void> {
+  const token = localStorage.getItem("token");
+  if (!token) {
+    throw new Error('User not authenticated');
+  }
+
+  const auth = JSON.parse(token);
+  const response = await fetch('/api/users/me', {
+    method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${auth.token}`,
+    },
+    body: JSON.stringify({
+      current_password: confirmation.currentPassword,
+      confirmation_phrase: confirmation.confirmationPhrase,
+      ownership_transfers: confirmation.ownershipTransfers,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    if (response.status === 401) {
+      throw new Error('UNAUTHORIZED');
+    }
+    throw new Error(errorData.error || 'Failed to delete account');
   }
 }

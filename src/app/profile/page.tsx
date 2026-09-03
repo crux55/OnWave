@@ -21,12 +21,6 @@ import { ConnectionStatus } from '@/components/ConnectionStatus';
 
 
 
-const userProfileData = {
-  subscription: 'Premium',
-  favoriteGenre: 'Synthwave',
-  theme: 'Dark Mode (App Default)',
-};
-
 interface ListItemProps {
   items: { id: string; name: string }[];
   emptyMessage: string;
@@ -590,17 +584,35 @@ export default function ProfilePage() {
               <div>
                 <h3 className="text-xl font-semibold text-foreground mb-3">Account Details</h3>
                 <div className="space-y-1 text-sm">
-                  <p className="text-muted-foreground">Subscription: <span className="text-primary font-medium">{userProfileData.subscription}</span></p>
+                  {token?.is_founding_member && (
+                    <p className="text-muted-foreground">
+                      Status: <span className="text-primary font-medium">Founding Member</span>
+                    </p>
+                  )}
                   <p className="text-muted-foreground">
                     Member since: {token && token.created_at ? new Date(token.created_at).toLocaleDateString() : "Unknown"}
                   </p>
+                  {userProfile.location && (
+                    <p className="text-muted-foreground">Location: {userProfile.location}</p>
+                  )}
+                  {userProfile.website && (
+                    <p className="text-muted-foreground">
+                      Website: <a href={userProfile.website} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">{userProfile.website}</a>
+                    </p>
+                  )}
+                  <p className="text-muted-foreground">Favorite Genre: {userProfile.favorite_genre || 'Not set'}</p>
+                  <p className="text-muted-foreground">Theme: Dark Mode</p>
+                </div>
+              </div>
+            </section>
 
-                  <p className="text-muted-foreground">
-                    Account Created: {token && token.created_at ? new Date(token.created_at).toLocaleDateString() : "Unknown"}
-                  </p>
+            <Separator />
 
-
-               <div className="space-y-3">
+            <section>
+              <h3 className="text-xl font-semibold text-foreground mb-4 flex items-center gap-2">
+                <Bell className="h-5 w-5 text-primary" /> Show Reminders
+              </h3>
+              <div className="space-y-3">
                 {reminders.length > 0 ? (
                   <ul className="space-y-2">
                     {reminders.map(reminder => (
@@ -633,27 +645,7 @@ export default function ProfilePage() {
                     No show reminders set. Add some to never miss your favorites!
                   </p>
                 )}
-                </div>
-                 <p className="text-muted-foreground">Favorite Genre: No info yet</p>
-                  <p className="text-muted-foreground">Theme: Default</p>
-                </div>
               </div>
-            </section>
-
-            <Separator />
-
-            <section>
-              <h3 className="text-xl font-semibold text-foreground mb-4 flex items-center gap-2">
-                <Bell className="h-5 w-5 text-primary" /> Show Reminders
-              </h3>
-              <ProfileListSection
-                items={reminders.map(reminder => ({
-                  id: reminder.id,
-                  name: `${reminder.show_name} - ${new Date(reminder.show_date).toLocaleDateString()} at ${new Date(`2000-01-01T${reminder.show_start_time}`).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}`
-                }))}
-                emptyMessage="No show reminders set. Add some to never miss your favorites!"
-                icon={Bell}
-              />
             </section>
 
             <Separator />
