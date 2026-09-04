@@ -110,7 +110,10 @@ export async function fetchTopTags(): Promise<TopTag[]> {
   return response.json();
 }
 
-const DECADE_TAG_PATTERN = /^(19|20)?\d{2}s?$/i;
+// Matches "80s", "1980s", "80", "1980" (the original bare forms) as well as
+// real-world variants seen in the actual catalog data: "80's"/"1980's"
+// (apostrophe-s) and "80er"/"1980er" (German decade tags).
+const DECADE_TAG_PATTERN = /^(19|20)?\d{2}('s|s|er)?$/i;
 
 // rebalanceTopTags fixes the raw catalog's tag-frequency data being
 // dominated by decade tags (70s, 1970, 80s, ...) — so many stations tag
