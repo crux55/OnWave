@@ -115,17 +115,32 @@ export async function fetchTopTags(): Promise<TopTag[]> {
 // (apostrophe-s) and "80er"/"1980er" (German decade tags).
 const DECADE_TAG_PATTERN = /^(19|20)?\d{2}('s|s|er)?$/i;
 
+// Station frequencies/call-signs ("100.1 fm", "90.3", "88.1 fm") — real tag
+// data, but not a "browse by this" category the way a genre or decade is,
+// so these are dropped entirely rather than just deprioritized.
+const FREQUENCY_TAG_PATTERN = /^\d{1,4}([.,]\d{1,2})?\s*(fm|am|khz|mhz)?$/i;
+
+// Technical/format noise that shows up as tags on the raw catalog but
+// describes the stream, not the station — same "drop entirely" treatment
+// as frequency tags.
+const JUNK_TAGS = new Set(['aac', 'aac+', 'mp3', 'ogg', 'wav', 'flac', 'ssl', 'http', 'https', '24/7', '247']);
+
 // rebalanceTopTags fixes the raw catalog's tag-frequency data being
-// dominated by decade tags (70s, 1970, 80s, ...) — so many stations tag
-// themselves by decade that genre tags get crowded out of a plain
-// frequency sort. Decades stay (browsing "80s" radio is legitimate), just
-// capped, with genre matches sorted to the front so they aren't drowned
-// out by raw frequency.
+// dominated by noise — decade tags (70s, 1970, 80s, ...), station
+// frequencies, and stream-format tags all crowd out genuinely interesting
+// (mostly genre) tags in a plain frequency sort. Frequencies and format
+// noise are dropped outright since they're not a meaningful way to browse;
+// decades stay since browsing "80s" radio is legitimate, just capped, with
+// real genre matches sorted to the front so they aren't drowned out.
 export function rebalanceTopTags(tags: TopTag[], maxDecadeTags: number = 6, total: number = 30): TopTag[] {
   const decadeTags: TopTag[] = [];
   const otherTags: TopTag[] = [];
   for (const tag of tags) {
-    if (DECADE_TAG_PATTERN.test(tag.name.trim())) {
+    const name = tag.name.trim();
+    if (JUNK_TAGS.has(name.toLowerCase()) || FREQUENCY_TAG_PATTERN.test(name)) {
+      continue;
+    }
+    if (DECADE_TAG_PATTERN.test(name)) {
       decadeTags.push(tag);
     } else {
       otherTags.push(tag);
