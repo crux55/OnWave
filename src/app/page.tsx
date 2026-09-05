@@ -1,9 +1,10 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { fetchHomePageSections, fetchDiscoverSection, fetchLikedStations, likedStationToRadioStation, extractPreferredGenres, DISCOVER_GENRES } from '@/lib/api';
-import type { RadioStation } from '@/lib/types';
+import { fetchHomePageSections, fetchDiscoverSection, fetchLikedStations, likedStationToRadioStation, extractPreferredGenres, DISCOVER_GENRES, fetchAllShows } from '@/lib/api';
+import type { RadioStation, InternalShow } from '@/lib/types';
 import { RadioStationCard } from '@/components/RadioStationCard';
+import { InternalShowCard } from '@/components/InternalShowCard';
 import { usePlayer } from '@/contexts/PlayerContext';
 import { useLikedStations } from '@/hooks/use-liked-stations';
 import { RefreshCw, Sparkles, Shuffle, Heart, Play, Flame, Radio } from 'lucide-react';
@@ -200,8 +201,17 @@ export default function HomePage() {
   const [preferredGenres, setPreferredGenres] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isShuffling, setIsShuffling] = useState(false);
+  const [liveShows, setLiveShows] = useState<InternalShow[]>([]);
   const player = usePlayer();
   const { isLiked, toggleLike } = useLikedStations();
+
+  // Independent of the main station-data load below — a slow/failed fetch
+  // here shouldn't hold up or break the rest of the page.
+  useEffect(() => {
+    fetchAllShows()
+      .then(shows => setLiveShows(shows.filter(s => s.status === 'live')))
+      .catch(() => setLiveShows([]));
+  }, []);
 
   useEffect(() => {
     // A fresh cached snapshot skips the network round-trip entirely so
@@ -365,6 +375,24 @@ export default function HomePage() {
         <HeroCard station={heroStation} onPlay={handlePlayStation} isLiked={isLiked(heroStation.stationuuid)} onToggleLike={toggleLike} />
       )}
       {isLoading && <Skeleton className="mb-12 h-[200px] w-full rounded-2xl sm:h-[260px]" />}
+
+      {liveShows.length > 0 && (
+        <section className="mb-10">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="font-display text-2xl font-semibold text-foreground flex items-center gap-2">
+              <Radio className="h-5 w-5 text-red-500" /> Live Now
+            </h2>
+            <Link href="/live" className="text-sm font-medium text-accent hover:underline">See all</Link>
+          </div>
+          <div className="flex gap-4 overflow-x-auto pb-2 snap-x snap-mandatory [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+            {liveShows.slice(0, 8).map(show => (
+              <div key={show.id} className="w-56 shrink-0 snap-start">
+                <InternalShowCard show={show} />
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       <StationSection
         title={featuredGenre ? `Editor's Picks: ${capitalize(featuredGenre)}` : "Editor's Picks"}

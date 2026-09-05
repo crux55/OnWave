@@ -682,6 +682,9 @@ export async function unlikeStation(stationUuid: string): Promise<void> {
   }
 }
 
+export type BadgeScope = 'global' | 'station' | 'dj' | 'show';
+export type BadgeAwardRule = 'on_join' | 'on_chat_participate';
+
 export interface Badge {
   id: string;
   name: string;
@@ -690,6 +693,9 @@ export interface Badge {
   issuer_id?: string | null;
   issuer_type?: 'dj' | 'station' | null;
   issuer_name?: string | null;
+  scope: BadgeScope;
+  show_issuer_id?: string | null;
+  award_rule?: BadgeAwardRule | null;
   created_at: string;
 }
 
@@ -820,7 +826,15 @@ export async function fetchUserStations(userId: string): Promise<Station[]> {
   return result.stations || [];
 }
 
-export async function createBadge(badge: { name: string; icon: string; description?: string; station_id?: string }): Promise<void> {
+export async function createBadge(badge: {
+  name: string;
+  icon: string;
+  description?: string;
+  station_id?: string;
+  scope?: BadgeScope;
+  show_id?: string;
+  award_rule?: BadgeAwardRule;
+}): Promise<void> {
   const token = localStorage.getItem("token");
   if (!token) {
     throw new Error('User not authenticated');
@@ -892,6 +906,164 @@ export async function revokeBadge(email: string, badgeId: string): Promise<void>
       throw new Error('UNAUTHORIZED');
     }
     throw new Error(errorData.message || 'Failed to revoke badge');
+  }
+}
+
+// fetchBadgeLoadout / setBadgeLoadout manage a user's standing preference
+// for which of their held badges to display in chat, and in what order —
+// separate from award/revoke, which is about who holds a badge at all.
+export async function fetchBadgeLoadout(): Promise<string[]> {
+  const authToken = requireAuthToken();
+  const response = await fetch('/api/users/me/badges/loadout', {
+    headers: { 'Authorization': `Bearer ${authToken}` },
+  });
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    if (response.status === 401) {
+      throw new Error('UNAUTHORIZED');
+    }
+    throw new Error(errorData.error || 'Failed to fetch badge loadout');
+  }
+  const result = await response.json();
+  return result.badge_ids || [];
+}
+
+export async function setBadgeLoadout(badgeIds: string[]): Promise<void> {
+  const authToken = requireAuthToken();
+  const response = await fetch('/api/users/me/badges/loadout', {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${authToken}`,
+    },
+    body: JSON.stringify({ badge_ids: badgeIds }),
+  });
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    if (response.status === 401) {
+      throw new Error('UNAUTHORIZED');
+    }
+    throw new Error(errorData.error || 'Failed to set badge loadout');
+  }
+}
+
+// --- Live chat (M5) ---
+
+export interface ChatBadge {
+  id: string;
+  name: string;
+  icon: string;
+}
+
+export interface ChatMessage {
+  id: string;
+  show_id: string;
+  user_id: string;
+  username: string;
+  body: string;
+  created_at: string;
+  badges?: ChatBadge[];
+}
+
+export async function fetchChatHistory(showId: string): Promise<ChatMessage[]> {
+  const response = await fetch(`/api/shows/${showId}/chat/history`);
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Failed to fetch chat history');
+  }
+  const result = await response.json();
+  return result.messages || [];
+}
+
+export async function sendChatMessage(showId: string, body: string): Promise<ChatMessage> {
+  const authToken = requireAuthToken();
+  const response = await fetch(`/api/shows/${showId}/chat`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${authToken}`,
+    },
+    body: JSON.stringify({ body }),
+  });
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    if (response.status === 401) {
+      throw new Error('UNAUTHORIZED');
+    }
+    throw new Error(errorData.error || 'Failed to send message');
+  }
+  return response.json();
+}
+
+export async function deleteChatMessage(showId: string, messageId: string): Promise<void> {
+  const authToken = requireAuthToken();
+  const response = await fetch(`/api/shows/${showId}/chat/${messageId}/delete`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${authToken}` },
+  });
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    if (response.status === 401) {
+      throw new Error('UNAUTHORIZED');
+    }
+    throw new Error(errorData.error || 'Failed to delete message');
+  }
+}
+
+export async function muteChatUser(showId: string, userId: string, durationMinutes?: number): Promise<void> {
+  const authToken = requireAuthToken();
+  const response = await fetch(`/api/shows/${showId}/chat/mute`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${authToken}`,
+    },
+    body: JSON.stringify({ user_id: userId, duration_minutes: durationMinutes }),
+  });
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    if (response.status === 401) {
+      throw new Error('UNAUTHORIZED');
+    }
+    throw new Error(errorData.error || 'Failed to mute user');
+  }
+}
+
+export async function unmuteChatUser(showId: string, userId: string): Promise<void> {
+  const authToken = requireAuthToken();
+  const response = await fetch(`/api/shows/${showId}/chat/unmute`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${authToken}`,
+    },
+    body: JSON.stringify({ user_id: userId }),
+  });
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    if (response.status === 401) {
+      throw new Error('UNAUTHORIZED');
+    }
+    throw new Error(errorData.error || 'Failed to unmute user');
+  }
+}
+
+export async function updateChatSettings(showId: string, profanityFilterEnabled: boolean): Promise<void> {
+  const authToken = requireAuthToken();
+  const response = await fetch(`/api/shows/${showId}/chat/settings`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${authToken}`,
+    },
+    body: JSON.stringify({ profanity_filter_enabled: profanityFilterEnabled }),
+  });
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    if (response.status === 401) {
+      throw new Error('UNAUTHORIZED');
+    }
+    throw new Error(errorData.error || 'Failed to update chat settings');
   }
 }
 

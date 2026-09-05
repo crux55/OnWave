@@ -100,6 +100,26 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
     });
   }, [toast]);
 
+  const showLiveNotification = useCallback((notification: WebSocketNotification) => {
+    toast({ title: notification.title || '🔴 Now live', description: notification.message, duration: 10000 });
+
+    const currentPermission = typeof window !== 'undefined' ? Notification.permission : 'default';
+    if (currentPermission === 'granted') {
+      try {
+        const browserNotification = new Notification(`🔴 ${notification.show_name}`, {
+          body: notification.message,
+          icon: '/icons/icon-192x192.png',
+        });
+        browserNotification.onclick = () => {
+          window.focus();
+          browserNotification.close();
+        };
+      } catch (error) {
+        console.error('Error showing browser notification:', error);
+      }
+    }
+  }, [toast]);
+
   const connect = useCallback(() => {
     if (isUnmountedRef.current) return;
 
@@ -130,6 +150,8 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
         const data: WebSocketNotification = JSON.parse(event.data);
         if (data.type === 'show_reminder') {
           showReminderNotification(data);
+        } else if (data.type === 'show_live') {
+          showLiveNotification(data);
         }
       } catch (err) {
         console.error('[WS] Failed to parse message:', err);
@@ -150,7 +172,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
       // logging the Event object directly shows {} because its props aren't enumerable.
       console.warn('[WS] WebSocket connection error — reconnecting automatically');
     };
-  }, [showReminderNotification]);
+  }, [showReminderNotification, showLiveNotification]);
 
   useEffect(() => {
     isUnmountedRef.current = false;

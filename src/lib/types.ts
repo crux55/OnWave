@@ -89,6 +89,7 @@ export interface InternalShow {
   viewer_count: number;
   terminated_by?: string | null;
   termination_reason?: string | null;
+  profanity_filter_enabled: boolean;
 }
 
 export interface PBSShow {
@@ -161,11 +162,11 @@ export interface Reminder {
 }
 
 export interface WebSocketNotification {
-  type: 'show_reminder';
+  type: 'show_reminder' | 'show_live';
   title: string;
   message: string;
   show_name: string;
-  show_time: string;
+  show_time?: string;
   timestamp: string;
 }
 

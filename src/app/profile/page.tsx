@@ -18,6 +18,7 @@ import { jwtDecode as jwt_decode } from "jwt-decode";
 import { useReminders } from '@/contexts/RemindersContext';
 import { NotificationSettings } from '@/components/NotificationSettings';
 import { GoLiveDialog } from '@/components/live/GoLiveDialog';
+import { BadgeLoadoutSelector } from '@/components/live/BadgeLoadoutSelector';
 import { ConnectionStatus } from '@/components/ConnectionStatus';
 
 
@@ -424,6 +425,9 @@ export default function ProfilePage() {
                         )}
                       </div>
                     ))}
+                  </div>
+                  <div className="mt-3">
+                    <BadgeLoadoutSelector myBadges={myBadges} />
                   </div>
                 </section>
               </>

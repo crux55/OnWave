@@ -1,102 +1,24 @@
-# Radio Show Reminder System
+# Reminder & Live-Notification System
 
-## 🎯 Overview
-A complete React frontend for a radio show reminder system with real-time WebSocket notifications, integrated with your existing OnWave radio app.
+## Overview
+Reminders are tied to real scheduled shows — there's no free-text/manual reminder path. A user sets a reminder from the Bell icon on a show card (PBS-scraped or OnWave-internal), and gets a real-time push when it's due. The same delivery channel also carries "X just went live" notifications (added in M5).
 
-## ✨ Features
+## How it works
 
-### 🔔 **Reminder Management**
-- **Create Reminders**: Easy form to set up reminders for radio shows
-- **View Reminders**: Clean list of all user reminders with status indicators
-- **Delete Reminders**: One-click removal of unwanted reminders
-- **Quick Reminders**: Direct creation from PBS show cards with preset intervals
+### Creating a reminder
+- The Bell icon on `PBSShowCard` and `InternalShowCard` is the only entry point — there's no standalone reminder-creation form. Clicking it calls into `RemindersContext` (`useReminders()`), which owns the actual `POST /reminders` / `GET /reminders` / `DELETE /reminders/{id}` calls.
+- Reminders are always attached to a real `Show`/`PBSShow` record — the schedule data itself is the source of truth for what the reminder is about.
 
-### 🌐 **Real-time Notifications**
-- **WebSocket Integration**: Automatic connection after login
-- **Live Status Indicator**: Visual connection status in the UI
-- **Toast Notifications**: Auto-dismissing alerts (5 seconds) when shows start
-- **Automatic Reconnection**: Robust connection handling
+### Real-time delivery
+- `NotificationContext` (`src/contexts/NotificationContext.tsx`) opens one WebSocket per logged-in user to `wss://.../ws?user_id={userId}`, with automatic reconnect on drop.
+- Two message types are currently handled: `show_reminder` (a reminder's scheduled time has arrived) and `show_live` (a station/show the user follows has just started broadcasting — see M5's Go Live chat/notifications work). Both show a toast and, if permission was granted, a browser `Notification`.
+- There's no dedicated "Reminders" nav tab or bell icon in the top nav — reminders live entirely on the show cards that created them, and delivery is a toast/notification, not a page.
 
-### 🎨 **User Experience**
-- **Responsive Design**: Mobile-first approach with adaptive layouts
-- **Form Validation**: Client-side validation with helpful error messages
-- **Loading States**: Visual feedback during API operations
-- **Error Handling**: Graceful error handling with user-friendly messages
+### Backend
+- `internal/reminder` owns the reminder CRUD + the periodic checker/cleanup jobs that decide when a reminder is due.
+- `internal/notify`'s `WebSocketHub` is the actual connection registry (keyed by user ID) both the reminder checker and the M5 "went live" event bridge push through.
 
-## 🏗️ **Architecture**
-
-### **Components**
-- `CreateReminderForm` - Form for creating new reminders
-- `RemindersList` - Display and manage user reminders
-- `ConnectionStatus` - WebSocket connection indicator
-- `PBSShowCard` - Enhanced with quick reminder functionality
-
-### **Contexts**
-- `WebSocketContext` - Manages WebSocket connections and real-time notifications
-
-### **Hooks**
-- `useReminders` - State management for reminder operations
-- `useSubscriptions` - Existing subscription functionality (enhanced)
-
-### **API Integration**
-- `POST /reminders` - Create new reminders
-- `GET /reminders` - Fetch user reminders
-- `DELETE /reminders/{id}` - Remove reminders
-- `ws://localhost:8080/ws?user_id={userId}` - Real-time notifications
-
-## 🚀 **Usage**
-
-### **Navigation**
-Access reminders via the new "Reminders" tab in the navigation bar (bell icon).
-
-### **Creating Reminders**
-1. Fill out the reminder form with show details
-2. Select reminder timing (5 min to 2 hours before)
-3. Submit to create the reminder
-
-### **Quick Reminders from Show Cards**
-1. Click the bell icon on any PBS show card
-2. Choose from preset reminder intervals (15 min, 30 min, 1 hour)
-3. Instant reminder creation with toast confirmation
-
-### **Real-time Notifications**
-- Automatic WebSocket connection after login
-- Live connection status indicator
-- Toast notifications when shows are about to start
-- Notifications auto-dismiss after 5 seconds
-
-## 🔧 **Technical Details**
-
-### **State Management**
-- React Context for WebSocket connection
-- Custom hooks for reminder operations
-- Local state management with proper loading/error handling
-
-### **Type Safety**
-- Full TypeScript integration
-- Defined interfaces for all API responses
-- Type-safe WebSocket message handling
-
-### **Responsive Design**
-- Mobile-first responsive layout
-- Adaptive grid system
-- Touch-friendly interface elements
-
-### **Error Handling**
-- Try-catch blocks around all async operations
-- User-friendly error messages
-- Graceful fallbacks for connection issues
-
-## 🎨 **UI Components**
-- Built with existing shadcn/ui components
-- Consistent with OnWave design system
-- Accessibility-focused implementation
-- Loading states and visual feedback
-
-## 🔌 **Integration**
-- Seamlessly integrates with existing authentication
-- Uses existing toast system
-- Follows established routing patterns
-- Compatible with existing PlayerContext
-
-The reminder system is now fully integrated into your OnWave app and ready for use!
+## Related components
+- `RemindersList` — a user's own reminders (profile page).
+- `ConnectionStatus` — a small connected/disconnected indicator for the notification socket.
+- `PBSShowCard` / `InternalShowCard` — the actual reminder entry points.

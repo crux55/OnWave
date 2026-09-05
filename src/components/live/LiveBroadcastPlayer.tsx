@@ -21,23 +21,24 @@ import {
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { useLiveBroadcast } from '@/contexts/LiveBroadcastContext';
-import { joinBroadcast, terminateBroadcast } from '@/lib/api';
+import { terminateBroadcast } from '@/lib/api';
 import type { InternalShow } from '@/lib/types';
-
-const deriveWsUrl = () =>
-  (window.location.protocol === 'https:' ? 'wss://' : 'ws://') + window.location.host + '/livekit-ws/';
+import type { ListenerConnectionState } from '@/hooks/use-listener-room';
 
 interface LiveBroadcastPlayerProps {
   show: InternalShow;
   isAdmin: boolean;
   /** True when the current viewer is the one broadcasting this exact show (via LiveBroadcastContext). */
   isOwnBroadcast: boolean;
+  /** The listener's shared Room connection (also used by LiveChatPanel) — unused when isOwnBroadcast. */
+  listenerRoom?: Room | null;
+  listenerConnectionState?: ListenerConnectionState;
 }
 
-export function LiveBroadcastPlayer({ show, isAdmin, isOwnBroadcast }: LiveBroadcastPlayerProps) {
+export function LiveBroadcastPlayer({ show, isAdmin, isOwnBroadcast, listenerRoom, listenerConnectionState }: LiveBroadcastPlayerProps) {
   return isOwnBroadcast
     ? <BroadcasterView show={show} isAdmin={isAdmin} />
-    : <ListenerView show={show} isAdmin={isAdmin} />;
+    : <ListenerView show={show} isAdmin={isAdmin} room={listenerRoom ?? null} connectionState={listenerConnectionState ?? 'connecting'} />;
 }
 
 function BroadcasterView({ show, isAdmin }: { show: InternalShow; isAdmin: boolean }) {
@@ -102,48 +103,29 @@ function BroadcasterView({ show, isAdmin }: { show: InternalShow; isAdmin: boole
   );
 }
 
-function ListenerView({ show, isAdmin }: { show: InternalShow; isAdmin: boolean }) {
+function ListenerView({ show, isAdmin, room, connectionState }: {
+  show: InternalShow;
+  isAdmin: boolean;
+  room: Room | null;
+  connectionState: ListenerConnectionState;
+}) {
   const { toast } = useToast();
   const audioRef = useRef<HTMLAudioElement>(null);
-  const roomRef = useRef<Room | null>(null);
-  const [connectionState, setConnectionState] = useState<'connecting' | 'connected' | 'failed'>('connecting');
   const [terminateReason, setTerminateReason] = useState('');
   const [isTerminating, setIsTerminating] = useState(false);
 
   useEffect(() => {
-    let cancelled = false;
-    const room = new Room();
-    roomRef.current = room;
-
-    room.on(RoomEvent.TrackSubscribed, (track: RemoteTrack) => {
+    if (!room) return;
+    const handleTrack = (track: RemoteTrack) => {
       if (track.kind === 'audio' && audioRef.current) {
         track.attach(audioRef.current);
       }
-    });
-    room.on(RoomEvent.Disconnected, () => {
-      if (!cancelled) setConnectionState('failed');
-    });
-
-    (async () => {
-      try {
-        const { room_name, token } = await joinBroadcast(show.id);
-        if (cancelled) return;
-        await room.connect(deriveWsUrl(), token);
-        if (cancelled) return;
-        setConnectionState('connected');
-      } catch (error: any) {
-        if (!cancelled) {
-          setConnectionState('failed');
-          toast({ title: "Couldn't join stream", description: error.message, variant: 'destructive' });
-        }
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-      room.disconnect();
     };
-  }, [show.id, toast]);
+    room.on(RoomEvent.TrackSubscribed, handleTrack);
+    return () => {
+      room.off(RoomEvent.TrackSubscribed, handleTrack);
+    };
+  }, [room]);
 
   const handleTerminate = async () => {
     setIsTerminating(true);

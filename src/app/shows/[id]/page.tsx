@@ -7,14 +7,17 @@ import { Loader2, Radio, CalendarClock, CircleOff } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { LiveBroadcastPlayer } from '@/components/live/LiveBroadcastPlayer';
+import { LiveChatPanel } from '@/components/live/LiveChatPanel';
 import { useLiveBroadcast } from '@/contexts/LiveBroadcastContext';
+import { useListenerRoom } from '@/hooks/use-listener-room';
 import { fetchShow } from '@/lib/api';
 import type { InternalShow, Token } from '@/lib/types';
 
-// Live shows are polled rather than pushed — M4 is deliberately audio-only
-// with no chat/websocket layer yet (that's M5), so a plain refetch is what
-// keeps viewer_count and an admin's kill-switch/room_finished transition
-// visible to everyone already on this page.
+// Live shows are polled rather than pushed for status/viewer_count — chat
+// itself is realtime (over the LiveKit room's data channel), but a show
+// going live/ending/getting terminated needs its own signal, and a plain
+// refetch is simpler than a second push channel for something this
+// infrequent.
 const LIVE_POLL_MS = 10000;
 
 export default function ShowDetailPage() {
@@ -26,6 +29,7 @@ export default function ShowDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | undefined>();
 
   useEffect(() => {
     const tokenString = localStorage.getItem('token');
@@ -33,6 +37,7 @@ export default function ShowDetailPage() {
     try {
       const decoded = jwt_decode<Token>(JSON.parse(tokenString).token);
       setIsAdmin(!!decoded.is_admin);
+      setCurrentUserId(decoded.user_id);
     } catch {
       // Not logged in / bad token — isAdmin stays false, page still works for listening.
     }
@@ -59,6 +64,17 @@ export default function ShowDetailPage() {
     return () => clearInterval(interval);
   }, [show?.status, load]);
 
+  const isOwnBroadcast = liveBroadcast.showId === show?.id;
+  const { room: listenerRoom, connectionState: listenerConnectionState } = useListenerRoom(
+    params.id,
+    show?.status === 'live' && !isOwnBroadcast
+  );
+  const activeRoom = isOwnBroadcast ? liveBroadcast.room : listenerRoom;
+  // Station members who aren't the current broadcaster don't get the
+  // moderator UI here yet — the backend enforces the real permission
+  // regardless, this is just the frontend's (simplified) show/hide gate.
+  const isModerator = isAdmin || isOwnBroadcast;
+
   if (isLoading) {
     return (
       <div className="flex justify-center py-20">
@@ -76,17 +92,28 @@ export default function ShowDetailPage() {
     );
   }
 
-  const isOwnBroadcast = liveBroadcast.showId === show.id;
-
   return (
-    <div className="container mx-auto max-w-2xl py-8 space-y-6">
+    <div className="container mx-auto max-w-5xl py-8 space-y-6">
       <div>
         <h1 className="font-display text-2xl font-semibold text-foreground">{show.name}</h1>
         {show.description && <p className="text-muted-foreground mt-1">{show.description}</p>}
       </div>
 
       {show.status === 'live' && (
-        <LiveBroadcastPlayer show={show} isAdmin={isAdmin} isOwnBroadcast={isOwnBroadcast} />
+        <div className="flex flex-col gap-6 lg:flex-row">
+          <div className="lg:flex-1 lg:min-w-0">
+            <LiveBroadcastPlayer
+              show={show}
+              isAdmin={isAdmin}
+              isOwnBroadcast={isOwnBroadcast}
+              listenerRoom={listenerRoom}
+              listenerConnectionState={listenerConnectionState}
+            />
+          </div>
+          <div className="lg:w-80 lg:shrink-0 h-[28rem] lg:h-auto">
+            <LiveChatPanel show={show} room={activeRoom} isModerator={isModerator} currentUserId={currentUserId} />
+          </div>
+        </div>
       )}
 
       {show.status === 'scheduled' && (
