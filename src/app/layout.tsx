@@ -14,6 +14,7 @@ import { RadioPlayer } from '@/components/RadioPlayer';
 import { MaximizedPlayerDialog } from '@/components/MaximizedPlayerDialog';
 import { PlayerProvider, usePlayer } from '@/contexts/PlayerContext';
 import { LiveBroadcastProvider } from '@/contexts/LiveBroadcastContext';
+import { LiveBroadcastIndicator } from '@/components/live/LiveBroadcastIndicator';
 import { RemindersProvider } from '@/contexts/RemindersContext';
 import { NotificationProvider } from '@/contexts/NotificationContext';
 import { Toaster } from '@/components/ui/toaster';
@@ -136,6 +137,8 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
       {player.isPlayerBarOpen && player.currentStation && player.isMaximizedViewOpen && (
         <MaximizedPlayerDialog station={player.currentStation} />
       )}
+
+      <LiveBroadcastIndicator />
     </div>
   );
 }
