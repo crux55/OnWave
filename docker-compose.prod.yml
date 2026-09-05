@@ -40,6 +40,9 @@ services:
       - FORCE_CACHE=${FORCE_CACHE}
       - CACHE_EXPIRE_HOURS=${CACHE_EXPIRE_HOURS}
       - JWT_SECRET=${JWT_SECRET}
+      - LIVEKIT_INTERNAL_URL=${LIVEKIT_INTERNAL_URL}
+      - LIVEKIT_API_KEY=${LIVEKIT_API_KEY}
+      - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET}
     depends_on:
       mysql:
         condition: service_healthy
@@ -48,6 +51,21 @@ services:
     restart: unless-stopped
     volumes:
       - ./uploads:/app/uploads
+
+  # Self-hosted WebRTC SFU for M4's Go Live audio loop (proven out by the
+  # M4 spike). network_mode: host is required — LiveKit's TURN/RTC media
+  # planes need raw UDP on fixed ports reachable straight from the internet
+  # via the router's port-forwards, which a bridge-network port mapping
+  # can't give it the same way. livekit.yaml lives directly on the host
+  # (not in this repo) since it carries the real API key/secret.
+  livekit:
+    image: livekit/livekit-server:latest
+    container_name: onwave_livekit
+    network_mode: host
+    restart: unless-stopped
+    command: --config /etc/livekit.yaml
+    volumes:
+      - /home/andru/livekit/livekit.yaml:/etc/livekit.yaml:ro
 
   notifications:
     image: onwave-backend:latest

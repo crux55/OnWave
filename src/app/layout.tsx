@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { RadioPlayer } from '@/components/RadioPlayer';
 import { MaximizedPlayerDialog } from '@/components/MaximizedPlayerDialog';
 import { PlayerProvider, usePlayer } from '@/contexts/PlayerContext';
+import { LiveBroadcastProvider } from '@/contexts/LiveBroadcastContext';
 import { RemindersProvider } from '@/contexts/RemindersContext';
 import { NotificationProvider } from '@/contexts/NotificationContext';
 import { Toaster } from '@/components/ui/toaster';
@@ -43,12 +44,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       </head>
       <body>
         <PlayerProvider>
-          <RemindersProvider>
-            <NotificationProvider>
-              <AppLayoutContent>{children}</AppLayoutContent>
-              <Toaster />
-            </NotificationProvider>
-          </RemindersProvider>
+          <LiveBroadcastProvider>
+            <RemindersProvider>
+              <NotificationProvider>
+                <AppLayoutContent>{children}</AppLayoutContent>
+                <Toaster />
+              </NotificationProvider>
+            </RemindersProvider>
+          </LiveBroadcastProvider>
         </PlayerProvider>
       </body>
     </html>

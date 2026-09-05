@@ -1,4 +1,5 @@
 import React from 'react';
+import Link from 'next/link';
 import type { InternalShow } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -16,7 +17,11 @@ interface InternalShowCardProps {
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 export const InternalShowCard: React.FC<InternalShowCardProps> = ({ show, isFollowing, onToggleFollow, isTogglingFollow }) => {
-  const status = showStatus(show);
+  // show.status is the real M4 broadcast state — trust it for "live"
+  // specifically (an actual LiveKit session is running), and only fall
+  // back to the schedule-time heuristic for upcoming/expired, since most
+  // shows never actually get started through Go Live.
+  const status = show.status === 'live' ? 'live' : showStatus(show);
   const occurrence = nextOccurrence(show);
 
   const getStatusColor = (s: string) => {
@@ -33,39 +38,41 @@ export const InternalShowCard: React.FC<InternalShowCardProps> = ({ show, isFoll
 
   return (
     <Card className="h-full hover:shadow-lg transition-shadow duration-200 relative">
-      <CardHeader className="pb-3">
-        <div className="flex justify-between items-start">
-          <CardTitle className="text-lg font-semibold line-clamp-2 flex-1">
-            {show.name}
-          </CardTitle>
-          <Badge className={`ml-2 text-xs ${getStatusColor(status)}`}>
-            {status}
-          </Badge>
-        </div>
-      </CardHeader>
-
-      <CardContent className="space-y-3 pb-12">
-        {(show.station_name || show.dj_name) && (
-          <div className="flex items-center text-sm text-muted-foreground">
-            {show.station_name ? <Radio className="h-4 w-4 mr-2" /> : <User className="h-4 w-4 mr-2" />}
-            <span className="truncate">{show.station_name || show.dj_name}</span>
+      <Link href={`/shows/${show.id}`} className="block">
+        <CardHeader className="pb-3">
+          <div className="flex justify-between items-start">
+            <CardTitle className="text-lg font-semibold line-clamp-2 flex-1">
+              {show.name}
+            </CardTitle>
+            <Badge className={`ml-2 text-xs ${getStatusColor(status)}`}>
+              {status}
+            </Badge>
           </div>
-        )}
+        </CardHeader>
 
-        <div className="flex items-center text-sm text-muted-foreground">
-          <Calendar className="h-4 w-4 mr-2" />
-          <span>{scheduleLabel}</span>
-        </div>
+        <CardContent className="space-y-3 pb-12">
+          {(show.station_name || show.dj_name) && (
+            <div className="flex items-center text-sm text-muted-foreground">
+              {show.station_name ? <Radio className="h-4 w-4 mr-2" /> : <User className="h-4 w-4 mr-2" />}
+              <span className="truncate">{show.station_name || show.dj_name}</span>
+            </div>
+          )}
 
-        <div className="flex items-center text-sm text-muted-foreground">
-          <Clock className="h-4 w-4 mr-2" />
-          <span>{occurrence.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} · {show.duration_minutes} min</span>
-        </div>
+          <div className="flex items-center text-sm text-muted-foreground">
+            <Calendar className="h-4 w-4 mr-2" />
+            <span>{scheduleLabel}</span>
+          </div>
 
-        {show.description && (
-          <p className="text-sm text-muted-foreground line-clamp-2">{show.description}</p>
-        )}
-      </CardContent>
+          <div className="flex items-center text-sm text-muted-foreground">
+            <Clock className="h-4 w-4 mr-2" />
+            <span>{occurrence.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} · {show.duration_minutes} min</span>
+          </div>
+
+          {show.description && (
+            <p className="text-sm text-muted-foreground line-clamp-2">{show.description}</p>
+          )}
+        </CardContent>
+      </Link>
 
       {onToggleFollow && (
         <div className="absolute bottom-2 left-2">

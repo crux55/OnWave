@@ -17,6 +17,7 @@ import { JWT, Profile, Token, User } from '@/lib/types';
 import { jwtDecode as jwt_decode } from "jwt-decode";
 import { useReminders } from '@/contexts/RemindersContext';
 import { NotificationSettings } from '@/components/NotificationSettings';
+import { GoLiveDialog } from '@/components/live/GoLiveDialog';
 import { ConnectionStatus } from '@/components/ConnectionStatus';
 
 
@@ -472,6 +473,19 @@ export default function ProfilePage() {
                     Request a Station
                   </Button>
                 </section>
+              </>
+            )}
+
+            {token?.role === 'dj' && (
+              <>
+                <Separator />
+                <GoLiveDialog
+                  trigger={
+                    <Button className="w-full bg-red-600 hover:bg-red-700 text-white">
+                      <Radio className="mr-2 h-4 w-4" /> Go Live
+                    </Button>
+                  }
+                />
               </>
             )}
 

@@ -1244,6 +1244,7 @@ export interface ShowSummary {
   one_off_date?: string | null;
   start_time: string;
   duration_minutes: number;
+  status: 'scheduled' | 'live' | 'ended' | 'terminated';
 }
 
 export interface StationMember {
@@ -1345,6 +1346,147 @@ export async function createShow(show: {
       throw new Error('UNAUTHORIZED');
     }
     throw new Error(errorData.message || 'Failed to create show');
+  }
+}
+
+export async function fetchShow(showId: string): Promise<InternalShow> {
+  const response = await fetch(`/api/shows/${showId}`);
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Failed to fetch show');
+  }
+  return response.json();
+}
+
+export interface GoLiveOptions {
+  agreed_to_terms: boolean;
+  own_license?: boolean;
+}
+
+export interface GoLiveResult {
+  show_id: string;
+  room_name: string;
+  token: string;
+}
+
+function requireAuthToken(): string {
+  const token = localStorage.getItem('token');
+  if (!token) {
+    throw new Error('User not authenticated');
+  }
+  return JSON.parse(token).token;
+}
+
+// goLive starts broadcasting on an existing scheduled show.
+export async function goLive(showId: string, options: GoLiveOptions): Promise<GoLiveResult> {
+  const authToken = requireAuthToken();
+  const response = await fetch(`/api/shows/${showId}/go-live`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${authToken}`,
+    },
+    body: JSON.stringify(options),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    if (response.status === 401) {
+      throw new Error('UNAUTHORIZED');
+    }
+    throw new Error(errorData.error || 'Failed to go live');
+  }
+  return response.json();
+}
+
+// goLiveAdhoc creates a spontaneous show and starts broadcasting on it in
+// one step — the "on the fly" path, as opposed to attaching to something
+// already on the schedule. Leave station_id unset to go live as an
+// independent DJ under your own name.
+export async function goLiveAdhoc(options: GoLiveOptions & {
+  name: string;
+  description?: string;
+  station_id?: string;
+}): Promise<GoLiveResult> {
+  const authToken = requireAuthToken();
+  const response = await fetch('/api/shows/go-live/adhoc', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${authToken}`,
+    },
+    body: JSON.stringify(options),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    if (response.status === 401) {
+      throw new Error('UNAUTHORIZED');
+    }
+    throw new Error(errorData.error || 'Failed to go live');
+  }
+  return response.json();
+}
+
+export interface JoinBroadcastResult {
+  room_name: string;
+  token: string;
+}
+
+// joinBroadcast returns a listen-only token for a currently-live show.
+export async function joinBroadcast(showId: string): Promise<JoinBroadcastResult> {
+  const authToken = requireAuthToken();
+  const response = await fetch(`/api/shows/${showId}/join`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${authToken}` },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    if (response.status === 401) {
+      throw new Error('UNAUTHORIZED');
+    }
+    throw new Error(errorData.error || "This show isn't live right now");
+  }
+  return response.json();
+}
+
+// endBroadcast is the broadcaster's own graceful stop.
+export async function endBroadcast(showId: string): Promise<void> {
+  const authToken = requireAuthToken();
+  const response = await fetch(`/api/shows/${showId}/end`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${authToken}` },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    if (response.status === 401) {
+      throw new Error('UNAUTHORIZED');
+    }
+    throw new Error(errorData.error || 'Failed to end broadcast');
+  }
+}
+
+// terminateBroadcast is the admin kill switch — ends someone else's live
+// broadcast immediately, with a required reason stored for audit.
+export async function terminateBroadcast(showId: string, reason: string): Promise<void> {
+  const authToken = requireAuthToken();
+  const response = await fetch(`/api/admin/shows/${showId}/terminate`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${authToken}`,
+    },
+    body: JSON.stringify({ reason }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    if (response.status === 401) {
+      throw new Error('UNAUTHORIZED');
+    }
+    throw new Error(errorData.error || 'Failed to terminate broadcast');
   }
 }
 

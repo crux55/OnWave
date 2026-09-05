@@ -1,6 +1,7 @@
 'use client';
 
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { jwtDecode as jwt_decode } from 'jwt-decode';
 import { Radio, Loader2, Users, Heart, Calendar, Bell, UserCircle2, Clock, Award, Plus, ShieldCheck, UserPlus } from 'lucide-react';
@@ -10,6 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { GoLiveDialog } from '@/components/live/GoLiveDialog';
 import { fetchStation, fetchMyFollows, followTarget, unfollowTarget, createBadge, awardBadge, revokeBadge, inviteStationMember, type StationDetail, type Follow, type ScrapedShowSummary } from '@/lib/api';
 import type { Token } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
@@ -298,6 +300,18 @@ export default function StationPage() {
                 {isFollowing ? 'Following' : 'Follow'}
               </Button>
 
+              {canManageStation && (
+                <GoLiveDialog
+                  stationId={station.id}
+                  scheduledShows={station.shows.filter(s => s.status === 'scheduled')}
+                  trigger={
+                    <Button className="w-full bg-red-600 hover:bg-red-700 text-white">
+                      <Radio className="mr-2 h-4 w-4" /> Go Live
+                    </Button>
+                  }
+                />
+              )}
+
               <section>
                 <h3 className="text-xl font-semibold text-foreground mb-3 flex items-center gap-2">
                   <Clock className="h-5 w-5 text-primary" /> Broadcast Schedule
@@ -337,7 +351,18 @@ export default function StationPage() {
                     {station.shows.map(show => (
                       <div key={show.id} className="flex items-center justify-between gap-3 rounded-md border border-border bg-muted/30 p-3">
                         <div className="min-w-0">
-                          <p className="font-medium text-foreground truncate">{show.name}</p>
+                          <div className="flex items-center gap-2">
+                            {show.status === 'live' ? (
+                              <Link href={`/shows/${show.id}`} className="font-medium text-foreground truncate hover:underline">
+                                {show.name}
+                              </Link>
+                            ) : (
+                              <p className="font-medium text-foreground truncate">{show.name}</p>
+                            )}
+                            {show.status === 'live' && (
+                              <Badge className="bg-red-600 hover:bg-red-600 text-white text-xs shrink-0">LIVE</Badge>
+                            )}
+                          </div>
                           <p className="text-sm text-muted-foreground">
                             {formatSchedule(show)}
                             {show.dj_name && ` — with ${show.dj_name}`}

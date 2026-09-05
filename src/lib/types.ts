@@ -82,6 +82,13 @@ export interface InternalShow {
   start_time: string;
   duration_minutes: number;
   created_at: string;
+  // Live-hosting state (M4) — 'scheduled' until someone goes live with it,
+  // then 'live', 'ended', or 'terminated' if an admin force-stopped it.
+  status: 'scheduled' | 'live' | 'ended' | 'terminated';
+  is_video: boolean;
+  viewer_count: number;
+  terminated_by?: string | null;
+  termination_reason?: string | null;
 }
 
 export interface PBSShow {
