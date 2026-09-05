@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { fetchTopTags, fetchHomePageSections, fetchDiscoverSection, fetchLikedStations, likedStationToRadioStation, extractPreferredGenres, rebalanceTopTags } from '@/lib/api';
-import type { RadioStation, TopTag } from '@/lib/types';
+import { fetchHomePageSections, fetchDiscoverSection, fetchLikedStations, likedStationToRadioStation, extractPreferredGenres, DISCOVER_GENRES } from '@/lib/api';
+import type { RadioStation } from '@/lib/types';
 import { RadioStationCard } from '@/components/RadioStationCard';
 import { usePlayer } from '@/contexts/PlayerContext';
 import { useLikedStations } from '@/hooks/use-liked-stations';
@@ -34,7 +34,6 @@ interface HomeCache {
   discoverStations4: RadioStation[];
   discoverGenre4: string;
   likedStations: RadioStation[];
-  topTags: TopTag[];
   preferredGenres: string[];
 }
 
@@ -198,7 +197,6 @@ export default function HomePage() {
   const [discoverStations4, setDiscoverStations4] = useState<RadioStation[]>([]);
   const [discoverGenre4, setDiscoverGenre4] = useState<string>('');
   const [likedStations, setLikedStations] = useState<RadioStation[]>([]);
-  const [topTags, setTopTags] = useState<TopTag[]>([]);
   const [preferredGenres, setPreferredGenres] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isShuffling, setIsShuffling] = useState(false);
@@ -226,7 +224,6 @@ export default function HomePage() {
           setDiscoverStations4(parsed.discoverStations4 ?? []);
           setDiscoverGenre4(parsed.discoverGenre4 ?? '');
           setLikedStations(parsed.likedStations ?? []);
-          setTopTags(parsed.topTags);
           setPreferredGenres(parsed.preferredGenres ?? []);
           setIsLoading(false);
           return;
@@ -239,20 +236,16 @@ export default function HomePage() {
     const load = async () => {
       setIsLoading(true);
       try {
-        // Liked stations + tags first, since the Discover row's genre pick
-        // needs to know what the viewer already likes before it can be
-        // biased toward it — fetchHomePageSections/fetchDiscoverSection
-        // below depend on this resolving first, which does add one extra
+        // Liked stations first, since the Discover row's genre pick needs
+        // to know what the viewer already likes before it can be biased
+        // toward it — fetchHomePageSections/fetchDiscoverSection below
+        // depend on this resolving first, which does add one extra
         // round-trip to the initial load (liked-stations is small/fast,
         // but not zero) in exchange for genuine personalization.
-        const [liked, tags] = await Promise.all([
-          fetchLikedStations().catch(() => []),
-          fetchTopTags(),
-        ]);
+        const liked = await fetchLikedStations().catch(() => []);
         const likedAsStations = liked.map(likedStationToRadioStation);
         const preferred = extractPreferredGenres(likedAsStations);
         setLikedStations(likedAsStations);
-        setTopTags(tags);
         setPreferredGenres(preferred);
 
         // Four independent Discover rows instead of two — replacing the
@@ -295,7 +288,6 @@ export default function HomePage() {
             discoverStations4: discover4.stations,
             discoverGenre4: discover4.genre,
             likedStations: likedAsStations,
-            topTags: tags,
             preferredGenres: preferred,
           };
           sessionStorage.setItem(HOME_CACHE_KEY, JSON.stringify(cache));
@@ -354,22 +346,20 @@ export default function HomePage() {
         </p>
       </header>
 
-      {topTags.length > 0 && (
-        <section className="mb-10">
-          <h2 className="font-display text-2xl font-semibold mb-3 text-foreground">Top Tags</h2>
-          <div className="flex flex-wrap gap-2">
-            {rebalanceTopTags(topTags).map(tagObj => (
-              <Link
-                key={tagObj.name}
-                href={`/search?search=${encodeURIComponent(tagObj.name)}`}
-                className="inline-block rounded-full border border-border bg-card/40 px-3 py-1 text-sm font-medium text-foreground"
-              >
-                {tagObj.name} <span className="text-xs text-muted-foreground">({tagObj.stationcount})</span>
-              </Link>
-            ))}
-          </div>
-        </section>
-      )}
+      <section className="mb-10">
+        <h2 className="font-display text-2xl font-semibold mb-3 text-foreground">Browse by Genre</h2>
+        <div className="flex flex-wrap gap-2">
+          {DISCOVER_GENRES.map(genre => (
+            <Link
+              key={genre}
+              href={`/search?search=${encodeURIComponent(genre)}`}
+              className="inline-block rounded-full border border-border bg-card/40 px-3 py-1 text-sm font-medium capitalize text-foreground"
+            >
+              {genre}
+            </Link>
+          ))}
+        </div>
+      </section>
 
       {!isLoading && heroStation && (
         <HeroCard station={heroStation} onPlay={handlePlayStation} isLiked={isLiked(heroStation.stationuuid)} onToggleLike={toggleLike} />
