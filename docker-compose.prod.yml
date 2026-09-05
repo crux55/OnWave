@@ -81,9 +81,12 @@ services:
       - MYSQL_DATABASE=${MYSQL_DATABASE}
       - JWT_SECRET=${JWT_SECRET}
       - PORT=${NOTIFICATIONS_PORT}
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
     depends_on:
       mysql:
         condition: service_healthy
+      redis:
+        condition: service_started
     restart: unless-stopped
 
   workers:
