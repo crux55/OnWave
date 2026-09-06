@@ -1,14 +1,17 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { fetchPBSShowsByDateRange, fetchFromApi, fetchMyFollows, followTarget, unfollowTarget, fetchAllShows as fetchAllInternalShows } from '@/lib/api';
+import Link from 'next/link';
+import { fetchPBSShowsByDateRange, fetchFromApi, fetchMyFollows, followTarget, unfollowTarget, fetchAllShows as fetchAllInternalShows, fetchAllStations, type Station } from '@/lib/api';
 import type { PBSShow, RadioStation, InternalShow } from '@/lib/types';
 import { PBSShowCard } from '@/components/PBSShowCard';
 import { InternalShowCard } from '@/components/InternalShowCard';
+import { StationAvatar } from '@/components/StationAvatar';
 import { showStatus } from '@/lib/show-schedule';
 import { Tv, Calendar, Clock, Radio } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 import { usePlayer } from '@/contexts/PlayerContext';
 import { useToast } from '@/hooks/use-toast';
 
@@ -58,6 +61,12 @@ export default function ShowsPage() {
   const [togglingShowName, setTogglingShowName] = useState<string | null>(null);
   const [followedProgramIds, setFollowedProgramIds] = useState<Set<string>>(new Set());
   const [togglingProgramId, setTogglingProgramId] = useState<string | null>(null);
+  // OnWave's own hosted-station directory — moved here from Discover's old
+  // Directory tab, since this page is already "what's on OnWave," not
+  // Discover's job of finding new stations from radio-browser's catalog.
+  const [stationDirectory, setStationDirectory] = useState<Station[]>([]);
+  const [isStationDirectoryLoading, setIsStationDirectoryLoading] = useState(true);
+  const [stationDirectoryError, setStationDirectoryError] = useState(false);
   const player = usePlayer();
   const { toast } = useToast();
 
@@ -113,6 +122,11 @@ export default function ShowsPage() {
     fetchAllInternalShows()
       .then(setInternalShows)
       .catch(() => setInternalShows([]));
+
+    fetchAllStations()
+      .then(setStationDirectory)
+      .catch(() => setStationDirectoryError(true))
+      .finally(() => setIsStationDirectoryLoading(false));
 
     if (localStorage.getItem('token')) {
       fetchMyFollows()
@@ -249,6 +263,39 @@ export default function ShowsPage() {
           Discover and explore radio shows from all your favorite stations
         </p>
       </div>
+
+      <section className="mb-12">
+        <h2 className="text-2xl font-semibold tracking-tight mb-4">OnWave Stations</h2>
+        {isStationDirectoryLoading && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Skeleton key={i} className="h-16 w-full rounded-xl" />
+            ))}
+          </div>
+        )}
+        {!isStationDirectoryLoading && stationDirectoryError && (
+          <p className="text-muted-foreground">Couldn&apos;t load the station directory right now — try again shortly.</p>
+        )}
+        {!isStationDirectoryLoading && !stationDirectoryError && stationDirectory.length === 0 && (
+          <p className="text-muted-foreground">No stations yet.</p>
+        )}
+        {!isStationDirectoryLoading && !stationDirectoryError && stationDirectory.length > 0 && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {stationDirectory.map((station) => (
+              <Link key={station.id} href={`/stations/${station.slug || station.id}`}>
+                <Card className="h-full hover:shadow-lg hover:border-accent/50 transition-all">
+                  <CardHeader className="flex flex-row items-center gap-3">
+                    <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full">
+                      <StationAvatar name={station.name} seed={station.id} className="text-xs" />
+                    </div>
+                    <CardTitle className="text-base truncate">{station.name}</CardTitle>
+                  </CardHeader>
+                </Card>
+              </Link>
+            ))}
+          </div>
+        )}
+      </section>
 
       <div className="flex flex-wrap items-center gap-3 mb-8">
         {(showAllStationFilters ? stationNames : stationNames.slice(0, 12)).map(name => {

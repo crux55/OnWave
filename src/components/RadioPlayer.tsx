@@ -10,10 +10,11 @@ import {
 } from 'lucide-react';
 import React, { useRef, useEffect, useCallback, useState } from 'react';
 import { usePlayer } from '@/contexts/PlayerContext';
-import { cn } from '@/lib/utils';
+import { cn, getProxiedFaviconUrl } from '@/lib/utils';
 import { useChromecast } from '@/hooks/use-chromecast';
 import { useLikedStations } from '@/hooks/use-liked-stations';
 import { SafeImage } from '@/components/SafeImage';
+import { StationAvatar } from '@/components/StationAvatar';
 
 declare global {
   interface HTMLMediaElement {
@@ -283,12 +284,12 @@ export function RadioPlayer({ station, className }: RadioPlayerProps) {
             <div className="flex items-center gap-2 w-full">
               <div className="h-8 w-8 shrink-0 overflow-hidden rounded-md bg-gradient-to-br from-accent/25 to-[hsl(var(--accent-2))]/20">
                 <SafeImage
-                  src={station.favicon}
+                  src={getProxiedFaviconUrl(station.favicon)}
                   alt={`${station.name} logo`}
                   width={32}
                   height={32}
                   className="h-full w-full object-cover"
-                  fallback={<div className="h-full w-full" />}
+                  fallback={<StationAvatar name={station.name} seed={station.stationuuid} className="text-[10px]" />}
                 />
               </div>
               <div className="flex-grow overflow-hidden">
@@ -332,12 +333,12 @@ export function RadioPlayer({ station, className }: RadioPlayerProps) {
                 <div className="flex items-center gap-3 md:gap-4 flex-grow overflow-hidden">
                     <div className="hidden sm:block h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-gradient-to-br from-accent/25 to-[hsl(var(--accent-2))]/20 shadow-[0_0_0_2px_hsl(var(--accent)/0.4)]">
                         <SafeImage
-                            src={station.favicon}
+                            src={getProxiedFaviconUrl(station.favicon)}
                             alt={`${station.name} logo`}
                             width={48}
                             height={48}
                             className="h-full w-full object-cover"
-                            fallback={<div className="h-full w-full" />}
+                            fallback={<StationAvatar name={station.name} seed={station.stationuuid} className="text-xs" />}
                         />
                     </div>
                     <div className="flex-grow overflow-hidden space-y-1">

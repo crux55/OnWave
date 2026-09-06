@@ -12,7 +12,8 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { SafeImage } from '@/components/SafeImage';
-import { cn } from '@/lib/utils';
+import { StationAvatar } from '@/components/StationAvatar';
+import { cn, getProxiedFaviconUrl } from '@/lib/utils';
 
 function capitalize(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
@@ -59,7 +60,7 @@ const HeroCard: React.FC<HeroCardProps> = ({ station, onPlay, isLiked, onToggleL
         instead of the same two gradient blobs regardless of station. */}
     <div className="pointer-events-none absolute inset-0 overflow-hidden">
       <SafeImage
-        src={station.favicon}
+        src={getProxiedFaviconUrl(station.favicon)}
         alt=""
         width={600}
         height={600}
@@ -71,16 +72,12 @@ const HeroCard: React.FC<HeroCardProps> = ({ station, onPlay, isLiked, onToggleL
     <div className="relative flex min-h-[200px] items-end gap-5 p-6 sm:min-h-[260px] sm:p-8">
       <div className="hidden h-24 w-24 shrink-0 overflow-hidden rounded-2xl border border-border/60 bg-card shadow-lg sm:block sm:h-32 sm:w-32">
         <SafeImage
-          src={station.favicon}
+          src={getProxiedFaviconUrl(station.favicon)}
           alt={`${station.name} logo`}
           width={128}
           height={128}
           className="h-full w-full object-cover"
-          fallback={
-            <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-accent/25 to-[hsl(var(--accent-2))]/20">
-              <Radio className="h-10 w-10 text-muted-foreground" />
-            </div>
-          }
+          fallback={<StationAvatar name={station.name} seed={station.stationuuid} className="text-2xl" />}
         />
       </div>
 

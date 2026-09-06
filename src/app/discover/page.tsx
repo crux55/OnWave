@@ -1,21 +1,18 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import Link from 'next/link';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import type { RadioStation } from '@/lib/types';
 import { usePlayer } from '@/contexts/PlayerContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Search as SearchIcon, AlertTriangle, SlidersHorizontal, ListPlus, Users } from 'lucide-react';
+import { Search as SearchIcon, AlertTriangle, SlidersHorizontal, ListPlus } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { fetchFromApi, toPlayerStation, fetchAllStations, type Station } from '@/lib/api';
+import { fetchFromApi, toPlayerStation } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { useLikedStations } from '@/hooks/use-liked-stations';
 import { RadioStationCard } from '@/components/RadioStationCard';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Select,
   SelectContent,
@@ -81,10 +78,7 @@ function DiscoverPageContent() {
   const { toast } = useToast();
   const { isLiked, toggleLike } = useLikedStations();
 
-  const initialTab = searchParams.get('tab') === 'directory' ? 'directory' : 'search';
-  const [activeTab, setActiveTab] = useState<'search' | 'directory'>(initialTab);
-
-  // --- Search tab state ---
+  // --- Search state ---
   const initialSearch = searchParams.get('search') || '';
   const [searchTerm, setSearchTerm] = useState(initialSearch);
   const [stations, setStations] = useState<RadioStation[]>([]);
@@ -105,11 +99,6 @@ function DiscoverPageContent() {
   const [visibleCount, setVisibleCount] = useState(REVEAL_BATCH);
   const abortRef = useRef<AbortController | null>(null);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
-
-  // --- Directory tab state ---
-  const [directoryStations, setDirectoryStations] = useState<Station[]>([]);
-  const [isDirectoryLoading, setIsDirectoryLoading] = useState(true);
-  const [directoryError, setDirectoryError] = useState(false);
 
   const handleSearchStations = useCallback(async (term?: string) => {
     const query = typeof term === 'string' ? term : searchTerm;
@@ -195,10 +184,9 @@ function DiscoverPageContent() {
     }
   }, [searchTerm, stations]);
 
-  // Sync tab + key filters to the URL so a search is bookmarkable/shareable.
+  // Sync key filters to the URL so a search is bookmarkable/shareable.
   useEffect(() => {
     const params = new URLSearchParams();
-    if (activeTab === 'directory') params.set('tab', 'directory');
     if (searchTerm.trim()) params.set('search', searchTerm.trim());
     if (limit !== DEFAULT_FILTERS.limit) params.set('limit', String(limit));
     if (codec !== 'any') params.set('codec', codec);
@@ -206,9 +194,9 @@ function DiscoverPageContent() {
     const query = params.toString();
     router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
     // Deliberately excludes router/pathname/searchParams from deps — only
-    // the actual filter/tab state should trigger a URL rewrite.
+    // the actual filter state should trigger a URL rewrite.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, searchTerm, limit, codec, country]);
+  }, [searchTerm, limit, codec, country]);
 
   // Reveal more of the already-fetched results as the user scrolls near
   // the bottom of the grid — a real backend offset/pagination API doesn't
@@ -226,14 +214,6 @@ function DiscoverPageContent() {
     observer.observe(sentinel);
     return () => observer.disconnect();
   }, [stations.length]);
-
-  // Load the OnWave station directory once, for the Directory tab.
-  useEffect(() => {
-    fetchAllStations()
-      .then(setDirectoryStations)
-      .catch(() => setDirectoryError(true))
-      .finally(() => setIsDirectoryLoading(false));
-  }, []);
 
   const handlePlayStation = (station: RadioStation) => {
     const playerStation = toPlayerStation(station);
@@ -298,18 +278,12 @@ function DiscoverPageContent() {
           </h1>
         </div>
         <p className="text-md text-muted-foreground">
-          Search thousands of stations worldwide, or browse OnWave's own station directory.
+          Search thousands of stations worldwide, from radio-browser's global directory.
         </p>
       </header>
 
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'search' | 'directory')} className="w-full">
-        <TabsList className="grid w-full grid-cols-2 max-w-md mb-6">
-          <TabsTrigger value="search">Search</TabsTrigger>
-          <TabsTrigger value="directory">Directory</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="search">
-          <Card className="shadow-lg mb-8">
+      <div className="w-full">
+        <Card className="shadow-lg mb-8">
             <CardHeader>
               <CardTitle>Station Search</CardTitle>
             </CardHeader>
@@ -522,43 +496,7 @@ function DiscoverPageContent() {
               )}
             </div>
           )}
-        </TabsContent>
-
-        <TabsContent value="directory">
-          {isDirectoryLoading && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {Array.from({ length: 4 }).map((_, i) => (
-                <Skeleton key={i} className="h-20 w-full rounded-xl" />
-              ))}
-            </div>
-          )}
-
-          {!isDirectoryLoading && directoryError && (
-            <p className="text-muted-foreground">Couldn't load the station directory right now — try again shortly.</p>
-          )}
-
-          {!isDirectoryLoading && !directoryError && directoryStations.length === 0 && (
-            <p className="text-muted-foreground">No stations yet.</p>
-          )}
-
-          {!isDirectoryLoading && !directoryError && directoryStations.length > 0 && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {directoryStations.map((station) => (
-                <Link key={station.id} href={`/stations/${station.slug || station.id}`}>
-                  <Card className="h-full hover:shadow-lg hover:border-accent/50 transition-all">
-                    <CardHeader className="flex flex-row items-center gap-3">
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted">
-                        <Users className="h-5 w-5 text-muted-foreground" />
-                      </div>
-                      <CardTitle className="text-base truncate">{station.name}</CardTitle>
-                    </CardHeader>
-                  </Card>
-                </Link>
-              ))}
-            </div>
-          )}
-        </TabsContent>
-      </Tabs>
+        </div>
     </div>
   );
 }

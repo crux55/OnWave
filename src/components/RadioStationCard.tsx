@@ -2,7 +2,8 @@ import type { RadioStation } from '@/lib/types';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Play, Heart } from 'lucide-react';
 import { SafeImage } from '@/components/SafeImage';
-import { cn } from '@/lib/utils';
+import { StationAvatar } from '@/components/StationAvatar';
+import { cn, getProxiedFaviconUrl } from '@/lib/utils';
 
 interface RadioStationCardProps {
   station: RadioStation;
@@ -34,12 +35,12 @@ export function RadioStationCard({ station, onPlay, isLiked, onToggleLike, varia
           className="group relative aspect-square w-full overflow-hidden bg-gradient-to-br from-accent/25 to-[hsl(var(--accent-2))]/20"
         >
           <SafeImage
-            src={station.favicon}
+            src={getProxiedFaviconUrl(station.favicon)}
             alt={`${station.name} logo`}
             width={160}
             height={160}
             className="h-full w-full object-cover"
-            fallback={<div className="h-full w-full" />}
+            fallback={<StationAvatar name={station.name} seed={station.stationuuid} />}
           />
           <span className="absolute inset-0 flex items-center justify-center bg-background/0 opacity-0 transition-all duration-200 group-hover:bg-background/40 group-hover:opacity-100">
             <span className="flex h-9 w-9 items-center justify-center rounded-full bg-accent text-accent-foreground">
@@ -63,12 +64,12 @@ export function RadioStationCard({ station, onPlay, isLiked, onToggleLike, varia
       <CardHeader className="flex flex-row items-start gap-3 p-4">
         <div className="h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-gradient-to-br from-accent/25 to-[hsl(var(--accent-2))]/20">
           <SafeImage
-            src={station.favicon}
+            src={getProxiedFaviconUrl(station.favicon)}
             alt={`${station.name} logo`}
             width={48}
             height={48}
             className="h-full w-full object-cover"
-            fallback={<div className="h-full w-full" />}
+            fallback={<StationAvatar name={station.name} seed={station.stationuuid} />}
           />
         </div>
         <div className="min-w-0 flex-1">

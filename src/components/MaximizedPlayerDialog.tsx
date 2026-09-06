@@ -11,7 +11,7 @@ import Image from 'next/image';
 import {
   Play, Pause, Volume2, VolumeX, SkipForward, SkipBack, Loader2, ExternalLink, Minimize2, Music2, X
 } from 'lucide-react';
-import { cn, isValidImageUrl } from '@/lib/utils';
+import { cn, getProxiedFaviconUrl } from '@/lib/utils';
 import { AudioVisualizer } from '@/components/AudioVisualizer';
 import { useAudioVisualizer } from '@/hooks/use-audio-visualizer';
 import { useChromecast } from '@/hooks/use-chromecast';
@@ -77,7 +77,7 @@ export function MaximizedPlayerDialog({ station }: MaximizedPlayerDialogProps) {
       <DialogContent hideCloseButton className="sm:max-w-2xl md:max-w-3xl lg:max-w-4xl p-0 overflow-hidden data-[state=open]:min-h-[70vh] flex flex-col">
         <div className="relative h-60 sm:h-80 md:h-96 w-full">
           <Image
-            src={isValidImageUrl(station.favicon) ? station.favicon : `https://placehold.co/1200x800.png`}
+            src={getProxiedFaviconUrl(station.favicon) || `https://placehold.co/1200x800.png`}
             alt={`${station.name} artwork`}
             layout="fill"
             objectFit="cover"

@@ -17,3 +17,15 @@ export function isValidImageUrl(urlString: string | null | undefined): boolean {
     return false;
   }
 }
+
+// Station favicons come from third-party URLs (radio-browser.info's
+// crowdsourced favicon field, mostly) that are frequently dead, blocked by
+// Cross-Origin-Resource-Policy, or served over plain http — which this https
+// site's browser will refuse to load as mixed content. Routing them through
+// our own backend's favicon-cache endpoint instead of hotlinking directly
+// fetches (and caches) the image server-side, so none of those three
+// failure modes apply to the copy the browser actually loads.
+export function getProxiedFaviconUrl(urlString: string | null | undefined): string | null {
+  if (!isValidImageUrl(urlString)) return null;
+  return `/api/favicon-cache?url=${encodeURIComponent(urlString!)}`;
+}
