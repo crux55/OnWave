@@ -37,6 +37,16 @@ export const SafeImage = ({ src, alt, width, height, fallback, className }: Safe
       height={height}
       className={className}
       onError={() => setHasError(true)}
+      // Every caller now passes a same-origin relative path
+      // (/api/favicon-cache?url=...), which next/image's optimizer treats
+      // as "local" and re-fetches by calling back into the Next.js server
+      // itself — but that server has no route for /api/*, only nginx does
+      // (it proxies /api/ straight to the Go backend at the reverse-proxy
+      // layer). The self-fetch 404s there, so the optimizer reports "not a
+      // valid image" for every single station. Skipping optimization lets
+      // the browser request the path directly instead, the same way it
+      // already fetches every other /api/* endpoint.
+      unoptimized
     />
   );
 };

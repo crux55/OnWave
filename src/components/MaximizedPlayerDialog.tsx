@@ -83,6 +83,10 @@ export function MaximizedPlayerDialog({ station }: MaximizedPlayerDialogProps) {
             objectFit="cover"
             className="bg-muted blur-md scale-110 opacity-50"
             data-ai-hint="radio station background"
+            // See SafeImage.tsx: a relative /api/favicon-cache path can't be
+            // optimized by next/image's self-fetch behind nginx's /api/
+            // routing, so this must go straight to the browser unoptimized.
+            unoptimized
           />
           <div className="absolute inset-0">
             <AudioVisualizer

@@ -69,6 +69,8 @@ services:
       - MYSQL_PORT=${MYSQL_PORT}
       - MYSQL_DATABASE=${MYSQL_DATABASE}
       - JWT_SECRET=${JWT_SECRET}
+      - REDIS_ADDR=${REDIS_HOST}:${REDIS_PORT}
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
       - PORT=${NOTIFICATIONS_PORT}
     depends_on:
       mysql:
