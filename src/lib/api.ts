@@ -328,7 +328,7 @@ async function fetchGenreStations(genre: string): Promise<RadioStation[]> {
   // Fetch a larger pool than before (60 -> 100) since the image-quality
   // check below rejects a real chunk of candidates — plain radio-browser
   // tag search turns up plenty of stations with missing or tiny favicons.
-  const result = await fetchFromApi({ term: genre, limit: '100', min_bitrate: '64' });
+  const result = await fetchFromApi({ term: genre, mode: 'tag', limit: '100', min_bitrate: '64' });
   const candidates = fisherYatesShuffle(result.stations.filter(isQualityStation));
   return filterToQualityImages(candidates, candidates.length);
 }
