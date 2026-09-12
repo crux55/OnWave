@@ -3,7 +3,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm, type SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -34,6 +34,7 @@ const registerFormSchema = z.object({
   password: commonPasswordSchema,
   confirmPassword: commonPasswordSchema,
   username: z.string().min(3, { message: "Username must be at least 3 characters." }),
+  inviteCode: z.string().optional(),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match.",
   path: ["confirmPassword"],
@@ -43,12 +44,17 @@ type RegisterFormValues = z.infer<typeof registerFormSchema>;
 
 
 
-export default function LoginPage() {
+function LoginPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const inviteCodeParam = searchParams.get('invite') || '';
   const { toast } = useToast();
   const [isLoadingGoogle, setIsLoadingGoogle] = useState(false);
   const [isLoadingEmail, setIsLoadingEmail] = useState(false);
-  const [activeTab, setActiveTab] = useState("signin");
+  // Arriving with an invite code (from /invite/[code]) goes straight to the
+  // register tab -- that's the whole point of an invite link, no reason to
+  // land on sign-in first.
+  const [activeTab, setActiveTab] = useState(inviteCodeParam ? "register" : "signin");
   const [registerMessage, setRegisterMessage] = useState("");
   const [loginMessage, setLoginMessage] = useState("");
 
@@ -60,7 +66,7 @@ export default function LoginPage() {
 
   const registerForm = useForm<RegisterFormValues>({
     resolver: zodResolver(registerFormSchema),
-    defaultValues: { email: '', password: '', confirmPassword: '', username: '' },
+    defaultValues: { email: '', password: '', confirmPassword: '', username: '', inviteCode: inviteCodeParam },
   });
 
   const handleGoogleSignIn = async (credentialResponse: CredentialResponse) => {
@@ -100,7 +106,16 @@ export default function LoginPage() {
       const res = await fetch('/api/users', {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
+        body: JSON.stringify({
+          email: data.email,
+          password: data.password,
+          confirmPassword: data.confirmPassword,
+          username: data.username,
+          // Backend field is snake_case (internal/auth/user.go's User.InviteCode
+          // json tag) -- everything else above happens to already match, this
+          // one needs an explicit rename rather than spreading `data` as-is.
+          invite_code: data.inviteCode || undefined,
+        }),
       });
       if (res.ok) {
         setRegisterMessage("Registration successful!");
@@ -351,6 +366,16 @@ export default function LoginPage() {
                   />
                   {registerForm.formState.errors.username && <p className="text-xs text-destructive pt-1">{registerForm.formState.errors.username.message}</p>}
                 </div>
+                <div className="space-y-1">
+                  <Label htmlFor="inviteCode-register">Invite code (optional)</Label>
+                  <Input
+                    id="inviteCode-register"
+                    type="text"
+                    placeholder="Got a founding-member invite?"
+                    {...registerForm.register("inviteCode")}
+                    disabled={isOverallLoading}
+                  />
+                </div>
                 <Button type="submit" disabled={isOverallLoading} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground py-3 text-base">
                    {isLoadingEmail && activeTab === "register" ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
                   Create Account
@@ -381,5 +406,13 @@ export default function LoginPage() {
         </CardFooter>
       </Card>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <React.Suspense fallback={<div className="flex min-h-screen items-center justify-center bg-background" />}>
+      <LoginPageContent />
+    </React.Suspense>
   );
 }

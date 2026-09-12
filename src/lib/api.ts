@@ -1263,6 +1263,30 @@ export async function grantDJByUsername(username: string): Promise<string> {
   return result.user_id;
 }
 
+export async function generateFoundingMemberInvite(): Promise<string> {
+  const token = localStorage.getItem("token");
+  if (!token) {
+    throw new Error('User not authenticated');
+  }
+
+  const auth = JSON.parse(token);
+  const response = await fetch('/api/admin/founding-member-invites', {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${auth.token}` },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    if (response.status === 401) {
+      throw new Error('UNAUTHORIZED');
+    }
+    throw new Error(errorData.error || 'Failed to generate invite');
+  }
+
+  const result = await response.json();
+  return result.code;
+}
+
 export async function inviteStationMember(stationId: string, invite: { username?: string; email?: string }): Promise<string> {
   const token = localStorage.getItem("token");
   if (!token) {

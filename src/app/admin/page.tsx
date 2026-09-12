@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { jwtDecode as jwt_decode } from 'jwt-decode';
-import { ShieldCheck, ShieldAlert, Loader2, Check, X, UserPlus } from 'lucide-react';
+import { ShieldCheck, ShieldAlert, Loader2, Check, X, UserPlus, Sparkles, Copy } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,6 +16,7 @@ import {
   approveDJRequest,
   denyDJRequest,
   grantDJByUsername,
+  generateFoundingMemberInvite,
   fetchPublicProfile,
   type StationRequest,
   type DJRequest,
@@ -38,6 +39,8 @@ export default function AdminPage() {
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [grantUsername, setGrantUsername] = useState('');
   const [isGranting, setIsGranting] = useState(false);
+  const [generatedInviteLink, setGeneratedInviteLink] = useState('');
+  const [isGeneratingInvite, setIsGeneratingInvite] = useState(false);
 
   useEffect(() => {
     const tokenString = localStorage.getItem('token');
@@ -144,6 +147,23 @@ export default function AdminPage() {
     } finally {
       setIsGranting(false);
     }
+  };
+
+  const handleGenerateInvite = async () => {
+    setIsGeneratingInvite(true);
+    try {
+      const code = await generateFoundingMemberInvite();
+      setGeneratedInviteLink(`${window.location.origin}/invite/${code}`);
+    } catch (error: any) {
+      toast({ title: 'Failed to generate invite', description: error.message, variant: 'destructive' });
+    } finally {
+      setIsGeneratingInvite(false);
+    }
+  };
+
+  const handleCopyInviteLink = () => {
+    navigator.clipboard.writeText(generatedInviteLink);
+    toast({ title: 'Copied to clipboard' });
   };
 
   if (isLoading) {
@@ -284,6 +304,31 @@ export default function AdminPage() {
                 Grant
               </Button>
             </div>
+          </section>
+
+          <Separator />
+
+          <section className="space-y-3 rounded-lg border border-accent/30 bg-accent/5 p-4">
+            <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-accent" /> Generate Founding-Member Invite
+            </h3>
+            <p className="text-xs text-muted-foreground">
+              A one-time link — whoever registers with it becomes a founding member permanently, free on anything that becomes a paid feature later. Send it yourself; nothing here sends it for you.
+            </p>
+            <div className="flex items-center gap-2">
+              <Button size="sm" onClick={handleGenerateInvite} disabled={isGeneratingInvite}>
+                {isGeneratingInvite ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : null}
+                Generate invite link
+              </Button>
+            </div>
+            {generatedInviteLink && (
+              <div className="flex items-center gap-2">
+                <Input readOnly value={generatedInviteLink} className="h-9 text-sm flex-1 min-w-0" />
+                <Button size="sm" variant="outline" onClick={handleCopyInviteLink}>
+                  <Copy className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            )}
           </section>
         </CardContent>
       </Card>
