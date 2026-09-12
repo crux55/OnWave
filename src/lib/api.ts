@@ -241,39 +241,6 @@ function isQualityStation(station: RadioStation): boolean {
   return station.lastcheckok === 1 && (station.bitrate === 0 || station.bitrate >= 64);
 }
 
-const MIN_STATION_IMAGE_PX = 48;
-const IMAGE_LOAD_TIMEOUT_MS = 3000;
-
-// hasQualityImage actually loads a station's favicon in the browser and
-// checks both that it loads and that it clears a minimum pixel size —
-// a URL merely responding (all the backend's own favicon check verifies)
-// still lets through broken placeholder images and tiny icons that look
-// bad blown up to card size. Anything that fails to load, errors, times
-// out, or comes back under the size floor is rejected.
-function hasQualityImage(station: RadioStation): Promise<boolean> {
-  return new Promise(resolve => {
-    if (typeof window === 'undefined' || !isValidImageUrl(station.favicon)) {
-      resolve(false);
-      return;
-    }
-    const img = new window.Image();
-    const timer = setTimeout(() => {
-      img.onload = null;
-      img.onerror = null;
-      resolve(false);
-    }, IMAGE_LOAD_TIMEOUT_MS);
-    img.onload = () => {
-      clearTimeout(timer);
-      resolve(img.naturalWidth >= MIN_STATION_IMAGE_PX && img.naturalHeight >= MIN_STATION_IMAGE_PX);
-    };
-    img.onerror = () => {
-      clearTimeout(timer);
-      resolve(false);
-    };
-    img.src = station.favicon;
-  });
-}
-
 function fisherYatesShuffle<T>(arr: T[]): T[] {
   const a = [...arr];
   for (let i = a.length - 1; i > 0; i--) {
@@ -312,25 +279,17 @@ export function extractPreferredGenres(stations: RadioStation[]): string[] {
   return DISCOVER_GENRES.filter(genre => tagSet.has(genre));
 }
 
-// filterToQualityImages runs hasQualityImage across a candidate pool in
-// parallel and returns up to `limit` that pass, in the pool's own order —
-// shared by every home-page source (genre search, backend's popular
-// ranking) so "does this station actually have a decent image" is one
-// rule, not reimplemented per call site.
-async function filterToQualityImages(candidates: RadioStation[], limit: number): Promise<RadioStation[]> {
-  const withImageCheck = await Promise.all(
-    candidates.map(async station => ({ station, hasImage: await hasQualityImage(station) }))
-  );
-  return withImageCheck.filter(c => c.hasImage).map(c => c.station).slice(0, limit);
-}
-
 async function fetchGenreStations(genre: string): Promise<RadioStation[]> {
-  // Fetch a larger pool than before (60 -> 100) since the image-quality
-  // check below rejects a real chunk of candidates — plain radio-browser
-  // tag search turns up plenty of stations with missing or tiny favicons.
+  // Used to also pre-load and size-check every candidate's favicon in the
+  // browser before returning anything — up to ~100 real image loads per
+  // genre, each with a 3s worst-case timeout, done in parallel but still
+  // bottlenecked by however many of them were slow or dead. That's a lot of
+  // latency to spend on a quality gate that StationAvatar (the generated
+  // fallback) already makes unnecessary: a broken/missing image now just
+  // renders instantly as an avatar instead of a blank box, so there's no
+  // need to pre-vet every candidate before a single card can render.
   const result = await fetchFromApi({ term: genre, mode: 'tag', limit: '100', min_bitrate: '64' });
-  const candidates = fisherYatesShuffle(result.stations.filter(isQualityStation));
-  return filterToQualityImages(candidates, candidates.length);
+  return fisherYatesShuffle(result.stations.filter(isQualityStation));
 }
 
 export async function fetchHomePageSections(preferredGenres: string[] = []): Promise<{
@@ -356,10 +315,10 @@ export async function fetchHomePageSections(preferredGenres: string[] = []): Pro
     fetchGenreStations(discoverGenre).catch(() => [] as RadioStation[]),
   ]);
 
-  // grouped.popular is a pool of up to 25 backend-cached stations, already
-  // favicon-URL-reachable — filter down to real-quality images client-side
-  // rather than trusting that reachability check for the actual card art.
-  const popular = await filterToQualityImages(grouped.popular, 8);
+  // grouped.popular is already favicon-checked server-side (PopCache only
+  // keeps candidates with a reachable favicon, see webradio.PopCache) — no
+  // need to re-vet it client-side too.
+  const popular = grouped.popular.slice(0, 8);
   // trending isn't shown anywhere anymore, but its computation still feeds
   // the seen-set below so Discover doesn't repeat stations already shown.
   const trending = grouped.trending.slice(0, 8);
