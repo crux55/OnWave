@@ -12,7 +12,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { useEffect, useState } from "react";
-import { fetchCurrentUserProfile, fetchLikedStations, fetchMyBadges, fetchManagedBadges, fetchMyStations, fetchMyFollows, createBadge, awardBadge, revokeBadge, markBadgesSeen, createShow, createStationRequest, createDJRequest, type Badge, type MyBadge, type Station, type Follow } from "@/lib/api";
+import { fetchCurrentUserProfile, fetchLikedStations, fetchMyBadges, fetchManagedBadges, fetchMyStations, fetchMyFollows, createBadge, awardBadge, revokeBadge, markBadgesSeen, createShow, createDJRequest, type Badge, type MyBadge, type Station, type Follow } from "@/lib/api";
+import { CreateStationRequestForm } from "@/components/CreateStationRequestForm";
 import { JWT, Profile, Token, User } from '@/lib/types';
 import { jwtDecode as jwt_decode } from "jwt-decode";
 import { useReminders } from '@/contexts/RemindersContext';
@@ -78,10 +79,6 @@ export default function ProfilePage() {
   const [newShowTime, setNewShowTime] = useState('21:00');
   const [newShowDuration, setNewShowDuration] = useState('60');
   const [isCreatingShow, setIsCreatingShow] = useState(false);
-  const [newStationName, setNewStationName] = useState('');
-  const [newStationDescription, setNewStationDescription] = useState('');
-  const [newStationHandle, setNewStationHandle] = useState('');
-  const [isSubmittingStationRequest, setIsSubmittingStationRequest] = useState(false);
   const [hasSubmittedStationRequest, setHasSubmittedStationRequest] = useState(false);
   const [djRequestMessage, setDjRequestMessage] = useState('');
   const [isSubmittingDJRequest, setIsSubmittingDJRequest] = useState(false);
@@ -218,27 +215,6 @@ export default function ProfilePage() {
       toast({ title: 'Failed to create show', description: error.message, variant: 'destructive' });
     } finally {
       setIsCreatingShow(false);
-    }
-  };
-
-  const handleCreateStationRequest = async () => {
-    if (!newStationName.trim()) return;
-    setIsSubmittingStationRequest(true);
-    try {
-      await createStationRequest({
-        name: newStationName.trim(),
-        description: newStationDescription.trim(),
-        requested_handle: newStationHandle.trim() || undefined,
-      });
-      toast({ title: 'Request submitted', description: "An admin will review it shortly." });
-      setNewStationName('');
-      setNewStationDescription('');
-      setNewStationHandle('');
-      setHasSubmittedStationRequest(true);
-    } catch (error: any) {
-      toast({ title: 'Failed to submit request', description: error.message, variant: 'destructive' });
-    } finally {
-      setIsSubmittingStationRequest(false);
     }
   };
 
@@ -462,20 +438,7 @@ export default function ProfilePage() {
                   <h3 className="text-xl font-semibold text-foreground flex items-center gap-2">
                     <Radio className="h-5 w-5 text-accent" /> Create a Station
                   </h3>
-                  <p className="text-sm text-muted-foreground">
-                    Requests are reviewed by an admin before your station goes live.
-                  </p>
-                  <Input placeholder="Station name" value={newStationName} onChange={e => setNewStationName(e.target.value)} />
-                  <Input placeholder="Description" value={newStationDescription} onChange={e => setNewStationDescription(e.target.value)} />
-                  <Input placeholder="Requested handle (optional)" value={newStationHandle} onChange={e => setNewStationHandle(e.target.value)} />
-                  <Button
-                    size="sm"
-                    onClick={handleCreateStationRequest}
-                    disabled={isSubmittingStationRequest || !newStationName.trim()}
-                  >
-                    {isSubmittingStationRequest ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
-                    Request a Station
-                  </Button>
+                  <CreateStationRequestForm onSubmitted={() => setHasSubmittedStationRequest(true)} />
                 </section>
               </>
             )}

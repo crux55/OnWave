@@ -12,6 +12,10 @@ import { Tv, Calendar, Clock, Radio } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { CreateStationRequestForm } from '@/components/CreateStationRequestForm';
+import { Plus } from 'lucide-react';
 import { usePlayer } from '@/contexts/PlayerContext';
 import { useToast } from '@/hooks/use-toast';
 
@@ -67,6 +71,7 @@ export default function ShowsPage() {
   const [stationDirectory, setStationDirectory] = useState<Station[]>([]);
   const [isStationDirectoryLoading, setIsStationDirectoryLoading] = useState(true);
   const [stationDirectoryError, setStationDirectoryError] = useState(false);
+  const [isCreateStationOpen, setIsCreateStationOpen] = useState(false);
   const player = usePlayer();
   const { toast } = useToast();
 
@@ -265,7 +270,36 @@ export default function ShowsPage() {
       </div>
 
       <section className="mb-12">
-        <h2 className="text-2xl font-semibold tracking-tight mb-4">OnWave Stations</h2>
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <h2 className="text-2xl font-semibold tracking-tight">OnWave Stations</h2>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              if (!localStorage.getItem('token')) {
+                toast({
+                  title: 'Login Required',
+                  description: 'Please log in to request a station',
+                  action: <a href="/auth/login" className="text-primary hover:underline">Login here</a>,
+                  variant: 'destructive',
+                });
+                return;
+              }
+              setIsCreateStationOpen(true);
+            }}
+          >
+            <Plus className="mr-1.5 h-4 w-4" />
+            Don&apos;t see your station? Create one
+          </Button>
+        </div>
+        <Dialog open={isCreateStationOpen} onOpenChange={setIsCreateStationOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Create a Station</DialogTitle>
+            </DialogHeader>
+            <CreateStationRequestForm onSubmitted={() => setIsCreateStationOpen(false)} />
+          </DialogContent>
+        </Dialog>
         {isStationDirectoryLoading && (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {Array.from({ length: 4 }).map((_, i) => (
