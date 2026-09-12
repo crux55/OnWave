@@ -1658,6 +1658,35 @@ export async function signInWithGoogle(idToken: string): Promise<void> {
   localStorage.setItem('token', JSON.stringify({ token: result.token, userId: result.userId }));
 }
 
+// Always resolves with the backend's generic message, whether or not the
+// email matched an account — that's deliberate anti-enumeration behavior
+// on the backend, not something to work around here.
+export async function requestPasswordReset(email: string): Promise<{ message: string }> {
+  const response = await fetch('/api/users/forgot-password', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email }),
+  });
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => '');
+    throw new Error(errorText || 'Failed to request a password reset');
+  }
+  return response.json();
+}
+
+export async function resetPassword(token: string, newPassword: string): Promise<{ message: string }> {
+  const response = await fetch('/api/users/reset-password', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token, new_password: newPassword }),
+  });
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => '');
+    throw new Error(errorText || 'Failed to reset password');
+  }
+  return response.json();
+}
+
 export async function changeUsername(username: string): Promise<void> {
   const token = localStorage.getItem("token");
   if (!token) {

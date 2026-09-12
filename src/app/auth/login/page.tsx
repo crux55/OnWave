@@ -2,6 +2,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useForm, type SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -288,6 +289,11 @@ export default function LoginPage() {
                     disabled={isOverallLoading} 
                   />
                   {signInForm.formState.errors.password && <p className="text-xs text-destructive pt-1">{signInForm.formState.errors.password.message}</p>}
+                  <div className="text-right">
+                    <Link href="/auth/forgot-password" className="text-xs text-muted-foreground hover:text-primary hover:underline">
+                      Forgot password?
+                    </Link>
+                  </div>
                 </div>
                 <Button type="submit" disabled={isOverallLoading} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground py-3 text-base">
                   {isLoadingEmail && activeTab === "signin" ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
