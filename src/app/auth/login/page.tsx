@@ -396,14 +396,14 @@ function LoginPageContent() {
            <p className="px-8 text-center text-xs text-muted-foreground">
             By clicking continue, you agree to our{" "}
             <a
-              href="/terms" // Replace with your actual terms URL
+              href="/terms"
               className="underline underline-offset-4 hover:text-primary"
             >
               Terms of Service
             </a>{" "}
             and{" "}
             <a
-              href="/privacy" // Replace with your actual privacy URL
+              href="/privacy"
               className="underline underline-offset-4 hover:text-primary"
             >
               Privacy Policy

@@ -4,8 +4,8 @@
   "description": "Discover and listen to radio stations from around the world.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#FEEAFA",
-  "theme_color": "#7000A8",
+  "background_color": "#0A0A12",
+  "theme_color": "#0A0A12",
   "icons": [
     {
       "src": "/icons/icon-192x192.png",
