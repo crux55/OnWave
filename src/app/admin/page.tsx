@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { jwtDecode as jwt_decode } from 'jwt-decode';
-import { ShieldCheck, ShieldAlert, Loader2, Check, X, UserPlus, Sparkles, Copy } from 'lucide-react';
+import { ShieldCheck, ShieldAlert, Loader2, Check, X, UserPlus, Sparkles, Copy, Bug, Lightbulb, MessageCircle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,11 +18,15 @@ import {
   grantDJByUsername,
   generateFoundingMemberInvite,
   fetchPublicProfile,
+  fetchFeedbackReports,
+  resolveFeedbackReport,
   type StationRequest,
   type DJRequest,
+  type FeedbackReport,
 } from '@/lib/api';
 import type { Token } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
 
 function requesterLabel(names: Record<string, string>, requesterId: string): string {
   return names[requesterId] || `User ${requesterId.slice(0, 8)}`;
@@ -41,6 +45,8 @@ export default function AdminPage() {
   const [isGranting, setIsGranting] = useState(false);
   const [generatedInviteLink, setGeneratedInviteLink] = useState('');
   const [isGeneratingInvite, setIsGeneratingInvite] = useState(false);
+  const [feedbackReports, setFeedbackReports] = useState<FeedbackReport[]>([]);
+  const [resolvingId, setResolvingId] = useState<string | null>(null);
 
   useEffect(() => {
     const tokenString = localStorage.getItem('token');
@@ -63,10 +69,11 @@ export default function AdminPage() {
       return;
     }
 
-    Promise.all([fetchPendingStationRequests(), fetchPendingDJRequests()])
-      .then(async ([stations, djs]) => {
+    Promise.all([fetchPendingStationRequests(), fetchPendingDJRequests(), fetchFeedbackReports()])
+      .then(async ([stations, djs, reports]) => {
         setStationRequests(stations);
         setDjRequests(djs);
+        setFeedbackReports(reports);
 
         const requesterIds = Array.from(new Set([...stations.map(s => s.requester_id), ...djs.map(d => d.requester_id)]));
         const profiles = await Promise.all(requesterIds.map(id => fetchPublicProfile(id).catch(() => null)));
@@ -164,6 +171,18 @@ export default function AdminPage() {
   const handleCopyInviteLink = () => {
     navigator.clipboard.writeText(generatedInviteLink);
     toast({ title: 'Copied to clipboard' });
+  };
+
+  const handleResolveFeedback = async (id: string) => {
+    setResolvingId(id);
+    try {
+      await resolveFeedbackReport(id);
+      setFeedbackReports(prev => prev.map(r => r.id === id ? { ...r, status: 'resolved' } : r));
+    } catch (error: any) {
+      toast({ title: 'Failed to resolve report', description: error.message, variant: 'destructive' });
+    } finally {
+      setResolvingId(null);
+    }
   };
 
   if (isLoading) {
@@ -272,6 +291,51 @@ export default function AdminPage() {
                           {processingId === req.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <X className="h-3.5 w-3.5" />}
                         </Button>
                       </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+
+          <Separator />
+
+          <section>
+            <h3 className="text-xl font-semibold text-foreground mb-3 flex items-center gap-2">
+              <MessageCircle className="h-5 w-5 text-accent" /> Bug Reports &amp; Feature Ideas
+            </h3>
+            {feedbackReports.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No reports yet.</p>
+            ) : (
+              <div className="space-y-2">
+                {feedbackReports.map(report => (
+                  <div
+                    key={report.id}
+                    className={cn(
+                      'rounded-md border border-border bg-muted/30 p-3',
+                      report.status === 'resolved' && 'opacity-50'
+                    )}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                          {report.type === 'bug' ? <Bug className="h-3.5 w-3.5 text-destructive" /> : <Lightbulb className="h-3.5 w-3.5 text-accent" />}
+                          {report.username || 'Anonymous'}
+                          {report.page_url && <span className="font-normal text-muted-foreground">— {report.page_url}</span>}
+                        </div>
+                        <p className="text-sm text-muted-foreground mt-1 whitespace-pre-wrap break-words">{report.message}</p>
+                      </div>
+                      {report.status === 'open' && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="flex-shrink-0"
+                          onClick={() => handleResolveFeedback(report.id)}
+                          disabled={resolvingId === report.id}
+                        >
+                          {resolvingId === report.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+                        </Button>
+                      )}
                     </div>
                   </div>
                 ))}

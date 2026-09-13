@@ -1296,6 +1296,99 @@ export async function grantDJByUsername(username: string): Promise<string> {
   return result.user_id;
 }
 
+export type FeedbackType = 'bug' | 'feature';
+
+export interface FeedbackReport {
+  id: string;
+  user_id?: string;
+  username?: string;
+  type: FeedbackType;
+  message: string;
+  page_url?: string;
+  user_agent?: string;
+  status: 'open' | 'resolved';
+  created_at: string;
+}
+
+// Deliberately usable when logged out — the floating feedback button
+// appears on every page, including ones a guest can see before signing in.
+// A token is attached when one exists so the report is linked to the
+// submitter, but its absence isn't an error.
+export async function submitFeedback(type: FeedbackType, message: string, pageUrl: string): Promise<void> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  const token = localStorage.getItem("token");
+  if (token) {
+    try {
+      headers['Authorization'] = `Bearer ${JSON.parse(token).token}`;
+    } catch {
+      // Malformed stored token — submit anonymously rather than failing.
+    }
+  }
+
+  const response = await fetch('/api/feedback', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      type,
+      message,
+      page_url: pageUrl,
+      user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : undefined,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    if (response.status === 429) {
+      throw new Error('Too many reports submitted recently — please try again later.');
+    }
+    throw new Error(errorData.message || 'Failed to submit report');
+  }
+}
+
+export async function fetchFeedbackReports(): Promise<FeedbackReport[]> {
+  const token = localStorage.getItem("token");
+  if (!token) {
+    throw new Error('User not authenticated');
+  }
+
+  const auth = JSON.parse(token);
+  const response = await fetch('/api/admin/feedback', {
+    headers: { 'Authorization': `Bearer ${auth.token}` },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    if (response.status === 401) {
+      throw new Error('UNAUTHORIZED');
+    }
+    throw new Error(errorData.message || 'Failed to fetch feedback reports');
+  }
+
+  const result = await response.json();
+  return result.reports || [];
+}
+
+export async function resolveFeedbackReport(id: string): Promise<void> {
+  const token = localStorage.getItem("token");
+  if (!token) {
+    throw new Error('User not authenticated');
+  }
+
+  const auth = JSON.parse(token);
+  const response = await fetch(`/api/admin/feedback/${id}/resolve`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${auth.token}` },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    if (response.status === 401) {
+      throw new Error('UNAUTHORIZED');
+    }
+    throw new Error(errorData.message || 'Failed to resolve report');
+  }
+}
+
 export async function generateFoundingMemberInvite(): Promise<string> {
   const token = localStorage.getItem("token");
   if (!token) {

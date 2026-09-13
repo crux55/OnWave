@@ -15,6 +15,7 @@ import { MaximizedPlayerDialog } from '@/components/MaximizedPlayerDialog';
 import { PlayerProvider, usePlayer } from '@/contexts/PlayerContext';
 import { LiveBroadcastProvider } from '@/contexts/LiveBroadcastContext';
 import { LiveBroadcastIndicator } from '@/components/live/LiveBroadcastIndicator';
+import { FeedbackButton } from '@/components/FeedbackButton';
 import { RemindersProvider } from '@/contexts/RemindersContext';
 import { NotificationProvider } from '@/contexts/NotificationContext';
 import { Toaster } from '@/components/ui/toaster';
@@ -139,6 +140,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
       )}
 
       <LiveBroadcastIndicator />
+      <FeedbackButton />
     </div>
   );
 }
