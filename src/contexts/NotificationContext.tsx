@@ -127,15 +127,22 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
     if (!stored) return;
 
     let userId: string;
+    let token: string;
     try {
       const auth = JSON.parse(stored);
       userId = auth.userId;
-      if (!userId) return;
+      token = auth.token;
+      if (!userId || !token) return;
     } catch {
       return;
     }
 
-    const url = `${WS_BASE_URL}?user_id=${userId}`;
+    // The backend derives the user from this token, not from user_id --
+    // the WebSocket API can't set an Authorization header, so the token
+    // has to travel as a query param instead. user_id stays for the
+    // duration/reconnect logic below that already reads it, but the
+    // server no longer trusts it as-is.
+    const url = `${WS_BASE_URL}?user_id=${userId}&token=${encodeURIComponent(token)}`;
     const ws = new WebSocket(url);
     wsRef.current = ws;
 
