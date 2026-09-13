@@ -1760,11 +1760,24 @@ export interface JoinBroadcastResult {
 }
 
 // joinBroadcast returns a listen-only token for a currently-live show.
+// Deliberately usable when logged out (project_r#19) -- listening to a
+// live show shouldn't require an account, only chatting/following should.
+// A token is attached when one exists so a logged-in listener's session
+// is still attributable server-side, but its absence isn't an error.
 export async function joinBroadcast(showId: string): Promise<JoinBroadcastResult> {
-  const authToken = requireAuthToken();
+  const headers: Record<string, string> = {};
+  const stored = localStorage.getItem('token');
+  if (stored) {
+    try {
+      headers['Authorization'] = `Bearer ${JSON.parse(stored).token}`;
+    } catch {
+      // Malformed stored token -- join anonymously rather than failing.
+    }
+  }
+
   const response = await fetch(`/api/shows/${showId}/join`, {
     method: 'POST',
-    headers: { 'Authorization': `Bearer ${authToken}` },
+    headers,
   });
 
   if (!response.ok) {
