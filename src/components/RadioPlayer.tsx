@@ -42,12 +42,27 @@ export function RadioPlayer({ station, className }: RadioPlayerProps) {
   const { isLiked, toggleLike } = useLikedStations();
 
 
+  // Single effect owning both the audio element's lifecycle (creating it,
+  // loading the right src, wiring listeners) and driving play/pause off
+  // isPlaying — previously split into two separate effects that both
+  // independently called .play()/.pause() on the same element in reaction
+  // to the same state. That split was the actual cause of the
+  // paused/unpaused loop bug: a real external pause (headphones
+  // disconnecting fires a native 'pause' event) flipped isPlaying to
+  // false, which re-ran *both* effects, each unconditionally calling
+  // .pause() again in their cleanup/body — regardless of whether the
+  // element was already paused — which is itself enough to keep firing
+  // more 'pause' events and re-triggering the same effects. Consolidating
+  // to one effect removes the duplicate mutation; checking
+  // audio.paused before calling .play()/.pause() (rather than calling
+  // them unconditionally on every run) removes the redundant native
+  // events those calls would otherwise keep generating.
   useEffect(() => {
     if (!station || !player.isPlayerBarOpen) {
-      if (audioRef.current) {
+      if (audioRef.current && !audioRef.current.paused) {
         audioRef.current.pause();
-        audioRef.current.src = '';
       }
+      if (audioRef.current) audioRef.current.src = '';
       player.setIsPlaying(false);
       setIsLoading(false);
       setError(null);
@@ -62,51 +77,26 @@ export function RadioPlayer({ station, className }: RadioPlayerProps) {
       audioRef.current.crossOrigin = 'anonymous';
       player.audioElementRef.current = audioRef.current;
     }
-
-    if (streamUrl && audioRef.current.src !== streamUrl) {
-        audioRef.current.src = streamUrl;
-        audioRef.current.load();
-    }
-
-    const playAudio = async () => {
-      if (audioRef.current && streamUrl) {
-        try {
-          setIsLoading(true);
-          setError(null);
-          await audioRef.current.play();
-          player.setIsPlaying(true);
-        } catch (e: any) {
-          setError(`Stream init error`);
-          player.setIsPlaying(false);
-        } finally {
-          setIsLoading(false);
-        }
-      }
-    };
-
-    // Only autoplay when context says playback should be active — and not
-    // while casting, since the remote device is the one actually playing.
-    if (player.isPlaying && !chromecast.isCasting) {
-      playAudio();
-    } else if (audioRef.current) {
-      audioRef.current.pause();
-    }
-    
     const currentAudio = audioRef.current;
+
+    if (streamUrl && currentAudio.src !== streamUrl) {
+      currentAudio.src = streamUrl;
+      currentAudio.load();
+    }
 
     const handleAudioError = (e: Event) => {
       const audioElement = e.target as HTMLAudioElement;
       const mediaError = audioElement.error;
-      
-      let uiErrorMessage = 'Stream error'; 
+
+      let uiErrorMessage = 'Stream error';
 
       if (!mediaError) {
-        setError(uiErrorMessage); 
+        setError(uiErrorMessage);
         player.setIsPlaying(false);
         setIsLoading(false);
         return;
       }
-      
+
       const MEDIA_ERR_ABORTED = (window.MediaError && window.MediaError.MEDIA_ERR_ABORTED) || 1;
       const MEDIA_ERR_NETWORK = (window.MediaError && window.MediaError.MEDIA_ERR_NETWORK) || 2;
       const MEDIA_ERR_DECODE = (window.MediaError && window.MediaError.MEDIA_ERR_DECODE) || 3;
@@ -128,69 +118,74 @@ export function RadioPlayer({ station, className }: RadioPlayerProps) {
         default:
           uiErrorMessage = 'Unknown stream error.';
       }
-      
-      setError(uiErrorMessage); 
+
+      setError(uiErrorMessage);
       player.setIsPlaying(false);
       setIsLoading(false);
     };
-    
+
     const handleCanPlay = () => setIsLoading(false);
     const handlePlaying = () => { player.setIsPlaying(true); setIsLoading(false); setError(null); };
     const handleWaiting = () => setIsLoading(true);
-    const handlePause = () => player.setIsPlaying(false);
+    // Only push a state change when one's actually needed — a pause we
+    // triggered ourselves below already has isPlaying=false by the time
+    // this fires, so this only really does something for a genuine
+    // external pause (headphones disconnecting, OS media controls, etc.).
+    const handlePause = () => {
+      if (player.isPlaying) player.setIsPlaying(false);
+    };
 
+    currentAudio.addEventListener('error', handleAudioError);
+    currentAudio.addEventListener('playing', handlePlaying);
+    currentAudio.addEventListener('waiting', handleWaiting);
+    currentAudio.addEventListener('pause', handlePause);
+    currentAudio.addEventListener('canplay', handleCanPlay);
 
-    if (currentAudio) {
-      currentAudio.addEventListener('error', handleAudioError);
-      currentAudio.addEventListener('playing', handlePlaying);
-      currentAudio.addEventListener('waiting', handleWaiting);
-      currentAudio.addEventListener('pause', handlePause);
-      currentAudio.addEventListener('canplay', handleCanPlay);
+    // Only autoplay when context says playback should be active — and not
+    // while casting, since the remote device is the one actually playing.
+    // Checking .paused first means a render that doesn't actually need to
+    // change playback state (most of them — this effect re-runs on every
+    // isPlaying change, not just the ones that started here) doesn't
+    // re-issue a redundant play()/pause() call.
+    if (player.isPlaying && !chromecast.isCasting) {
+      if (currentAudio.paused) {
+        setIsLoading(true);
+        setError(null);
+        currentAudio.play()
+          .then(() => player.setIsPlaying(true))
+          .catch(() => {
+            setError('Stream init error');
+            player.setIsPlaying(false);
+          })
+          .finally(() => setIsLoading(false));
+      }
+    } else if (!currentAudio.paused) {
+      currentAudio.pause();
     }
 
     return () => {
-      if (currentAudio) {
-        // Closing the player (station -> null) makes the parent stop
-        // rendering this component entirely rather than re-rendering it
-        // with the new props first — the early-return branch above that
-        // would normally pause playback never runs, only this cleanup
-        // does. Without an explicit pause here, the Audio object keeps
-        // playing in the background, orphaned from any component, and a
-        // newly opened station then plays on top of it as a second stream.
-        currentAudio.pause();
-        currentAudio.removeEventListener('error', handleAudioError);
-        currentAudio.removeEventListener('playing', handlePlaying);
-        currentAudio.removeEventListener('waiting', handleWaiting);
-        currentAudio.removeEventListener('pause', handlePause);
-        currentAudio.removeEventListener('canplay', handleCanPlay);
-      }
+      currentAudio.removeEventListener('error', handleAudioError);
+      currentAudio.removeEventListener('playing', handlePlaying);
+      currentAudio.removeEventListener('waiting', handleWaiting);
+      currentAudio.removeEventListener('pause', handlePause);
+      currentAudio.removeEventListener('canplay', handleCanPlay);
     };
   }, [station, streamUrl, player.isPlayerBarOpen, player.isPlaying, player.setIsPlaying, chromecast.isCasting]);
 
-
+  // Closing the player (station -> null) makes the parent stop rendering
+  // this component entirely rather than re-rendering it with the new props
+  // first — the early-return branch above that would normally pause
+  // playback never runs in that case, only a real unmount does. Split into
+  // its own effect with an empty dependency array (rather than folded into
+  // the main effect's cleanup, as it originally was) so it only fires on
+  // an actual unmount, not on every dependency change above — that
+  // unconditional per-run pause() was the other half of the feedback loop
+  // this fix addresses.
   useEffect(() => {
-    if (!audioRef.current || !station || !player.isPlayerBarOpen) return;
-
-    const syncPlayback = async () => {
-      if (!audioRef.current) return;
-
-      if (player.isPlaying && !chromecast.isCasting) {
-        try {
-          if (streamUrl && audioRef.current.src !== streamUrl) {
-            audioRef.current.src = streamUrl;
-            audioRef.current.load();
-          }
-          await audioRef.current.play();
-        } catch {
-          player.setIsPlaying(false);
-        }
-      } else {
-        audioRef.current.pause();
-      }
+    return () => {
+      audioRef.current?.pause();
     };
-
-    syncPlayback();
-  }, [player.isPlaying, player.isPlayerBarOpen, player.setIsPlaying, station, streamUrl, chromecast.isCasting]);
+  }, []);
 
 
   useEffect(() => {
