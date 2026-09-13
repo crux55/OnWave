@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import type { PBSShow } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,9 +12,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Clock, Calendar, User, ExternalLink, Bell, Play, Radio } from 'lucide-react';
+import { Clock, Calendar, User, ExternalLink, Bell, Play, Radio, Mic, MessagesSquare, Loader2 } from 'lucide-react';
 import { useReminders } from '@/contexts/RemindersContext';
 import { useToast } from '@/hooks/use-toast';
+import { joinExternalShowRoom } from '@/lib/api';
 
 interface PBSShowCardProps {
   show: PBSShow;
@@ -26,7 +28,30 @@ interface PBSShowCardProps {
 export const PBSShowCard: React.FC<PBSShowCardProps> = ({ show, onTuneIn, isFollowing, onToggleFollow, isTogglingFollow }) => {
   const { addReminder, allReminders } = useReminders();
   const { toast } = useToast();
+  const router = useRouter();
   const [isCreatingReminder, setIsCreatingReminder] = useState(false);
+  const [isJoiningRoom, setIsJoiningRoom] = useState(false);
+
+  const handleJoinRoom = async () => {
+    setIsJoiningRoom(true);
+    try {
+      const id = await joinExternalShowRoom(show.station_name ?? '', show.name, show.start_time, undefined);
+      router.push(`/shows/${id}`);
+    } catch (error: any) {
+      if (error.message === 'UNAUTHORIZED') {
+        toast({
+          title: 'Login Required',
+          description: 'Please log in to join the room',
+          action: <a href="/auth/login" className="text-primary hover:underline">Login here</a>,
+          variant: 'destructive',
+        });
+      } else {
+        toast({ title: "Couldn't open room", description: error.message, variant: 'destructive' });
+      }
+    } finally {
+      setIsJoiningRoom(false);
+    }
+  };
 
   const hasExistingReminder = allReminders.some(
     reminder =>
@@ -119,9 +144,17 @@ export const PBSShowCard: React.FC<PBSShowCardProps> = ({ show, onTuneIn, isFoll
           <CardTitle className="text-lg font-semibold line-clamp-2 flex-1">
             {show.name}
           </CardTitle>
-          <Badge className={`ml-2 text-xs ${getStatusColor(show.status)}`}>
-            {show.status}
-          </Badge>
+          <div className="ml-2 flex shrink-0 items-center gap-1.5">
+            {show.status === 'live' && (
+              <Badge variant="outline" className="gap-1 text-xs text-muted-foreground">
+                <Mic className="h-3 w-3" />
+                Audio
+              </Badge>
+            )}
+            <Badge className={`text-xs ${getStatusColor(show.status)}`}>
+              {show.status}
+            </Badge>
+          </div>
         </div>
       </CardHeader>
       
@@ -210,17 +243,32 @@ export const PBSShowCard: React.FC<PBSShowCardProps> = ({ show, onTuneIn, isFoll
           </DropdownMenu>
       </div>
 
-      {onTuneIn && (
-        <div className="absolute bottom-2 right-2">
-          <Button
-            variant="default"
-            size="sm"
-            className="h-8 gap-1.5"
-            onClick={onTuneIn}
-          >
-            <Play className="h-3.5 w-3.5" />
-            Tune In
-          </Button>
+      {(onTuneIn || show.status === 'live') && (
+        <div className="absolute bottom-2 right-2 flex items-center gap-1.5">
+          {show.status === 'live' && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 gap-1.5"
+              onClick={handleJoinRoom}
+              disabled={isJoiningRoom}
+              title="Listen along and chat with others tuned in"
+            >
+              {isJoiningRoom ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <MessagesSquare className="h-3.5 w-3.5" />}
+              Join Room
+            </Button>
+          )}
+          {onTuneIn && (
+            <Button
+              variant="default"
+              size="sm"
+              className="h-8 gap-1.5"
+              onClick={onTuneIn}
+            >
+              <Play className="h-3.5 w-3.5" />
+              Tune In
+            </Button>
+          )}
         </div>
       )}
     </Card>

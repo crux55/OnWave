@@ -3,15 +3,47 @@
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState, useCallback } from 'react';
 import { jwtDecode as jwt_decode } from 'jwt-decode';
-import { Loader2, Radio, CalendarClock, CircleOff } from 'lucide-react';
+import { Loader2, Radio, CalendarClock, CircleOff, Play, Pause } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { LiveBroadcastPlayer } from '@/components/live/LiveBroadcastPlayer';
 import { LiveChatPanel } from '@/components/live/LiveChatPanel';
 import { useLiveBroadcast } from '@/contexts/LiveBroadcastContext';
 import { useListenerRoom } from '@/hooks/use-listener-room';
+import { useResolvedStationStream } from '@/hooks/use-external-live-streams';
+import { usePlayer } from '@/contexts/PlayerContext';
 import { fetchShow } from '@/lib/api';
 import type { InternalShow, Token } from '@/lib/types';
+
+// External (PBS-scraped) show rooms (project_r#30) have no OnWave
+// broadcast to render — nobody publishes into the LiveKit room, so
+// LiveBroadcastPlayer would just sit empty. Instead: a plain play/pause
+// against the resolved external stream, same mechanism "Tune In" already
+// uses elsewhere, with the chat panel alongside it exactly like a real
+// broadcast.
+function ExternalRoomTuneIn({ show }: { show: InternalShow }) {
+  const player = usePlayer();
+  const stream = useResolvedStationStream(show.external_station_name);
+  const isThisPlaying = player.isPlaying && player.currentStation?.name === stream?.name;
+
+  return (
+    <div className="flex flex-col items-center justify-center gap-4 rounded-xl border border-border bg-card/60 p-8 text-center h-full min-h-[16rem]">
+      <Radio className="h-8 w-8 text-muted-foreground" />
+      <div>
+        <p className="font-medium text-foreground">{show.external_station_name}</p>
+        <p className="text-sm text-muted-foreground">Listening happens in your player, chat happens here.</p>
+      </div>
+      <Button
+        onClick={() => stream && player.playStation(stream)}
+        disabled={!stream}
+        className="gap-2"
+      >
+        {!stream ? <Loader2 className="h-4 w-4 animate-spin" /> : isThisPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+        {!stream ? 'Finding stream…' : isThisPlaying ? 'Playing' : 'Tune In'}
+      </Button>
+    </div>
+  );
+}
 
 // Live shows are polled rather than pushed for status/viewer_count — chat
 // itself is realtime (over the LiveKit room's data channel), but a show
@@ -102,13 +134,17 @@ export default function ShowDetailPage() {
       {show.status === 'live' && (
         <div className="flex flex-col gap-6 lg:flex-row">
           <div className="lg:flex-1 lg:min-w-0">
-            <LiveBroadcastPlayer
-              show={show}
-              isAdmin={isAdmin}
-              isOwnBroadcast={isOwnBroadcast}
-              listenerRoom={listenerRoom}
-              listenerConnectionState={listenerConnectionState}
-            />
+            {show.external_station_name ? (
+              <ExternalRoomTuneIn show={show} />
+            ) : (
+              <LiveBroadcastPlayer
+                show={show}
+                isAdmin={isAdmin}
+                isOwnBroadcast={isOwnBroadcast}
+                listenerRoom={listenerRoom}
+                listenerConnectionState={listenerConnectionState}
+              />
+            )}
           </div>
           <div className="lg:w-80 lg:shrink-0 h-[28rem] lg:h-auto">
             <LiveChatPanel show={show} room={activeRoom} isModerator={isModerator} currentUserId={currentUserId} />

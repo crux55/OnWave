@@ -1660,6 +1660,30 @@ export async function fetchShow(showId: string): Promise<InternalShow> {
   return response.json();
 }
 
+// Gets-or-creates the chat room for a currently-live external (PBS-scraped)
+// show and returns its show id — see project_r#30. Requires login (same as
+// joining any other show's chat).
+export async function joinExternalShowRoom(stationName: string, showName: string, startTime?: string, durationMinutes?: number): Promise<string> {
+  const authToken = requireAuthToken();
+  const response = await fetch('/api/shows/external-room', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${authToken}`,
+    },
+    body: JSON.stringify({ station_name: stationName, show_name: showName, start_time: startTime, duration_minutes: durationMinutes }),
+  });
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    if (response.status === 401) {
+      throw new Error('UNAUTHORIZED');
+    }
+    throw new Error(errorData.error || 'Failed to open room');
+  }
+  const result = await response.json();
+  return result.id;
+}
+
 export interface GoLiveOptions {
   agreed_to_terms: boolean;
   own_license?: boolean;

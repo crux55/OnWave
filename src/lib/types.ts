@@ -90,6 +90,11 @@ export interface InternalShow {
   terminated_by?: string | null;
   termination_reason?: string | null;
   profanity_filter_enabled: boolean;
+  // Set only for a room created via joinExternalShowRoom (project_r#30) —
+  // its presence means this show has no real OnWave broadcast (no one
+  // publishes into its LiveKit room), just chat alongside an external
+  // stream tuned in locally the normal way.
+  external_station_name?: string | null;
 }
 
 export interface PBSShow {

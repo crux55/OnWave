@@ -26,6 +26,34 @@ function resolveBestStream(stations: RadioStation[]): RadioStation | null {
   return { ...best, url: toHttps(best.url) ?? best.url, url_resolved: toHttps(best.url_resolved) ?? best.url_resolved };
 }
 
+// Resolves a single station name to a real playable stream — the
+// single-station counterpart to useExternalLiveStreams below, for a page
+// that already knows exactly which station it needs (the external-room
+// watch page), rather than a list of live shows to resolve in bulk.
+export function useResolvedStationStream(stationName: string | null | undefined): RadioStation | null {
+  const [stream, setStream] = useState<RadioStation | null>(null);
+
+  useEffect(() => {
+    if (!stationName) {
+      setStream(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const term = STATION_SEARCH_TERM_OVERRIDES[stationName] ?? stationName;
+        const result = await fetchFromApi({ term });
+        if (!cancelled) setStream(resolveBestStream(result.stations));
+      } catch {
+        if (!cancelled) setStream(null);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [stationName]);
+
+  return stream;
+}
+
 // Given a list of currently-live external (PBS-scraped) shows, resolves
 // each distinct station to a real playable stream via the catalog search —
 // the scraper only ever records a station's name, not a stream URL. Shared
