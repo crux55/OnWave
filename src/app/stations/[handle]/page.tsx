@@ -4,7 +4,7 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { jwtDecode as jwt_decode } from 'jwt-decode';
-import { Radio, Loader2, Users, Heart, Calendar, Bell, UserCircle2, Clock, Award, Plus, ShieldCheck, UserPlus, Upload as UploadIcon } from 'lucide-react';
+import { Radio, Loader2, Users, Heart, Calendar, Bell, UserCircle2, Clock, Award, Plus, ShieldCheck, UserPlus, UserMinus, Pencil, Check, X, Upload as UploadIcon } from 'lucide-react';
 import { BadgeIcon } from '@/components/BadgeIcon';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -13,7 +13,7 @@ import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { GoLiveDialog } from '@/components/live/GoLiveDialog';
-import { fetchStation, fetchMyFollows, followTarget, unfollowTarget, createBadge, awardBadge, revokeBadge, uploadBadgeIcon, inviteStationMember, type StationDetail, type Follow, type ScrapedShowSummary } from '@/lib/api';
+import { fetchStation, fetchMyFollows, followTarget, unfollowTarget, createBadge, awardBadge, revokeBadge, uploadBadgeIcon, inviteStationMember, updateStation, removeStationMember, type StationDetail, type Follow, type ScrapedShowSummary } from '@/lib/api';
 import type { Token } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 
@@ -71,6 +71,11 @@ export default function StationPage() {
   const [inviteMode, setInviteMode] = useState<'username' | 'email'>('username');
   const [inviteValue, setInviteValue] = useState('');
   const [isInviting, setIsInviting] = useState(false);
+  const [isEditingInfo, setIsEditingInfo] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editSlug, setEditSlug] = useState('');
+  const [isSavingInfo, setIsSavingInfo] = useState(false);
+  const [removingMemberId, setRemovingMemberId] = useState<string | null>(null);
 
   const loadStation = (handle: string) => {
     setIsLoading(true);
@@ -260,6 +265,63 @@ export default function StationPage() {
     }
   };
 
+  const handleStartEditInfo = () => {
+    if (!station) return;
+    setEditName(station.name);
+    setEditSlug(station.slug || '');
+    setIsEditingInfo(true);
+  };
+
+  const handleSaveStationInfo = async () => {
+    if (!station) return;
+    const name = editName.trim();
+    const slug = editSlug.trim().toLowerCase();
+    if (!name) {
+      toast({ title: 'Name cannot be empty', variant: 'destructive' });
+      return;
+    }
+
+    const update: { name?: string; slug?: string } = {};
+    if (name !== station.name) update.name = name;
+    if (slug !== (station.slug || '')) update.slug = slug;
+    if (Object.keys(update).length === 0) {
+      setIsEditingInfo(false);
+      return;
+    }
+
+    setIsSavingInfo(true);
+    try {
+      await updateStation(station.id, update);
+      toast({ title: 'Station updated' });
+      setIsEditingInfo(false);
+      // A slug change moves the page's own URL — reload and redirect to the
+      // new one rather than re-fetching by the now-stale old slug.
+      const nextHandle = update.slug || params.handle;
+      if (update.slug) {
+        router.replace(`/stations/${update.slug}?tab=overview`);
+      }
+      loadStation(nextHandle);
+    } catch (error: any) {
+      toast({ title: 'Failed to update station', description: error.message, variant: 'destructive' });
+    } finally {
+      setIsSavingInfo(false);
+    }
+  };
+
+  const handleRemoveMember = async (userId: string, name: string) => {
+    if (!station) return;
+    setRemovingMemberId(userId);
+    try {
+      await removeStationMember(station.id, userId);
+      toast({ title: 'Member removed', description: `${name || 'That member'} is no longer part of this station.` });
+      loadStation(params.handle);
+    } catch (error: any) {
+      toast({ title: 'Failed to remove member', description: error.message, variant: 'destructive' });
+    } finally {
+      setRemovingMemberId(null);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[calc(100vh-10rem)]">
@@ -328,6 +390,46 @@ export default function StationPage() {
                     </Button>
                   }
                 />
+              )}
+
+              {canManageStation && (
+                <section className="space-y-3 rounded-lg border border-border bg-muted/20 p-4">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                      <Pencil className="h-4 w-4 text-accent" /> Station Info
+                    </h4>
+                    {!isEditingInfo && (
+                      <Button size="sm" variant="outline" onClick={handleStartEditInfo}>
+                        Edit
+                      </Button>
+                    )}
+                  </div>
+                  {isEditingInfo ? (
+                    <div className="space-y-3">
+                      <div>
+                        <label className="text-xs text-muted-foreground mb-1 block">Name</label>
+                        <Input value={editName} onChange={e => setEditName(e.target.value)} className="h-9 text-sm" />
+                      </div>
+                      <div>
+                        <label className="text-xs text-muted-foreground mb-1 block">Slug (used in the station's URL)</label>
+                        <Input value={editSlug} onChange={e => setEditSlug(e.target.value)} className="h-9 text-sm" placeholder="e.g. my-station" />
+                      </div>
+                      <div className="flex gap-2">
+                        <Button size="sm" onClick={handleSaveStationInfo} disabled={isSavingInfo || !editName.trim()}>
+                          {isSavingInfo ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <Check className="mr-2 h-3.5 w-3.5" />}
+                          Save
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => setIsEditingInfo(false)} disabled={isSavingInfo}>
+                          <X className="mr-2 h-3.5 w-3.5" /> Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      {station.name}{station.slug ? ` · /stations/${station.slug}` : ''}
+                    </p>
+                  )}
+                </section>
               )}
 
               <section>
@@ -534,6 +636,21 @@ export default function StationPage() {
                           <span className="rounded-full bg-accent/20 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-accent">
                             Owner
                           </span>
+                        )}
+                        {canManageStation && member.role !== 'owner' && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveMember(member.user_id, member.name)}
+                            disabled={removingMemberId === member.user_id}
+                            title={`Remove ${member.name || 'this member'}`}
+                            className="ml-0.5 rounded-full p-0.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive disabled:opacity-50"
+                          >
+                            {removingMemberId === member.user_id ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              <UserMinus className="h-3 w-3" />
+                            )}
+                          </button>
                         )}
                       </div>
                     ))}

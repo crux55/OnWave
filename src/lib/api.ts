@@ -1462,6 +1462,60 @@ export async function inviteStationMember(stationId: string, invite: { username?
   return result.message;
 }
 
+export async function updateStation(stationId: string, update: { name?: string; slug?: string }): Promise<string> {
+  const token = localStorage.getItem("token");
+  if (!token) {
+    throw new Error('User not authenticated');
+  }
+
+  const auth = JSON.parse(token);
+  const response = await fetch(`/api/stations/${stationId}`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${auth.token}`,
+    },
+    body: JSON.stringify(update),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    if (response.status === 401) {
+      throw new Error('UNAUTHORIZED');
+    }
+    throw new Error(errorData.error || 'Failed to update station');
+  }
+
+  const result = await response.json();
+  return result.message;
+}
+
+export async function removeStationMember(stationId: string, userId: string): Promise<string> {
+  const token = localStorage.getItem("token");
+  if (!token) {
+    throw new Error('User not authenticated');
+  }
+
+  const auth = JSON.parse(token);
+  const response = await fetch(`/api/stations/${stationId}/members/${userId}`, {
+    method: 'DELETE',
+    headers: {
+      'Authorization': `Bearer ${auth.token}`,
+    },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    if (response.status === 401) {
+      throw new Error('UNAUTHORIZED');
+    }
+    throw new Error(errorData.error || 'Failed to remove member');
+  }
+
+  const result = await response.json();
+  return result.message;
+}
+
 export interface Follow {
   target_type: 'station' | 'show' | 'program';
   target_id: string;
