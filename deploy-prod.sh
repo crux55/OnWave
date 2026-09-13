@@ -22,6 +22,7 @@ echo "Building production images..."
 docker build -f Dockerfile.production \
   --build-arg NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL} \
   --build-arg NEXT_PUBLIC_WS_URL=${NEXT_PUBLIC_WS_URL} \
+  --build-arg NEXT_PUBLIC_SENTRY_DSN=${NEXT_PUBLIC_SENTRY_DSN} \
   -t onwave-frontend:latest \
   -t onwave-frontend:${FRONTEND_SHA} .
 
