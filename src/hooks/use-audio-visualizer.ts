@@ -52,6 +52,7 @@ export function useAudioVisualizer(audioElement: HTMLAudioElement | null, isPlay
   const [mode, setMode] = useState<VisualizerMode>('ambient');
   const analyserRef = useRef<AnalyserNode | null>(null);
   const dataRef = useRef<Uint8Array | null>(null);
+  const timeDomainRef = useRef<Uint8Array | null>(null);
 
   useEffect(() => {
     if (!audioElement || !isPlaying) return;
@@ -71,6 +72,7 @@ export function useAudioVisualizer(audioElement: HTMLAudioElement | null, isPlay
     analyserRef.current = analyser;
     const data = new Uint8Array(analyser.frequencyBinCount);
     dataRef.current = data;
+    timeDomainRef.current = new Uint8Array(analyser.fftSize);
     setMode('detecting');
 
     let cancelled = false;
@@ -105,5 +107,13 @@ export function useAudioVisualizer(audioElement: HTMLAudioElement | null, isPlay
     return dataRef.current;
   }, []);
 
-  return { mode, getFrequencyData };
+  // Raw oscilloscope-style samples (amplitude over time, centered at 128),
+  // for the waveform visualizer style — same analyser, different read.
+  const getTimeDomainData = useCallback((): Uint8Array | null => {
+    if (!analyserRef.current || !timeDomainRef.current) return null;
+    analyserRef.current.getByteTimeDomainData(timeDomainRef.current);
+    return timeDomainRef.current;
+  }, []);
+
+  return { mode, getFrequencyData, getTimeDomainData };
 }

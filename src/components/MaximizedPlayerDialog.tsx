@@ -13,7 +13,9 @@ import {
 } from 'lucide-react';
 import { cn, getProxiedFaviconUrl } from '@/lib/utils';
 import { AudioVisualizer } from '@/components/AudioVisualizer';
+import { VisualizerStylePicker } from '@/components/VisualizerStylePicker';
 import { useAudioVisualizer } from '@/hooks/use-audio-visualizer';
+import { useVisualizerStyle } from '@/hooks/use-visualizer-style';
 import { useChromecast } from '@/hooks/use-chromecast';
 
 interface MaximizedPlayerDialogProps {
@@ -26,7 +28,8 @@ export function MaximizedPlayerDialog({ station }: MaximizedPlayerDialogProps) {
   // isLoading and error states might need to be mirrored from RadioPlayer or context if they are specific to playback attempts.
   // For simplicity, we'll rely on context's isPlaying for now.
   const [lastVolumeBeforeMute, setLastVolumeBeforeMute] = React.useState(player.volume);
-  const { mode: visualizerMode, getFrequencyData } = useAudioVisualizer(player.audioElementRef.current, player.isPlaying);
+  const { mode: visualizerMode, getFrequencyData, getTimeDomainData } = useAudioVisualizer(player.audioElementRef.current, player.isPlaying);
+  const { style: visualizerStyle, setStyle: setVisualizerStyle } = useVisualizerStyle();
   const chromecast = useChromecast(streamUrl, station.name, station.codec);
 
   const togglePlayPause = useCallback(() => {
@@ -91,11 +94,18 @@ export function MaximizedPlayerDialog({ station }: MaximizedPlayerDialogProps) {
           <div className="absolute inset-0">
             <AudioVisualizer
               mode={visualizerMode}
+              style={visualizerStyle}
               getFrequencyData={getFrequencyData}
+              getTimeDomainData={getTimeDomainData}
               isPlaying={player.isPlaying}
             />
           </div>
           <div className="absolute inset-0 bg-gradient-to-t from-card via-card/70 to-transparent" />
+          <VisualizerStylePicker
+            value={visualizerStyle}
+            onChange={setVisualizerStyle}
+            className="absolute top-4 left-4 z-10"
+          />
           <div className="absolute bottom-0 left-0 p-6 w-full">
             <DialogHeader>
               <DialogTitle className="text-3xl sm:text-4xl font-bold text-card-foreground truncate">{station.name}</DialogTitle>
