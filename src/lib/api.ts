@@ -392,6 +392,27 @@ export async function fetchPBSShowsByDateRange(days: number = 7): Promise<PBSSho
   return shows;
 }
 
+export interface LiveNowResult {
+  internal: InternalShow[];
+  external: PBSShow[];
+}
+
+// Merges OnWave-native live shows with external (PBS-scraped) shows
+// currently live into one "everything live right now" answer — the Live
+// tab renders both, and the Shows tab's Schedule view just needs the count
+// for its "X live now" banner. Each half fails independently so one source
+// being briefly unavailable doesn't blank out the other.
+export async function fetchAllLiveNow(): Promise<LiveNowResult> {
+  const [internalShows, externalShows] = await Promise.all([
+    fetchAllShows().catch(() => [] as InternalShow[]),
+    fetchPBSShowsByDateRange(30).catch(() => [] as PBSShow[]),
+  ]);
+  return {
+    internal: internalShows.filter(s => s.status === 'live'),
+    external: externalShows.filter(s => s.status === 'live'),
+  };
+}
+
 export async function createReminder(reminderData: {
   show_name: string;
   show_date: string;
