@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 export type VisualizerMode = 'detecting' | 'reactive' | 'ambient';
 
@@ -21,8 +21,12 @@ function getOrCreateAnalyser(audio: HTMLAudioElement): AnalyserNode | null {
     const ctx = new AudioContextClass();
     const source = ctx.createMediaElementSource(audio);
     const analyser = ctx.createAnalyser();
-    analyser.fftSize = 128;
-    analyser.smoothingTimeConstant = 0.8;
+    // Higher resolution than before (128 -> 256) for finer bars; the
+    // renderer now does its own frame-to-frame smoothing, so the
+    // analyser's own smoothing is backed off to keep it responsive rather
+    // than doubly-smoothed into a sluggish blob.
+    analyser.fftSize = 256;
+    analyser.smoothingTimeConstant = 0.7;
 
     // Routing through the analyser detaches the element's default output —
     // it must be reconnected to destination or the stream goes silent.
@@ -90,11 +94,16 @@ export function useAudioVisualizer(audioElement: HTMLAudioElement | null, isPlay
     };
   }, [audioElement, isPlaying]);
 
-  const getFrequencyData = (): Uint8Array | null => {
+  // Stable identity (refs only, no reactive deps) so consumers can safely
+  // put this in a useEffect dependency array — an inline arrow here would
+  // recreate on every render and needlessly tear down/restart the
+  // visualizer's animation loop (and any smoothing state it keeps) on
+  // unrelated parent re-renders, e.g. dragging the volume slider.
+  const getFrequencyData = useCallback((): Uint8Array | null => {
     if (!analyserRef.current || !dataRef.current) return null;
     analyserRef.current.getByteFrequencyData(dataRef.current);
     return dataRef.current;
-  };
+  }, []);
 
   return { mode, getFrequencyData };
 }
