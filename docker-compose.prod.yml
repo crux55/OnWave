@@ -43,6 +43,8 @@ services:
       - LIVEKIT_INTERNAL_URL=${LIVEKIT_INTERNAL_URL}
       - LIVEKIT_API_KEY=${LIVEKIT_API_KEY}
       - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET}
+      - RESEND_API_KEY=${RESEND_API_KEY}
+      - RESEND_FROM_EMAIL=${RESEND_FROM_EMAIL}
     depends_on:
       mysql:
         condition: service_healthy
