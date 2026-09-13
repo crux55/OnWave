@@ -109,6 +109,10 @@ services:
       - FORCE_CACHE=${FORCE_CACHE}
       - CACHE_EXPIRE_HOURS=${CACHE_EXPIRE_HOURS}
       - SENTRY_DSN=${SENTRY_DSN}
+      # workers never validates a token itself, but config.Load() now
+      # refuses to start at all without a real JWT_SECRET (every RUN_MODE
+      # goes through the same startup check) -- see project_r#7.
+      - JWT_SECRET=${JWT_SECRET}
     depends_on:
       mysql:
         condition: service_healthy
