@@ -24,6 +24,7 @@ interface PlayerContextType {
   queueIndex: number;
   addToQueue: (station: RadioStation) => void;
   addManyToQueue: (stations: RadioStation[]) => void;
+  playQueue: (stations: RadioStation[]) => void;
   removeFromQueue: (index: number) => void;
   clearQueue: () => void;
   playNext: () => void;
@@ -63,6 +64,22 @@ export const PlayerProvider = ({ children }: { children: ReactNode }) => {
 
   const addManyToQueue = useCallback((stations: RadioStation[]) => {
     setQueue(prev => [...prev, ...stations]);
+  }, []);
+
+  // Unlike addManyToQueue (append-only, silent if nothing's currently
+  // playing — the queue is never surfaced anywhere in the UI, so that's
+  // indistinguishable from doing nothing), this replaces the queue and
+  // starts playback immediately at index 0, the behavior "add all to
+  // queue" actually needs when nothing is playing yet.
+  const playQueue = useCallback((stations: RadioStation[]) => {
+    if (stations.length === 0) return;
+    setQueue(stations);
+    setCurrentStation(stations[0]);
+    setIsPlayerBarOpen(true);
+    setIsPlayerMinimized(false);
+    setIsMaximizedViewOpen(false);
+    setIsPlayingState(true);
+    setQueueIndex(0);
   }, []);
 
   const removeFromQueue = useCallback((index: number) => {
@@ -170,6 +187,7 @@ export const PlayerProvider = ({ children }: { children: ReactNode }) => {
       queueIndex,
       addToQueue,
       addManyToQueue,
+      playQueue,
       removeFromQueue,
       clearQueue,
       playNext,

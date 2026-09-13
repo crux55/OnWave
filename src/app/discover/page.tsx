@@ -227,8 +227,19 @@ function DiscoverPageContent() {
   const handleAddAllToQueue = () => {
     const playable = sortedStations.filter(s => s.url_resolved || s.url).map(toPlayerStation);
     if (playable.length === 0) return;
-    player.addManyToQueue(playable);
-    toast({ title: 'Added to queue', description: `${playable.length} station${playable.length === 1 ? '' : 's'} added.` });
+
+    // Nothing playing yet means the player bar is closed — appending to
+    // the (nowhere-visible) queue would be a silent no-op from the user's
+    // perspective, so start playback immediately instead, with the rest
+    // queued up behind it. If something's already playing, keep the
+    // append-only behavior so it doesn't interrupt what's currently on.
+    if (!player.isPlayerBarOpen) {
+      player.playQueue(playable);
+      toast({ title: 'Playing queue', description: `Started ${playable[0].name} — ${playable.length} station${playable.length === 1 ? '' : 's'} queued.` });
+    } else {
+      player.addManyToQueue(playable);
+      toast({ title: 'Added to queue', description: `${playable.length} station${playable.length === 1 ? '' : 's'} added.` });
+    }
   };
 
   const handleResetFilters = () => {
