@@ -11,6 +11,13 @@ interface PlayerContextType {
   isPlaying: boolean;
   setIsPlaying: (playing: boolean) => void;
   togglePlayback: () => void;
+  // Set by RadioPlayer when the current station's stream fails to play —
+  // lifted here (rather than staying RadioPlayer-local state) so other
+  // surfaces showing their own play control for the same shared audio
+  // element, like the external-room tune-in control, can also show why
+  // playback failed instead of just silently reverting to "not playing".
+  playbackError: string | null;
+  setPlaybackError: (error: string | null) => void;
   isPlayerMinimized: boolean;
   togglePlayerSize: () => void;
   isMaximizedViewOpen: boolean;
@@ -46,6 +53,7 @@ export const PlayerProvider = ({ children }: { children: ReactNode }) => {
   const [isMuted, setIsMutedState] = useState(false);
   const [queue, setQueue] = useState<RadioStation[]>([]);
   const [queueIndex, setQueueIndex] = useState(-1);
+  const [playbackError, setPlaybackError] = useState<string | null>(null);
   const audioElementRef = useRef<HTMLAudioElement | null>(null);
 
 
@@ -56,6 +64,7 @@ export const PlayerProvider = ({ children }: { children: ReactNode }) => {
     setIsMaximizedViewOpen(false);
     setIsPlayingState(true);
     setQueueIndex(-1);
+    setPlaybackError(null);
   }, []);
 
   const addToQueue = useCallback((station: RadioStation) => {
@@ -80,6 +89,7 @@ export const PlayerProvider = ({ children }: { children: ReactNode }) => {
     setIsMaximizedViewOpen(false);
     setIsPlayingState(true);
     setQueueIndex(0);
+    setPlaybackError(null);
   }, []);
 
   const removeFromQueue = useCallback((index: number) => {
@@ -105,6 +115,7 @@ export const PlayerProvider = ({ children }: { children: ReactNode }) => {
     setIsMaximizedViewOpen(false);
     setIsPlayingState(true);
     setQueueIndex(index);
+    setPlaybackError(null);
   }, []);
 
   const playNext = useCallback(() => {
@@ -171,9 +182,11 @@ export const PlayerProvider = ({ children }: { children: ReactNode }) => {
       isPlayerBarOpen, 
       playStation, 
       closePlayerBar, 
-      isPlaying, 
-      setIsPlaying, 
+      isPlaying,
+      setIsPlaying,
       togglePlayback,
+      playbackError,
+      setPlaybackError,
       isPlayerMinimized, 
       togglePlayerSize,
       isMaximizedViewOpen,

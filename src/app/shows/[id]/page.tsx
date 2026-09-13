@@ -24,7 +24,12 @@ import type { InternalShow, Token } from '@/lib/types';
 function ExternalRoomTuneIn({ show }: { show: InternalShow }) {
   const player = usePlayer();
   const stream = useResolvedStationStream(show.external_station_name);
-  const isThisPlaying = player.isPlaying && player.currentStation?.name === stream?.name;
+  const isThisStation = player.currentStation?.name === stream?.name;
+  const isThisPlaying = player.isPlaying && isThisStation;
+  // Only show the error if it actually belongs to this stream -- the
+  // player is shared app-wide, so a stale error from tuning into
+  // something else elsewhere shouldn't show up here.
+  const thisStreamError = isThisStation && !player.isPlaying ? player.playbackError : null;
 
   return (
     <div className="flex flex-col items-center justify-center gap-4 rounded-xl border border-border bg-card/60 p-8 text-center h-full min-h-[16rem]">
@@ -41,6 +46,9 @@ function ExternalRoomTuneIn({ show }: { show: InternalShow }) {
         {!stream ? <Loader2 className="h-4 w-4 animate-spin" /> : isThisPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
         {!stream ? 'Finding stream…' : isThisPlaying ? 'Playing' : 'Tune In'}
       </Button>
+      {thisStreamError && (
+        <p className="text-xs text-destructive">Couldn't play this stream ({thisStreamError}) — try again or check back later.</p>
+      )}
     </div>
   );
 }

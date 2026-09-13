@@ -34,7 +34,15 @@ export function RadioPlayer({ station, className }: RadioPlayerProps) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const player = usePlayer();
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setErrorState] = useState<string | null>(null);
+  // Also lifted into PlayerContext (player.playbackError) so surfaces other
+  // than this bar/dialog -- e.g. the external-room tune-in control on
+  // /shows/[id] -- can show why playback failed instead of just silently
+  // reverting to "not playing". See project_r#35.
+  const setError = useCallback((message: string | null) => {
+    setErrorState(message);
+    player.setPlaybackError(message);
+  }, [player]);
   const [lastVolumeBeforeMute, setLastVolumeBeforeMute] = useState(player.volume);
   const [airPlayAvailable, setAirPlayAvailable] = useState(false);
   const streamUrl = station?.url_resolved || station?.url;
