@@ -46,12 +46,22 @@ echo "Starting production services..."
 export COMPOSE_HTTP_TIMEOUT=300
 docker-compose -f docker-compose.prod.yml --env-file .env.production up -d --force-recreate
 
-# Wait for the app to actually respond before declaring victory
+# Wait for the app to actually respond before declaring victory. Checks
+# both the frontend AND the backend (via /api/health, which pings MySQL) --
+# nginx/the frontend answer at "/" regardless of whether the backend is
+# actually working, which is exactly what let a crash-looping backend
+# deploy print "success" on 2026-08-29 (project_r#15).
 echo "Waiting for the app to come up..."
-HEALTHY=0
+FRONTEND_HEALTHY=0
+BACKEND_HEALTHY=0
 for i in $(seq 1 20); do
-  if curl -sf -o /dev/null "http://localhost/"; then
-    HEALTHY=1
+  if [ "$FRONTEND_HEALTHY" -ne 1 ] && curl -sf -o /dev/null "http://localhost/"; then
+    FRONTEND_HEALTHY=1
+  fi
+  if [ "$BACKEND_HEALTHY" -ne 1 ] && curl -sf -o /dev/null "http://localhost/api/health"; then
+    BACKEND_HEALTHY=1
+  fi
+  if [ "$FRONTEND_HEALTHY" -eq 1 ] && [ "$BACKEND_HEALTHY" -eq 1 ]; then
     break
   fi
   sleep 3
@@ -60,8 +70,8 @@ done
 echo "Service Status:"
 docker-compose -f docker-compose.prod.yml --env-file .env.production ps
 
-if [ "$HEALTHY" -ne 1 ]; then
-  echo "ERROR: Deployment FAILED: app did not respond at http://localhost/ after 60s"
+if [ "$FRONTEND_HEALTHY" -ne 1 ] || [ "$BACKEND_HEALTHY" -ne 1 ]; then
+  echo "ERROR: Deployment FAILED after 60s (frontend healthy: $FRONTEND_HEALTHY, backend healthy: $BACKEND_HEALTHY)"
   echo "Recent logs:"
   docker-compose -f docker-compose.prod.yml --env-file .env.production logs --tail=100
   exit 1
