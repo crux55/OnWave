@@ -211,7 +211,11 @@ function LoginPageContent() {
         title: 'Registration Successful!',
         description: `Welcome, ${data.username}! You're now signed in.`,
       });
-      router.push('/profile');
+      // New accounts land on /about, not /profile — a brand-new user has
+      // nothing to see on their own profile yet, and this is the one moment
+      // guaranteed to reach every new member with a warm "here's what
+      // OnWave is" welcome before they go do anything else.
+      router.push('/about');
     } catch (error: any) {
       let errorMessage = 'Registration failed. Please try again.';
       if (error.code === 'auth/email-already-in-use') {
@@ -238,6 +242,9 @@ function LoginPageContent() {
       <div className="absolute top-6 left-6">
         <AppLogo />
       </div>
+      <Link href="/about" className="absolute top-6 right-6 text-sm text-muted-foreground underline-offset-4 hover:text-accent hover:underline">
+        What is OnWave?
+      </Link>
       <Card className="w-full max-w-md shadow-xl">
         <CardHeader className="text-center">
           <LogIn className="mx-auto h-10 w-10 text-accent mb-3" />
