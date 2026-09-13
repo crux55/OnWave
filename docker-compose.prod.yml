@@ -46,6 +46,7 @@ services:
       - RESEND_API_KEY=${RESEND_API_KEY}
       - RESEND_FROM_EMAIL=${RESEND_FROM_EMAIL}
       - SENTRY_DSN=${SENTRY_DSN}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
     depends_on:
       mysql:
         condition: service_healthy
