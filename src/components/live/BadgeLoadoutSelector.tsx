@@ -6,6 +6,7 @@ import { Loader2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { fetchBadgeLoadout, setBadgeLoadout, type MyBadge } from '@/lib/api';
+import { BadgeIcon } from '@/components/BadgeIcon';
 
 const MAX_LOADOUT = 5;
 
@@ -78,7 +79,7 @@ export function BadgeLoadoutSelector({ myBadges }: BadgeLoadoutSelectorProps) {
                 className="flex items-center gap-1 rounded-full border border-accent/40 bg-accent/10 px-2.5 py-1 text-xs"
               >
                 <span className="text-muted-foreground">{i + 1}.</span>
-                <span>{badge.icon}</span>
+                <BadgeIcon badge={badge} size={16} />
                 <span className="font-medium">{badge.name}</span>
                 <X className="h-3 w-3 text-muted-foreground" />
               </button>
@@ -94,7 +95,7 @@ export function BadgeLoadoutSelector({ myBadges }: BadgeLoadoutSelectorProps) {
             onClick={() => toggleBadge(badge.id)}
             className="flex items-center gap-1.5 rounded-full border border-border bg-muted/30 px-3 py-1.5 text-sm"
           >
-            <span>{badge.icon}</span>
+            <BadgeIcon badge={badge} size={16} />
             <span className="text-foreground">{badge.name}</span>
           </button>
         ))}

@@ -648,6 +648,10 @@ export interface Badge {
   id: string;
   name: string;
   icon: string;
+  // An uploaded image, when set, takes display priority over icon — see
+  // BadgeIcon.tsx. icon (text/emoji) stays as the fallback wherever this
+  // is absent.
+  icon_url?: string | null;
   description: string;
   issuer_id?: string | null;
   issuer_type?: 'dj' | 'station' | null;
@@ -818,6 +822,34 @@ export async function createBadge(badge: {
   }
 }
 
+export async function uploadBadgeIcon(badgeId: string, file: File): Promise<string> {
+  const token = localStorage.getItem("token");
+  if (!token) {
+    throw new Error('User not authenticated');
+  }
+
+  const auth = JSON.parse(token);
+  const formData = new FormData();
+  formData.append('icon', file);
+
+  const response = await fetch(`/api/badges/${badgeId}/icon`, {
+    method: 'PUT',
+    headers: { 'Authorization': `Bearer ${auth.token}` },
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    if (response.status === 401) {
+      throw new Error('UNAUTHORIZED');
+    }
+    throw new Error(errorData.error || 'Failed to upload badge icon');
+  }
+
+  const result = await response.json();
+  return result.icon_url;
+}
+
 export async function awardBadge(email: string, badgeId: string): Promise<void> {
   const token = localStorage.getItem("token");
   if (!token) {
@@ -912,6 +944,7 @@ export interface ChatBadge {
   id: string;
   name: string;
   icon: string;
+  icon_url?: string | null;
 }
 
 export interface ChatMessage {

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { UserCircle2, Loader2, Award, FileText, Radio } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { BadgeIcon } from '@/components/BadgeIcon';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -98,7 +99,7 @@ export default function PublicProfilePage() {
                       title={badge.issuer_name ? `${badge.description} — awarded by ${badge.issuer_name}` : badge.description}
                       className="flex items-center gap-1.5 rounded-full border border-border bg-muted/30 px-3 py-1.5 text-sm"
                     >
-                      <span>{badge.icon}</span>
+                      <BadgeIcon badge={badge} size={18} />
                       <span className="font-medium text-foreground">{badge.name}</span>
                     </div>
                   ))}

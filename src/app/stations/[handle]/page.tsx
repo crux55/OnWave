@@ -4,7 +4,8 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { jwtDecode as jwt_decode } from 'jwt-decode';
-import { Radio, Loader2, Users, Heart, Calendar, Bell, UserCircle2, Clock, Award, Plus, ShieldCheck, UserPlus } from 'lucide-react';
+import { Radio, Loader2, Users, Heart, Calendar, Bell, UserCircle2, Clock, Award, Plus, ShieldCheck, UserPlus, Upload as UploadIcon } from 'lucide-react';
+import { BadgeIcon } from '@/components/BadgeIcon';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,7 +13,7 @@ import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { GoLiveDialog } from '@/components/live/GoLiveDialog';
-import { fetchStation, fetchMyFollows, followTarget, unfollowTarget, createBadge, awardBadge, revokeBadge, inviteStationMember, type StationDetail, type Follow, type ScrapedShowSummary } from '@/lib/api';
+import { fetchStation, fetchMyFollows, followTarget, unfollowTarget, createBadge, awardBadge, revokeBadge, uploadBadgeIcon, inviteStationMember, type StationDetail, type Follow, type ScrapedShowSummary } from '@/lib/api';
 import type { Token } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 
@@ -65,6 +66,7 @@ export default function StationPage() {
   const [isCreatingBadge, setIsCreatingBadge] = useState(false);
   const [awardEmail, setAwardEmail] = useState<Record<string, string>>({});
   const [isAwarding, setIsAwarding] = useState<string | null>(null);
+  const [uploadingIconId, setUploadingIconId] = useState<string | null>(null);
   const [isRevoking, setIsRevoking] = useState<string | null>(null);
   const [inviteMode, setInviteMode] = useState<'username' | 'email'>('username');
   const [inviteValue, setInviteValue] = useState('');
@@ -219,6 +221,22 @@ export default function StationPage() {
       toast({ title: 'Failed to revoke badge', description: error.message, variant: 'destructive' });
     } finally {
       setIsRevoking(null);
+    }
+  };
+
+  const handleUploadBadgeIcon = async (badgeId: string, file: File) => {
+    setUploadingIconId(badgeId);
+    try {
+      const iconUrl = await uploadBadgeIcon(badgeId, file);
+      setStation(prev => prev ? {
+        ...prev,
+        badges: prev.badges.map(b => (b.id === badgeId ? { ...b, icon_url: iconUrl } : b)),
+      } : prev);
+      toast({ title: 'Badge image updated' });
+    } catch (error: any) {
+      toast({ title: 'Failed to upload image', description: error.message, variant: 'destructive' });
+    } finally {
+      setUploadingIconId(null);
     }
   };
 
@@ -403,7 +421,7 @@ export default function StationPage() {
                         title={badge.description}
                         className="flex items-center gap-1.5 rounded-full border border-border bg-muted/30 px-3 py-1.5 text-sm"
                       >
-                        <span>{badge.icon}</span>
+                        <BadgeIcon badge={badge} size={18} />
                         <span className="font-medium text-foreground">{badge.name}</span>
                       </div>
                     ))}
@@ -444,7 +462,28 @@ export default function StationPage() {
                         <div className="space-y-2">
                           {station.badges.map(badge => (
                             <div key={badge.id} className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-card/40 p-2">
-                              <span className="text-lg">{badge.icon}</span>
+                              <BadgeIcon badge={badge} size={24} />
+                              <label
+                                className="cursor-pointer text-muted-foreground/70 hover:text-foreground"
+                                title="Upload a badge image"
+                              >
+                                {uploadingIconId === badge.id ? (
+                                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                ) : (
+                                  <UploadIcon className="h-3.5 w-3.5" />
+                                )}
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  className="hidden"
+                                  disabled={uploadingIconId === badge.id}
+                                  onChange={e => {
+                                    const file = e.target.files?.[0];
+                                    if (file) handleUploadBadgeIcon(badge.id, file);
+                                    e.target.value = '';
+                                  }}
+                                />
+                              </label>
                               <span className="flex-shrink-0 text-sm font-medium">{badge.name}</span>
                               <Input
                                 placeholder="user@email.com"

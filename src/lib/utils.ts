@@ -29,3 +29,14 @@ export function getProxiedFaviconUrl(urlString: string | null | undefined): stri
   if (!isValidImageUrl(urlString)) return null;
   return `/api/favicon-cache?url=${encodeURIComponent(urlString!)}`;
 }
+
+// The backend returns locally-hosted-upload paths (avatars, badge icons) as
+// a bare relative path like "/uploads/badge-icons/x.jpg" — that route only
+// exists on the Go backend, not the Next.js server, so it needs the API
+// base URL prefixed before it's usable as an <img src>, same convention
+// already used for profile avatars.
+export function getUploadedFileUrl(path: string | null | undefined): string | undefined {
+  if (!path) return undefined;
+  const apiHost = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080';
+  return `${apiHost}${path}`;
+}

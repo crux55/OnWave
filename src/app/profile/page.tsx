@@ -3,7 +3,8 @@
 
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { UserCircle2, Radio, Podcast, Users, FileText, Edit3, LogOut, Loader2, Bell, X, Heart, ChevronRight, Award, ShieldCheck, Plus, Calendar, Mic2 } from 'lucide-react';
+import { UserCircle2, Radio, Podcast, Users, FileText, Edit3, LogOut, Loader2, Bell, X, Heart, ChevronRight, Award, ShieldCheck, Plus, Calendar, Mic2, Upload } from 'lucide-react';
+import { BadgeIcon } from '@/components/BadgeIcon';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -12,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { useEffect, useState } from "react";
-import { fetchCurrentUserProfile, fetchLikedStations, fetchMyBadges, fetchManagedBadges, fetchMyStations, fetchMyFollows, createBadge, awardBadge, revokeBadge, markBadgesSeen, createShow, createDJRequest, type Badge, type MyBadge, type Station, type Follow } from "@/lib/api";
+import { fetchCurrentUserProfile, fetchLikedStations, fetchMyBadges, fetchManagedBadges, fetchMyStations, fetchMyFollows, createBadge, awardBadge, revokeBadge, uploadBadgeIcon, markBadgesSeen, createShow, createDJRequest, type Badge, type MyBadge, type Station, type Follow } from "@/lib/api";
 import { CreateStationRequestForm } from "@/components/CreateStationRequestForm";
 import { JWT, Profile, Token, User } from '@/lib/types';
 import { jwtDecode as jwt_decode } from "jwt-decode";
@@ -63,6 +64,7 @@ export default function ProfilePage() {
   const [likedCount, setLikedCount] = useState<number | null>(null);
   const [myBadges, setMyBadges] = useState<MyBadge[]>([]);
   const [manageableBadges, setManageableBadges] = useState<Badge[]>([]);
+  const [uploadingIconId, setUploadingIconId] = useState<string | null>(null);
   const [myStations, setMyStations] = useState<Station[]>([]);
   const [myFollows, setMyFollows] = useState<Follow[]>([]);
   const [createAsStationId, setCreateAsStationId] = useState<string>('');
@@ -262,8 +264,18 @@ export default function ProfilePage() {
     }
   };
 
-
-
+  const handleUploadBadgeIcon = async (badgeId: string, file: File) => {
+    setUploadingIconId(badgeId);
+    try {
+      const iconUrl = await uploadBadgeIcon(badgeId, file);
+      setManageableBadges(prev => prev.map(b => (b.id === badgeId ? { ...b, icon_url: iconUrl } : b)));
+      toast({ title: 'Badge image updated' });
+    } catch (error: any) {
+      toast({ title: 'Failed to upload image', description: error.message, variant: 'destructive' });
+    } finally {
+      setUploadingIconId(null);
+    }
+  };
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
@@ -392,7 +404,7 @@ export default function ProfilePage() {
                         title={badge.issuer_name ? `${badge.description} — awarded by ${badge.issuer_name}` : badge.description}
                         className="flex items-center gap-1.5 rounded-full border border-border bg-muted/30 px-3 py-1.5 text-sm"
                       >
-                        <span>{badge.icon}</span>
+                        <BadgeIcon badge={badge} size={18} />
                         <span className="font-medium text-foreground">{badge.name}</span>
                         {badge.is_new && (
                           <span className="rounded-full bg-accent px-1.5 py-0.5 text-[10px] font-semibold uppercase text-accent-foreground">
@@ -678,14 +690,35 @@ export default function ProfilePage() {
                     ) : (
                       <div className="space-y-2">
                         {manageableBadges.map(badge => (
-                          <div key={badge.id} className="flex items-center gap-2 rounded-md border border-border bg-card/40 p-2">
-                            <span className="text-lg">{badge.icon}</span>
+                          <div key={badge.id} className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-card/40 p-2">
+                            <BadgeIcon badge={badge} size={24} />
+                            <label
+                              className="cursor-pointer text-muted-foreground/70 hover:text-foreground"
+                              title="Upload a badge image"
+                            >
+                              {uploadingIconId === badge.id ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <Upload className="h-3.5 w-3.5" />
+                              )}
+                              <input
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                disabled={uploadingIconId === badge.id}
+                                onChange={e => {
+                                  const file = e.target.files?.[0];
+                                  if (file) handleUploadBadgeIcon(badge.id, file);
+                                  e.target.value = '';
+                                }}
+                              />
+                            </label>
                             <span className="flex-shrink-0 text-sm font-medium">{badge.name}</span>
                             <Input
                               placeholder="user@email.com"
                               value={awardEmail[badge.id] || ''}
                               onChange={e => setAwardEmail(prev => ({ ...prev, [badge.id]: e.target.value }))}
-                              className="h-8 text-sm"
+                              className="h-8 text-sm min-w-0 flex-1"
                             />
                             <Button
                               size="sm"

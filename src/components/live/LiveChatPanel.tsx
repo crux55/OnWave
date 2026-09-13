@@ -5,6 +5,7 @@ import { Room, RoomEvent } from 'livekit-client';
 import { Send, MoreVertical, Trash2, VolumeX, Settings, Loader2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
+import { BadgeIcon } from '@/components/BadgeIcon';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Switch } from '@/components/ui/switch';
@@ -160,7 +161,7 @@ export function LiveChatPanel({ show, room, isModerator, currentUserId }: LiveCh
               <p className="min-w-0 break-words">
                 <span className="font-medium text-foreground">{message.username}</span>
                 {message.badges?.map(badge => (
-                  <span key={badge.id} title={badge.name} className="mx-1 inline-block">{badge.icon}</span>
+                  <BadgeIcon key={badge.id} badge={badge} title={badge.name} size={14} className="mx-1 inline-block" />
                 ))}
                 <span className="text-muted-foreground">: </span>
                 <span className="text-foreground/90">{message.body}</span>
