@@ -4,7 +4,7 @@ import type { InternalShow } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Clock, Calendar, User, Radio, Bell, Loader2 } from 'lucide-react';
+import { Clock, Calendar, User, Radio, Bell, Loader2, Mic, Video } from 'lucide-react';
 import { nextOccurrence, showStatus } from '@/lib/show-schedule';
 
 interface InternalShowCardProps {
@@ -44,9 +44,17 @@ export const InternalShowCard: React.FC<InternalShowCardProps> = ({ show, isFoll
             <CardTitle className="text-lg font-semibold line-clamp-2 flex-1">
               {show.name}
             </CardTitle>
-            <Badge className={`ml-2 text-xs ${getStatusColor(status)}`}>
-              {status}
-            </Badge>
+            <div className="ml-2 flex shrink-0 items-center gap-1.5">
+              {status === 'live' && (
+                <Badge variant="outline" className="gap-1 text-xs text-muted-foreground">
+                  {show.is_video ? <Video className="h-3 w-3" /> : <Mic className="h-3 w-3" />}
+                  {show.is_video ? 'Video' : 'Audio'}
+                </Badge>
+              )}
+              <Badge className={`text-xs ${getStatusColor(status)}`}>
+                {status}
+              </Badge>
+            </div>
           </div>
         </CardHeader>
 
