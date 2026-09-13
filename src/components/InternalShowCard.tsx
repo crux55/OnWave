@@ -4,7 +4,7 @@ import type { InternalShow } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Clock, Calendar, User, Radio, Bell, Loader2, Mic, Video } from 'lucide-react';
+import { Clock, Calendar, User, Radio, Bell, Loader2, Mic, Video, MessageCircleOff } from 'lucide-react';
 import { nextOccurrence, showStatus } from '@/lib/show-schedule';
 
 interface InternalShowCardProps {
@@ -49,6 +49,12 @@ export const InternalShowCard: React.FC<InternalShowCardProps> = ({ show, isFoll
                 <Badge variant="outline" className="gap-1 text-xs text-muted-foreground">
                   {show.is_video ? <Video className="h-3 w-3" /> : <Mic className="h-3 w-3" />}
                   {show.is_video ? 'Video' : 'Audio'}
+                </Badge>
+              )}
+              {status === 'live' && show.no_interaction && (
+                <Badge variant="outline" className="gap-1 text-xs text-muted-foreground" title="This show doesn't have chat">
+                  <MessageCircleOff className="h-3 w-3" />
+                  No chat
                 </Badge>
               )}
               <Badge className={`text-xs ${getStatusColor(status)}`}>

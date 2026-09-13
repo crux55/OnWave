@@ -154,9 +154,17 @@ export default function ShowDetailPage() {
               />
             )}
           </div>
-          <div className="lg:w-80 lg:shrink-0 h-[28rem] lg:h-auto">
-            <LiveChatPanel show={show} room={activeRoom} isModerator={isModerator} currentUserId={currentUserId} />
-          </div>
+          {/* no_interaction is set at go-live time for a broadcast that
+              shouldn't carry chat (e.g. a partner stream whose own
+              audience has no way to see or take part in it) -- external
+              rooms (#30) are a different feature and always chat-enabled,
+              so this only ever suppresses the panel for a real OnWave
+              broadcast. See project_r#32. */}
+          {!show.no_interaction && (
+            <div className="lg:w-80 lg:shrink-0 h-[28rem] lg:h-auto">
+              <LiveChatPanel show={show} room={activeRoom} isModerator={isModerator} currentUserId={currentUserId} />
+            </div>
+          )}
         </div>
       )}
 

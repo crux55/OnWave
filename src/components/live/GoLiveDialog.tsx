@@ -54,6 +54,7 @@ export function GoLiveDialog({ trigger, stationId, scheduledShows = [] }: GoLive
   const [description, setDescription] = useState('');
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [ownLicense, setOwnLicense] = useState(false);
+  const [noInteraction, setNoInteraction] = useState(false);
   const [micGain, setMicGain] = useState(100);
   const [desktopGain, setDesktopGain] = useState(100);
   const [micStream, setMicStream] = useState<MediaStream | null>(null);
@@ -69,6 +70,7 @@ export function GoLiveDialog({ trigger, stationId, scheduledShows = [] }: GoLive
     setDescription('');
     setAgreedToTerms(false);
     setOwnLicense(false);
+    setNoInteraction(false);
     setMicGain(100);
     setDesktopGain(100);
     setMicStream(null);
@@ -125,13 +127,14 @@ export function GoLiveDialog({ trigger, stationId, scheduledShows = [] }: GoLive
     setIsStarting(true);
     try {
       const result = attachMode === 'existing'
-        ? await goLive(selectedShowId, { agreed_to_terms: agreedToTerms, own_license: ownLicense })
+        ? await goLive(selectedShowId, { agreed_to_terms: agreedToTerms, own_license: ownLicense, no_interaction: noInteraction })
         : await goLiveAdhoc({
             name: name.trim(),
             description: description.trim() || undefined,
             station_id: stationId,
             agreed_to_terms: agreedToTerms,
             own_license: ownLicense,
+            no_interaction: noInteraction,
           });
 
       await startBroadcasting({
@@ -227,6 +230,12 @@ export function GoLiveDialog({ trigger, stationId, scheduledShows = [] }: GoLive
                 <Checkbox id="own-license" checked={ownLicense} onCheckedChange={v => setOwnLicense(v === true)} />
                 <Label htmlFor="own-license" className="font-normal leading-snug">
                   This broadcast is covered under our own separate license (optional).
+                </Label>
+              </div>
+              <div className="flex items-start space-x-2">
+                <Checkbox id="no-interaction" checked={noInteraction} onCheckedChange={v => setNoInteraction(v === true)} />
+                <Label htmlFor="no-interaction" className="font-normal leading-snug">
+                  This show won't have chat (e.g. a partner stream whose own listeners can't see it) — hides the chat panel for viewers.
                 </Label>
               </div>
             </div>

@@ -1687,6 +1687,10 @@ export async function joinExternalShowRoom(stationName: string, showName: string
 export interface GoLiveOptions {
   agreed_to_terms: boolean;
   own_license?: boolean;
+  // Marks this broadcast as not carrying chat -- for a partner stream
+  // whose own audience has no way to see or take part in it. See
+  // project_r#32.
+  no_interaction?: boolean;
 }
 
 export interface GoLiveResult {

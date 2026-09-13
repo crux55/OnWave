@@ -95,6 +95,10 @@ export interface InternalShow {
   // publishes into its LiveKit room), just chat alongside an external
   // stream tuned in locally the normal way.
   external_station_name?: string | null;
+  // Set at go-live time for a broadcast that shouldn't show a chat panel —
+  // e.g. a partner stream whose own audience can't see or take part in it.
+  // See project_r#32.
+  no_interaction: boolean;
 }
 
 export interface PBSShow {
