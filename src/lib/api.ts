@@ -528,6 +528,7 @@ export interface LikedStation {
   country: string;
   codec: string;
   bitrate: number;
+  is_custom: boolean;
   created_at: string;
 }
 
@@ -566,6 +567,7 @@ export function likedStationToRadioStation(liked: LikedStation): RadioStation {
     changeuuid: '',
     iso_3166_2: '',
     hls: 0,
+    is_custom: liked.is_custom,
   };
 }
 
@@ -622,6 +624,7 @@ export async function likeStation(station: RadioStation): Promise<void> {
       country: station.country,
       codec: station.codec,
       bitrate: station.bitrate,
+      is_custom: station.is_custom || false,
     }),
   });
 
@@ -634,6 +637,37 @@ export async function likeStation(station: RadioStation): Promise<void> {
 
     throw new Error(errorData.message || 'Failed to like station');
   }
+}
+
+// Validates a candidate "bring your own" stream URL (OnWave#32) before it's
+// saved — backed by project_r's internal/resolver, the same URL-resolution
+// logic already used for search/pinned stations, now wired to an
+// authenticated, rate-limited endpoint.
+export async function resolveStationUrl(url: string): Promise<{ suggested_uuid: string; url_resolved: string; name: string; tags: string }> {
+  const token = localStorage.getItem("token");
+  if (!token) {
+    throw new Error('User not authenticated');
+  }
+
+  const auth = JSON.parse(token);
+  const response = await fetch('/api/liked-stations/resolve', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${auth.token}`,
+    },
+    body: JSON.stringify({ url }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    if (response.status === 401) {
+      throw new Error('UNAUTHORIZED');
+    }
+    throw new Error(errorData.error || "Couldn't verify that URL");
+  }
+
+  return response.json();
 }
 
 export async function unlikeStation(stationUuid: string): Promise<void> {

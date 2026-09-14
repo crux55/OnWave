@@ -1,6 +1,6 @@
 import type { RadioStation } from '@/lib/types';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Play, Heart } from 'lucide-react';
+import { Play, Heart, Send } from 'lucide-react';
 import { SafeImage } from '@/components/SafeImage';
 import { StationAvatar } from '@/components/StationAvatar';
 import { cn, getProxiedFaviconUrl } from '@/lib/utils';
@@ -10,12 +10,16 @@ interface RadioStationCardProps {
   onPlay: (station: RadioStation) => void;
   isLiked?: boolean;
   onToggleLike?: (station: RadioStation) => void;
+  /** Shown (grid variant only) for a custom/BYO station — "suggest this for
+   *  the site's curated list" (OnWave#31/#32). Omitted for an ordinary
+   *  station, which already came from the shared catalog. */
+  onSuggest?: (station: RadioStation) => void;
   /** 'grid' (default): wide card, art beside title — used in the /liked grid.
    *  'row': compact, art stacked above title — used in home page scroll rows. */
   variant?: 'grid' | 'row';
 }
 
-export function RadioStationCard({ station, onPlay, isLiked, onToggleLike, variant = 'grid' }: RadioStationCardProps) {
+export function RadioStationCard({ station, onPlay, isLiked, onToggleLike, onSuggest, variant = 'grid' }: RadioStationCardProps) {
   const likeButton = onToggleLike && (
     <button
       onClick={() => onToggleLike(station)}
@@ -73,7 +77,14 @@ export function RadioStationCard({ station, onPlay, isLiked, onToggleLike, varia
           />
         </div>
         <div className="min-w-0 flex-1">
-          <CardTitle className="truncate text-[15px] leading-tight" title={station.name}>{station.name}</CardTitle>
+          <div className="flex items-center gap-1.5">
+            <CardTitle className="truncate text-[15px] leading-tight" title={station.name}>{station.name}</CardTitle>
+            {station.is_custom && (
+              <span className="shrink-0 rounded-full bg-accent/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-accent">
+                Custom
+              </span>
+            )}
+          </div>
           <CardDescription className="mt-1 line-clamp-2 text-xs" title={`${station.tags} • ${station.country}`}>
             {station.tags} &bull; {station.country}
           </CardDescription>
@@ -85,13 +96,25 @@ export function RadioStationCard({ station, onPlay, isLiked, onToggleLike, varia
         <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground/70">
           {station.bitrate ? `${station.bitrate}K` : ''}
         </span>
-        <button
-          onClick={() => onPlay(station)}
-          aria-label={`Play ${station.name}`}
-          className="flex h-9 w-9 items-center justify-center rounded-full bg-accent text-accent-foreground transition-transform hover:scale-105"
-        >
-          <Play className="h-3.5 w-3.5 fill-current" />
-        </button>
+        <div className="flex items-center gap-2">
+          {station.is_custom && onSuggest && (
+            <button
+              onClick={() => onSuggest(station)}
+              aria-label={`Suggest ${station.name} for curation`}
+              title="Suggest this station to be added to OnWave"
+              className="flex h-9 w-9 items-center justify-center rounded-full border border-border text-muted-foreground transition-colors hover:border-accent hover:text-accent"
+            >
+              <Send className="h-3.5 w-3.5" />
+            </button>
+          )}
+          <button
+            onClick={() => onPlay(station)}
+            aria-label={`Play ${station.name}`}
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-accent text-accent-foreground transition-transform hover:scale-105"
+          >
+            <Play className="h-3.5 w-3.5 fill-current" />
+          </button>
+        </div>
       </CardFooter>
     </Card>
   );

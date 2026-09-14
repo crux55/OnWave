@@ -34,6 +34,9 @@ export interface RadioStation {
   changeuuid: string;
   iso_3166_2: string;
   hls: number;
+  // Set on a "bring your own" station a user added by URL rather than one
+  // saved from search — see OnWave#32. Absent/false for an ordinary station.
+  is_custom?: boolean;
 };
 
 export interface TopStationsResponse {
