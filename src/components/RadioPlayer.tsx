@@ -13,6 +13,7 @@ import { usePlayer } from '@/contexts/PlayerContext';
 import { cn, getProxiedFaviconUrl } from '@/lib/utils';
 import { useChromecast } from '@/hooks/use-chromecast';
 import { useLikedStations } from '@/hooks/use-liked-stations';
+import { useNowPlaying } from '@/hooks/use-now-playing';
 import { SafeImage } from '@/components/SafeImage';
 import { StationAvatar } from '@/components/StationAvatar';
 
@@ -234,6 +235,7 @@ export function RadioPlayer({ station, className }: RadioPlayerProps) {
   // While casting, the play/pause button reflects and controls the remote
   // session's state, not the (paused) local audio element.
   const isPlayingDisplay = chromecast.isCasting ? !chromecast.isRemotePaused : player.isPlaying;
+  const nowPlaying = useNowPlaying(streamUrl, isPlayingDisplay);
 
   const handleVolumeChange = useCallback((newVolume: number[]) => {
     const vol = newVolume[0];
@@ -359,6 +361,7 @@ export function RadioPlayer({ station, className }: RadioPlayerProps) {
                             <p className="text-xs text-muted-foreground truncate hidden md:block">
                               {(station.tags?.split(',')[0]?.trim() || 'Unknown')} - {station.country || 'Unknown'}
                             </p>                        </div>
+                        {nowPlaying && <p className="text-xs text-foreground/80 truncate">{nowPlaying}</p>}
                         {error && <p className="text-xs text-destructive truncate mt-0.5">{error}</p>}
                     </div>
                 </div>

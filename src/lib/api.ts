@@ -111,6 +111,22 @@ export async function fetchTopTags(): Promise<TopTag[]> {
   return response.json();
 }
 
+export interface NowPlaying {
+  title: string;
+  healthy: boolean;
+}
+
+// Pulls the currently-playing track from a stream's ICY metadata, when it
+// has any -- not every station supports this. healthy: false just means
+// "nothing to show," not an error (project_r#23).
+export async function fetchNowPlaying(streamUrl: string): Promise<NowPlaying> {
+  const response = await fetch(`/api/webradio/now-playing?url=${encodeURIComponent(streamUrl)}`);
+  if (!response.ok) {
+    return { title: '', healthy: false };
+  }
+  return response.json();
+}
+
 export async function fetchCurrentUserProfile() {
   if (typeof window === "undefined") return null;
 

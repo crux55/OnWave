@@ -18,6 +18,7 @@ import { useAudioVisualizer } from '@/hooks/use-audio-visualizer';
 import { useVisualizerStyle } from '@/hooks/use-visualizer-style';
 import { useChromecast } from '@/hooks/use-chromecast';
 import { CreateRoomDialog } from '@/components/CreateRoomDialog';
+import { useNowPlaying } from '@/hooks/use-now-playing';
 
 interface MaximizedPlayerDialogProps {
   station: RadioStation;
@@ -45,6 +46,7 @@ export function MaximizedPlayerDialog({ station }: MaximizedPlayerDialogProps) {
   // While casting, this reflects and controls the remote session's state,
   // not the (paused) local audio element.
   const isPlayingDisplay = chromecast.isCasting ? !chromecast.isRemotePaused : player.isPlaying;
+  const nowPlaying = useNowPlaying(streamUrl, isPlayingDisplay);
 
   const handleVolumeChange = useCallback((newVolume: number[]) => {
     const vol = newVolume[0];
@@ -110,6 +112,9 @@ export function MaximizedPlayerDialog({ station }: MaximizedPlayerDialogProps) {
           <div className="absolute bottom-0 left-0 p-6 w-full">
             <DialogHeader>
               <DialogTitle className="text-3xl sm:text-4xl font-bold text-card-foreground truncate">{station.name}</DialogTitle>
+              {nowPlaying && (
+                <p className="text-base font-medium text-card-foreground/90 truncate">{nowPlaying}</p>
+              )}
               <p className="text-sm text-muted-foreground">{station.tags} &bull; {station.country}</p>
             </DialogHeader>
           </div>
