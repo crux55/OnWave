@@ -76,6 +76,7 @@ export default function ProfilePage() {
   const [isAwarding, setIsAwarding] = useState<string | null>(null);
   const [isRevoking, setIsRevoking] = useState<string | null>(null);
   const [newShowName, setNewShowName] = useState('');
+  const [newShowTags, setNewShowTags] = useState('');
   const [newShowDay, setNewShowDay] = useState('2'); // Tuesday-ish default; '-1' means one-off
   const [newShowOneOffDate, setNewShowOneOffDate] = useState('');
   const [newShowTime, setNewShowTime] = useState('21:00');
@@ -209,10 +210,12 @@ export default function ProfilePage() {
         one_off_date: newShowDay === '-1' ? newShowOneOffDate : undefined,
         start_time: `${newShowTime}:00`,
         duration_minutes: parseInt(newShowDuration, 10) || 60,
+        tags: newShowTags.trim() || undefined,
       });
       toast({ title: 'Show created', description: newShowName });
       setNewShowName('');
       setNewShowOneOffDate('');
+      setNewShowTags('');
     } catch (error: any) {
       toast({ title: 'Failed to create show', description: error.message, variant: 'destructive' });
     } finally {
@@ -774,6 +777,7 @@ export default function ProfilePage() {
                       : 'Creating under your own DJ name.'}
                   </p>
                   <Input placeholder="Show name" value={newShowName} onChange={e => setNewShowName(e.target.value)} />
+                  <Input placeholder="Tags (e.g. jazz, chat show) — optional" value={newShowTags} onChange={e => setNewShowTags(e.target.value)} />
                   <div className="grid grid-cols-2 gap-2">
                     <Select value={newShowDay} onValueChange={setNewShowDay}>
                       <SelectTrigger className="h-9 text-sm">

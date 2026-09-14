@@ -85,6 +85,16 @@ export const InternalShowCard: React.FC<InternalShowCardProps> = ({ show, isFoll
           {show.description && (
             <p className="text-sm text-muted-foreground line-clamp-2">{show.description}</p>
           )}
+
+          {show.tags && (
+            <div className="flex flex-wrap gap-1">
+              {show.tags.split(',').map(t => t.trim()).filter(Boolean).slice(0, 4).map(tag => (
+                <span key={tag} className="rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
+                  {tag}
+                </span>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Link>
 

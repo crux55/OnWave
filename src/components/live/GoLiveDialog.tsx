@@ -52,6 +52,7 @@ export function GoLiveDialog({ trigger, stationId, scheduledShows = [] }: GoLive
   const [selectedShowId, setSelectedShowId] = useState(scheduledShows[0]?.id ?? '');
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [tags, setTags] = useState('');
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [ownLicense, setOwnLicense] = useState(false);
   const [noInteraction, setNoInteraction] = useState(false);
@@ -68,6 +69,7 @@ export function GoLiveDialog({ trigger, stationId, scheduledShows = [] }: GoLive
     setStep('setup');
     setName('');
     setDescription('');
+    setTags('');
     setAgreedToTerms(false);
     setOwnLicense(false);
     setNoInteraction(false);
@@ -135,6 +137,7 @@ export function GoLiveDialog({ trigger, stationId, scheduledShows = [] }: GoLive
             agreed_to_terms: agreedToTerms,
             own_license: ownLicense,
             no_interaction: noInteraction,
+            tags: tags.trim() || undefined,
           });
 
       await startBroadcasting({
@@ -199,6 +202,10 @@ export function GoLiveDialog({ trigger, stationId, scheduledShows = [] }: GoLive
                 <div className="space-y-1.5">
                   <Label htmlFor="live-description">Description (optional)</Label>
                   <Textarea id="live-description" value={description} onChange={e => setDescription(e.target.value)} rows={2} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="live-tags">Tags (optional)</Label>
+                  <Input id="live-tags" value={tags} onChange={e => setTags(e.target.value)} placeholder="e.g. jazz, chat show" />
                 </div>
               </div>
             )}

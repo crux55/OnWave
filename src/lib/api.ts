@@ -1730,6 +1730,7 @@ export async function createShow(show: {
   one_off_date?: string;
   start_time: string;
   duration_minutes?: number;
+  tags?: string;
 }): Promise<void> {
   const token = localStorage.getItem("token");
   if (!token) {
@@ -1791,7 +1792,7 @@ export async function joinExternalShowRoom(stationName: string, showName: string
 // Opens a listen-together room (project_r#33) for any station — radio-
 // browser or a user's own saved/BYO one (OnWave#32) — and returns its show
 // id, reusing the same /shows/{id} watch page every other live show uses.
-export async function createRoom(stationName: string, stationUrl: string, isPublic: boolean): Promise<string> {
+export async function createRoom(stationName: string, stationUrl: string, isPublic: boolean, tags?: string): Promise<string> {
   const authToken = requireAuthToken();
   const response = await fetch('/api/rooms', {
     method: 'POST',
@@ -1799,7 +1800,7 @@ export async function createRoom(stationName: string, stationUrl: string, isPubl
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${authToken}`,
     },
-    body: JSON.stringify({ station_name: stationName, station_url: stationUrl, is_public: isPublic }),
+    body: JSON.stringify({ station_name: stationName, station_url: stationUrl, is_public: isPublic, tags }),
   });
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
@@ -1891,6 +1892,7 @@ export async function goLiveAdhoc(options: GoLiveOptions & {
   name: string;
   description?: string;
   station_id?: string;
+  tags?: string;
 }): Promise<GoLiveResult> {
   const authToken = requireAuthToken();
   const response = await fetch('/api/shows/go-live/adhoc', {

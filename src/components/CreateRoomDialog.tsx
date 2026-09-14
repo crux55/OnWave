@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Users, Loader2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import {
   Dialog,
   DialogContent,
@@ -26,6 +27,7 @@ export function CreateRoomDialog({ station, trigger }: { station: RadioStation; 
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [isPublic, setIsPublic] = useState(false);
+  const [tags, setTags] = useState('');
   const [isCreating, setIsCreating] = useState(false);
 
   const handleCreate = async () => {
@@ -33,7 +35,7 @@ export function CreateRoomDialog({ station, trigger }: { station: RadioStation; 
     if (!streamUrl) return;
     setIsCreating(true);
     try {
-      const roomId = await createRoom(station.name, streamUrl, isPublic);
+      const roomId = await createRoom(station.name, streamUrl, isPublic, tags.trim() || undefined);
       setOpen(false);
       router.push(`/shows/${roomId}`);
     } catch (error: any) {
@@ -83,6 +85,12 @@ export function CreateRoomDialog({ station, trigger }: { station: RadioStation; 
             Public (Live tab)
           </Button>
         </div>
+
+        <Input
+          value={tags}
+          onChange={e => setTags(e.target.value)}
+          placeholder="Tags (optional) — e.g. jazz, chat show"
+        />
 
         <DialogFooter>
           <Button onClick={handleCreate} disabled={isCreating}>

@@ -112,6 +112,10 @@ export interface InternalShow {
   // external_station_name's name-based re-resolution, since a room can
   // wrap a "bring your own" station radio-browser can't find by name.
   room_station_url?: string | null;
+  // Flat, comma-separated free-text tags ("jazz, chat show") set by the
+  // creator so listeners know what to expect before joining. See
+  // project_r#41.
+  tags?: string | null;
 }
 
 export interface PBSShow {
