@@ -56,6 +56,7 @@ export function GoLiveDialog({ trigger, stationId, scheduledShows = [] }: GoLive
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [ownLicense, setOwnLicense] = useState(false);
   const [noInteraction, setNoInteraction] = useState(false);
+  const [noMusic, setNoMusic] = useState(false);
   const [micGain, setMicGain] = useState(100);
   const [desktopGain, setDesktopGain] = useState(100);
   const [micStream, setMicStream] = useState<MediaStream | null>(null);
@@ -73,6 +74,7 @@ export function GoLiveDialog({ trigger, stationId, scheduledShows = [] }: GoLive
     setAgreedToTerms(false);
     setOwnLicense(false);
     setNoInteraction(false);
+    setNoMusic(false);
     setMicGain(100);
     setDesktopGain(100);
     setMicStream(null);
@@ -129,14 +131,15 @@ export function GoLiveDialog({ trigger, stationId, scheduledShows = [] }: GoLive
     setIsStarting(true);
     try {
       const result = attachMode === 'existing'
-        ? await goLive(selectedShowId, { agreed_to_terms: agreedToTerms, own_license: ownLicense, no_interaction: noInteraction })
+        ? await goLive(selectedShowId, { agreed_to_terms: agreedToTerms, own_license: !noMusic && ownLicense, no_interaction: noInteraction, no_music: noMusic })
         : await goLiveAdhoc({
             name: name.trim(),
             description: description.trim() || undefined,
             station_id: stationId,
             agreed_to_terms: agreedToTerms,
-            own_license: ownLicense,
+            own_license: !noMusic && ownLicense,
             no_interaction: noInteraction,
+            no_music: noMusic,
             tags: tags.trim() || undefined,
           });
 
@@ -221,8 +224,9 @@ export function GoLiveDialog({ trigger, stationId, scheduledShows = [] }: GoLive
             <DialogHeader>
               <DialogTitle>Before you go live</DialogTitle>
               <DialogDescription>
-                Confirm this each time you broadcast — OnWave maintains a site-wide license, but you're responsible
-                for what you play.
+                {noMusic
+                  ? "Confirm this each time you broadcast — OnWave's content and conduct rules still apply, even talk-only."
+                  : "Confirm this each time you broadcast — OnWave maintains a site-wide license, but you're responsible for what you play."}
               </DialogDescription>
             </DialogHeader>
 
@@ -234,11 +238,19 @@ export function GoLiveDialog({ trigger, stationId, scheduledShows = [] }: GoLive
                 </Label>
               </div>
               <div className="flex items-start space-x-2">
-                <Checkbox id="own-license" checked={ownLicense} onCheckedChange={v => setOwnLicense(v === true)} />
-                <Label htmlFor="own-license" className="font-normal leading-snug">
-                  This broadcast is covered under our own separate license (optional).
+                <Checkbox id="no-music" checked={noMusic} onCheckedChange={v => setNoMusic(v === true)} />
+                <Label htmlFor="no-music" className="font-normal leading-snug">
+                  This is a talk-only show — no music (e.g. a chat show or podcast). Skips the music-licensing acknowledgment below.
                 </Label>
               </div>
+              {!noMusic && (
+                <div className="flex items-start space-x-2">
+                  <Checkbox id="own-license" checked={ownLicense} onCheckedChange={v => setOwnLicense(v === true)} />
+                  <Label htmlFor="own-license" className="font-normal leading-snug">
+                    This broadcast is covered under our own separate license (optional).
+                  </Label>
+                </div>
+              )}
               <div className="flex items-start space-x-2">
                 <Checkbox id="no-interaction" checked={noInteraction} onCheckedChange={v => setNoInteraction(v === true)} />
                 <Label htmlFor="no-interaction" className="font-normal leading-snug">

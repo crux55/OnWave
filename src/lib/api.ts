@@ -1846,6 +1846,9 @@ export interface GoLiveOptions {
   // whose own audience has no way to see or take part in it. See
   // project_r#32.
   no_interaction?: boolean;
+  // Marks this broadcast as talk-only (no music) -- the music-licensing
+  // acknowledgment doesn't apply. See project_r#42.
+  no_music?: boolean;
 }
 
 export interface GoLiveResult {

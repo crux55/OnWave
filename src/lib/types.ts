@@ -102,6 +102,9 @@ export interface InternalShow {
   // e.g. a partner stream whose own audience can't see or take part in it.
   // See project_r#32.
   no_interaction: boolean;
+  // Set at go-live time for a talk-only broadcast (chat show/podcast) — the
+  // music-licensing acknowledgment doesn't apply. See project_r#42.
+  no_music?: boolean;
   // A user-opened listen-together room (project_r#33) — any logged-in user
   // can open one for any station. dj_id is the room's opener, who
   // moderates its chat. Distinct from external_station_name (project_r#30,
