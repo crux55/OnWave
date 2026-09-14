@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import Image from 'next/image';
 import {
-  Play, Pause, Volume2, VolumeX, SkipForward, SkipBack, Loader2, ExternalLink, Minimize2, Music2, X
+  Play, Pause, Volume2, VolumeX, SkipForward, SkipBack, Loader2, ExternalLink, Minimize2, Music2, X, Users
 } from 'lucide-react';
 import { cn, getProxiedFaviconUrl } from '@/lib/utils';
 import { AudioVisualizer } from '@/components/AudioVisualizer';
@@ -17,6 +17,7 @@ import { VisualizerStylePicker } from '@/components/VisualizerStylePicker';
 import { useAudioVisualizer } from '@/hooks/use-audio-visualizer';
 import { useVisualizerStyle } from '@/hooks/use-visualizer-style';
 import { useChromecast } from '@/hooks/use-chromecast';
+import { CreateRoomDialog } from '@/components/CreateRoomDialog';
 
 interface MaximizedPlayerDialogProps {
   station: RadioStation;
@@ -174,11 +175,21 @@ export function MaximizedPlayerDialog({ station }: MaximizedPlayerDialogProps) {
         </div>
 
         <DialogFooter className="p-6 border-t items-center justify-between sm:justify-between">
-           <Button variant="ghost" asChild className="text-sm" disabled={!streamUrl}>
+          <div className="flex items-center gap-1">
+            <Button variant="ghost" asChild className="text-sm" disabled={!streamUrl}>
               <a href={streamUrl} target="_blank" rel="noopener noreferrer" aria-label="Open stream URL">
                 <ExternalLink className="mr-2 h-4 w-4" /> Open Stream
               </a>
             </Button>
+            <CreateRoomDialog
+              station={station}
+              trigger={
+                <Button variant="ghost" className="text-sm" disabled={!streamUrl}>
+                  <Users className="mr-2 h-4 w-4" /> Start a Room
+                </Button>
+              }
+            />
+          </div>
           <Button variant="outline" onClick={player.closeMaximizedPlayer}>
             <Minimize2 className="mr-2 h-4 w-4" />
             Collapse to Bar

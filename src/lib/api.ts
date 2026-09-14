@@ -1772,6 +1772,56 @@ export async function joinExternalShowRoom(stationName: string, showName: string
   return result.id;
 }
 
+// Opens a listen-together room (project_r#33) for any station — radio-
+// browser or a user's own saved/BYO one (OnWave#32) — and returns its show
+// id, reusing the same /shows/{id} watch page every other live show uses.
+export async function createRoom(stationName: string, stationUrl: string, isPublic: boolean): Promise<string> {
+  const authToken = requireAuthToken();
+  const response = await fetch('/api/rooms', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${authToken}`,
+    },
+    body: JSON.stringify({ station_name: stationName, station_url: stationUrl, is_public: isPublic }),
+  });
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    if (response.status === 401) {
+      throw new Error('UNAUTHORIZED');
+    }
+    throw new Error(errorData.error || 'Failed to open room');
+  }
+  const result = await response.json();
+  return result.id;
+}
+
+// Every open public room — the Live tab's listing of rooms anyone can join.
+export async function listPublicRooms(): Promise<InternalShow[]> {
+  const response = await fetch('/api/rooms');
+  if (!response.ok) {
+    return [];
+  }
+  const result = await response.json();
+  return result.rooms || [];
+}
+
+// Ends a room — only its opener or an admin may do this.
+export async function closeRoom(roomId: string): Promise<void> {
+  const authToken = requireAuthToken();
+  const response = await fetch(`/api/rooms/${roomId}/close`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${authToken}` },
+  });
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    if (response.status === 401) {
+      throw new Error('UNAUTHORIZED');
+    }
+    throw new Error(errorData.error || 'Failed to close room');
+  }
+}
+
 export interface GoLiveOptions {
   agreed_to_terms: boolean;
   own_license?: boolean;

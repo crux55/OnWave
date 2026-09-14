@@ -102,6 +102,16 @@ export interface InternalShow {
   // e.g. a partner stream whose own audience can't see or take part in it.
   // See project_r#32.
   no_interaction: boolean;
+  // A user-opened listen-together room (project_r#33) — any logged-in user
+  // can open one for any station. dj_id is the room's opener, who
+  // moderates its chat. Distinct from external_station_name (project_r#30,
+  // tied to a currently-live scraped show, not user-created).
+  is_room?: boolean;
+  room_is_public?: boolean;
+  // The exact stream to tune into — set instead of relying on
+  // external_station_name's name-based re-resolution, since a room can
+  // wrap a "bring your own" station radio-browser can't find by name.
+  room_station_url?: string | null;
 }
 
 export interface PBSShow {

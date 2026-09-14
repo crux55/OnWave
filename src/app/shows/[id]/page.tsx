@@ -3,7 +3,7 @@
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState, useCallback } from 'react';
 import { jwtDecode as jwt_decode } from 'jwt-decode';
-import { Loader2, Radio, CalendarClock, CircleOff, Play, Pause } from 'lucide-react';
+import { Loader2, Radio, CalendarClock, CircleOff, Play, Pause, Users, X } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { LiveBroadcastPlayer } from '@/components/live/LiveBroadcastPlayer';
@@ -12,18 +12,34 @@ import { useLiveBroadcast } from '@/contexts/LiveBroadcastContext';
 import { useListenerRoom } from '@/hooks/use-listener-room';
 import { useResolvedStationStream } from '@/hooks/use-external-live-streams';
 import { usePlayer } from '@/contexts/PlayerContext';
-import { fetchShow } from '@/lib/api';
-import type { InternalShow, Token } from '@/lib/types';
+import { fetchShow, closeRoom } from '@/lib/api';
+import { useToast } from '@/hooks/use-toast';
+import type { InternalShow, RadioStation, Token } from '@/lib/types';
 
-// External (PBS-scraped) show rooms (project_r#30) have no OnWave
-// broadcast to render — nobody publishes into the LiveKit room, so
-// LiveBroadcastPlayer would just sit empty. Instead: a plain play/pause
-// against the resolved external stream, same mechanism "Tune In" already
-// uses elsewhere, with the chat panel alongside it exactly like a real
-// broadcast.
-function ExternalRoomTuneIn({ show }: { show: InternalShow }) {
+// External (PBS-scraped) show rooms (project_r#30) and user-opened rooms
+// (project_r#33) both have no OnWave broadcast to render — nobody publishes
+// into the LiveKit room, so LiveBroadcastPlayer would just sit empty.
+// Instead: a plain play/pause against the station's stream, same mechanism
+// "Tune In" already uses elsewhere, with the chat panel alongside it
+// exactly like a real broadcast.
+function ExternalRoomTuneIn({ show, isOwnRoom, onClosed }: { show: InternalShow; isOwnRoom: boolean; onClosed: () => void }) {
   const player = usePlayer();
-  const stream = useResolvedStationStream(show.external_station_name);
+  const { toast } = useToast();
+  const [isClosing, setIsClosing] = useState(false);
+  // A room (project_r#33) already knows its exact stream — no need to
+  // re-resolve by name the way a #30 external room (tied to a currently-
+  // live scraped show, not a specific stored URL) still has to.
+  const resolvedStream = useResolvedStationStream(show.room_station_url ? undefined : show.external_station_name);
+  const stream: RadioStation | null = show.room_station_url
+    ? {
+        stationuuid: `room-${show.id}`, name: show.external_station_name || 'Room', url: show.room_station_url,
+        url_resolved: show.room_station_url, homepage: '', favicon: '', has_valid_favicon: false, tags: '', country: '',
+        countrycode: '', state: '', language: '', languagecodes: '', bitrate: 0, codec: '', votes: 0, clickcount: 0,
+        clicktrend: 0, lastchangetime: '', lastchangetime_iso8601: '', lastchecktime: '', lastchecktime_iso8601: '',
+        lastcheckok: 1, lastcheckoktime: '', lastcheckoktime_iso8601: '', lastlocalchecktime: '', lastlocalchecktime_iso8601: '',
+        ssl_error: 0, has_extended_info: false, serveruuid: `room-${show.id}`, changeuuid: '', iso_3166_2: '', hls: 0,
+      }
+    : resolvedStream;
   const isThisStation = player.currentStation?.name === stream?.name;
   const isThisPlaying = player.isPlaying && isThisStation;
   // Only show the error if it actually belongs to this stream -- the
@@ -31,9 +47,22 @@ function ExternalRoomTuneIn({ show }: { show: InternalShow }) {
   // something else elsewhere shouldn't show up here.
   const thisStreamError = isThisStation && !player.isPlaying ? player.playbackError : null;
 
+  const handleClose = async () => {
+    setIsClosing(true);
+    try {
+      await closeRoom(show.id);
+      toast({ title: 'Room closed' });
+      onClosed();
+    } catch (error: any) {
+      toast({ title: "Couldn't close room", description: error.message, variant: 'destructive' });
+    } finally {
+      setIsClosing(false);
+    }
+  };
+
   return (
     <div className="flex flex-col items-center justify-center gap-4 rounded-xl border border-border bg-card/60 p-8 text-center h-full min-h-[16rem]">
-      <Radio className="h-8 w-8 text-muted-foreground" />
+      {show.is_room ? <Users className="h-8 w-8 text-muted-foreground" /> : <Radio className="h-8 w-8 text-muted-foreground" />}
       <div>
         <p className="font-medium text-foreground">{show.external_station_name}</p>
         <p className="text-sm text-muted-foreground">Listening happens in your player, chat happens here.</p>
@@ -48,6 +77,12 @@ function ExternalRoomTuneIn({ show }: { show: InternalShow }) {
       </Button>
       {thisStreamError && (
         <p className="text-xs text-destructive">Couldn't play this stream ({thisStreamError}) — try again or check back later.</p>
+      )}
+      {isOwnRoom && (
+        <Button variant="outline" size="sm" onClick={handleClose} disabled={isClosing} className="text-destructive hover:text-destructive">
+          {isClosing ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <X className="mr-2 h-3.5 w-3.5" />}
+          Close Room
+        </Button>
       )}
     </div>
   );
@@ -143,7 +178,11 @@ export default function ShowDetailPage() {
         <div className="flex flex-col gap-6 lg:flex-row">
           <div className="lg:flex-1 lg:min-w-0">
             {show.external_station_name ? (
-              <ExternalRoomTuneIn show={show} />
+              <ExternalRoomTuneIn
+                show={show}
+                isOwnRoom={!!show.is_room && (isAdmin || show.dj_id === currentUserId)}
+                onClosed={load}
+              />
             ) : (
               <LiveBroadcastPlayer
                 show={show}

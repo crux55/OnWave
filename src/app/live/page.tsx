@@ -1,11 +1,11 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { Radio, Loader2 } from 'lucide-react';
+import { Radio, Loader2, Users } from 'lucide-react';
 
 import { InternalShowCard } from '@/components/InternalShowCard';
 import { PBSShowCard } from '@/components/PBSShowCard';
-import { fetchAllLiveNow } from '@/lib/api';
+import { fetchAllLiveNow, listPublicRooms } from '@/lib/api';
 import { useExternalLiveStreams } from '@/hooks/use-external-live-streams';
 import { useShowFollows, showFollowKey } from '@/hooks/use-show-follows';
 import { usePlayer } from '@/contexts/PlayerContext';
@@ -18,6 +18,7 @@ import type { InternalShow, PBSShow } from '@/lib/types';
 export default function LivePage() {
   const [internalLive, setInternalLive] = useState<InternalShow[]>([]);
   const [externalLive, setExternalLive] = useState<PBSShow[]>([]);
+  const [publicRooms, setPublicRooms] = useState<InternalShow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const player = usePlayer();
 
@@ -28,10 +29,11 @@ export default function LivePage() {
   } = useShowFollows();
 
   useEffect(() => {
-    fetchAllLiveNow()
-      .then(({ internal, external }) => {
+    Promise.all([fetchAllLiveNow(), listPublicRooms()])
+      .then(([{ internal, external }, rooms]) => {
         setInternalLive(internal);
         setExternalLive(external);
+        setPublicRooms(rooms);
       })
       .finally(() => setIsLoading(false));
   }, []);
@@ -41,7 +43,7 @@ export default function LivePage() {
     if (stream) player.playStation(stream);
   }, [player, stationStreams]);
 
-  const totalLive = internalLive.length + externalLive.length;
+  const totalLive = internalLive.length + externalLive.length + publicRooms.length;
 
   if (isLoading) {
     return (
@@ -67,26 +69,43 @@ export default function LivePage() {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-          {internalLive.map(show => (
-            <InternalShowCard
-              key={show.id}
-              show={show}
-              isFollowing={followedProgramIds.has(show.id)}
-              onToggleFollow={() => toggleProgramFollow(show.id)}
-              isTogglingFollow={togglingProgramId === show.id}
-            />
-          ))}
-          {externalLive.map(show => (
-            <PBSShowCard
-              key={show.id}
-              show={show}
-              onTuneIn={stationStreams[show.station_name ?? ''] ? () => handleTuneIn(show) : undefined}
-              isFollowing={followedShowNames.has(showFollowKey(show))}
-              onToggleFollow={() => toggleShowFollow(show)}
-              isTogglingFollow={togglingShowName === showFollowKey(show)}
-            />
-          ))}
+        <div className="space-y-10">
+          {(internalLive.length > 0 || externalLive.length > 0) && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+              {internalLive.map(show => (
+                <InternalShowCard
+                  key={show.id}
+                  show={show}
+                  isFollowing={followedProgramIds.has(show.id)}
+                  onToggleFollow={() => toggleProgramFollow(show.id)}
+                  isTogglingFollow={togglingProgramId === show.id}
+                />
+              ))}
+              {externalLive.map(show => (
+                <PBSShowCard
+                  key={show.id}
+                  show={show}
+                  onTuneIn={stationStreams[show.station_name ?? ''] ? () => handleTuneIn(show) : undefined}
+                  isFollowing={followedShowNames.has(showFollowKey(show))}
+                  onToggleFollow={() => toggleShowFollow(show)}
+                  isTogglingFollow={togglingShowName === showFollowKey(show)}
+                />
+              ))}
+            </div>
+          )}
+
+          {publicRooms.length > 0 && (
+            <section>
+              <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-foreground">
+                <Users className="h-5 w-5 text-accent" /> Rooms
+              </h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                {publicRooms.map(room => (
+                  <InternalShowCard key={room.id} show={room} />
+                ))}
+              </div>
+            </section>
+          )}
         </div>
       )}
     </div>
