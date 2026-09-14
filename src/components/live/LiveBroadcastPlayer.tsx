@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Room, RoomEvent, RemoteTrack } from 'livekit-client';
-import { Radio, Mic, MonitorUp, Volume2, VolumeX, ShieldAlert, Loader2 } from 'lucide-react';
+import { Radio, Mic, MonitorUp, Volume2, VolumeX, ShieldAlert, Loader2, Video, VideoOff } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -20,10 +20,11 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
 import { useLiveBroadcast } from '@/contexts/LiveBroadcastContext';
 import { terminateBroadcast } from '@/lib/api';
 import type { InternalShow } from '@/lib/types';
-import type { ListenerConnectionState } from '@/hooks/use-listener-room';
+import type { ListenerConnectionState } from '@/contexts/ListenerBroadcastContext';
 
 interface LiveBroadcastPlayerProps {
   show: InternalShow;
@@ -42,10 +43,17 @@ export function LiveBroadcastPlayer({ show, isAdmin, isOwnBroadcast, listenerRoo
 }
 
 function BroadcasterView({ show, isAdmin }: { show: InternalShow; isAdmin: boolean }) {
-  const { micGain, desktopGain, hasDesktopAudio, setMicGain, setDesktopGain, endBroadcasting } = useLiveBroadcast();
+  const { micGain, desktopGain, hasDesktopAudio, videoStream, isCameraOn, setMicGain, setDesktopGain, toggleCamera, endBroadcasting } = useLiveBroadcast();
   const [isMuted, setIsMuted] = useState(false);
   const [lastMicGain, setLastMicGain] = useState(micGain || 1);
   const [isEnding, setIsEnding] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    if (videoRef.current) {
+      videoRef.current.srcObject = videoStream;
+    }
+  }, [videoStream]);
 
   const toggleMute = () => {
     if (isMuted) {
@@ -76,6 +84,21 @@ function BroadcasterView({ show, isAdmin }: { show: InternalShow; isAdmin: boole
         </div>
         <span className="text-sm text-muted-foreground">{show.viewer_count} listening</span>
       </div>
+
+      {videoStream && (
+        <div className="relative">
+          <video ref={videoRef} autoPlay muted playsInline className="w-full rounded-lg bg-black aspect-video object-cover" />
+          <Button
+            size="icon"
+            variant="secondary"
+            onClick={toggleCamera}
+            className="absolute bottom-2 right-2"
+            title={isCameraOn ? 'Turn camera off' : 'Turn camera on'}
+          >
+            {isCameraOn ? <Video className="h-4 w-4" /> : <VideoOff className="h-4 w-4" />}
+          </Button>
+        </div>
+      )}
 
       <p className="text-sm text-muted-foreground">You're broadcasting right now.</p>
 
@@ -111,19 +134,32 @@ function ListenerView({ show, isAdmin, room, connectionState }: {
 }) {
   const { toast } = useToast();
   const audioRef = useRef<HTMLAudioElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
   const [terminateReason, setTerminateReason] = useState('');
   const [isTerminating, setIsTerminating] = useState(false);
+  const [hasVideoTrack, setHasVideoTrack] = useState(false);
 
   useEffect(() => {
     if (!room) return;
     const handleTrack = (track: RemoteTrack) => {
       if (track.kind === 'audio' && audioRef.current) {
         track.attach(audioRef.current);
+      } else if (track.kind === 'video' && videoRef.current) {
+        track.attach(videoRef.current);
+        setHasVideoTrack(true);
+      }
+    };
+    const handleUnsubscribed = (track: RemoteTrack) => {
+      if (track.kind === 'video') {
+        track.detach();
+        setHasVideoTrack(false);
       }
     };
     room.on(RoomEvent.TrackSubscribed, handleTrack);
+    room.on(RoomEvent.TrackUnsubscribed, handleUnsubscribed);
     return () => {
       room.off(RoomEvent.TrackSubscribed, handleTrack);
+      room.off(RoomEvent.TrackUnsubscribed, handleUnsubscribed);
     };
   }, [room]);
 
@@ -149,14 +185,25 @@ function ListenerView({ show, isAdmin, room, connectionState }: {
         <span className="text-sm text-muted-foreground">{show.viewer_count} listening</span>
       </div>
 
-      <div className="flex flex-col items-center justify-center gap-3 rounded-lg bg-background/40 py-10">
-        <Radio className={connectionState === 'connected' ? 'h-10 w-10 text-accent animate-pulse' : 'h-10 w-10 text-muted-foreground'} />
-        <p className="text-sm text-muted-foreground">
-          {connectionState === 'connecting' && 'Connecting...'}
-          {connectionState === 'connected' && 'Audio streaming live'}
-          {connectionState === 'failed' && 'Connection lost'}
-        </p>
-      </div>
+      {show.is_video && (
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          className={cn('w-full rounded-lg bg-black aspect-video object-cover', !hasVideoTrack && 'hidden')}
+        />
+      )}
+
+      {(!show.is_video || !hasVideoTrack) && (
+        <div className="flex flex-col items-center justify-center gap-3 rounded-lg bg-background/40 py-10">
+          <Radio className={connectionState === 'connected' ? 'h-10 w-10 text-accent animate-pulse' : 'h-10 w-10 text-muted-foreground'} />
+          <p className="text-sm text-muted-foreground">
+            {connectionState === 'connecting' && 'Connecting...'}
+            {connectionState === 'connected' && (show.is_video ? 'Waiting for video…' : 'Audio streaming live')}
+            {connectionState === 'failed' && 'Connection lost'}
+          </p>
+        </div>
+      )}
 
       <audio ref={audioRef} autoPlay />
 

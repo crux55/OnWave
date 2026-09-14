@@ -1849,6 +1849,9 @@ export interface GoLiveOptions {
   // Marks this broadcast as talk-only (no music) -- the music-licensing
   // acknowledgment doesn't apply. See project_r#42.
   no_music?: boolean;
+  // Marks this broadcast as publishing a camera video track alongside
+  // audio. See project_r#20.
+  is_video?: boolean;
 }
 
 export interface GoLiveResult {

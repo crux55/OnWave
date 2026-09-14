@@ -13,8 +13,11 @@ import { Button } from '@/components/ui/button';
 import { RadioPlayer } from '@/components/RadioPlayer';
 import { MaximizedPlayerDialog } from '@/components/MaximizedPlayerDialog';
 import { PlayerProvider, usePlayer } from '@/contexts/PlayerContext';
+import { useListenerBroadcast } from '@/contexts/ListenerBroadcastContext';
 import { LiveBroadcastProvider } from '@/contexts/LiveBroadcastContext';
+import { ListenerBroadcastProvider } from '@/contexts/ListenerBroadcastContext';
 import { LiveBroadcastIndicator } from '@/components/live/LiveBroadcastIndicator';
+import { LiveListenerMiniPlayer } from '@/components/live/LiveListenerMiniPlayer';
 import { FeedbackButton } from '@/components/FeedbackButton';
 import { RemindersProvider } from '@/contexts/RemindersContext';
 import { NotificationProvider } from '@/contexts/NotificationContext';
@@ -47,12 +50,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <body>
         <PlayerProvider>
           <LiveBroadcastProvider>
-            <RemindersProvider>
-              <NotificationProvider>
-                <AppLayoutContent>{children}</AppLayoutContent>
-                <Toaster />
-              </NotificationProvider>
-            </RemindersProvider>
+            <ListenerBroadcastProvider>
+              <RemindersProvider>
+                <NotificationProvider>
+                  <AppLayoutContent>{children}</AppLayoutContent>
+                  <Toaster />
+                </NotificationProvider>
+              </RemindersProvider>
+            </ListenerBroadcastProvider>
           </LiveBroadcastProvider>
         </PlayerProvider>
       </body>
@@ -63,6 +68,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 function AppLayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const player = usePlayer();
+  const listener = useListenerBroadcast();
+  // The live-listener mini-player is hidden on the show's own page (same
+  // page it'd otherwise duplicate), same check the component itself makes.
+  const isLiveMiniPlayerVisible = !!listener.room && !!listener.currentShowId && pathname !== `/shows/${listener.currentShowId}`;
 
   return (
       <div className="flex flex-col min-h-screen">
@@ -91,14 +100,16 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
       </header>
 
       {/* Mobile Bottom Navigation */}
-      <nav 
+      <nav
         className={cn(
           "sm:hidden fixed left-0 right-0 z-30 flex justify-around border-t bg-background p-2",
-          player.isPlayerBarOpen && !player.isMaximizedViewOpen 
-            ? player.isPlayerMinimized 
-              ? "bottom-12" // Above minimized player
-              : "bottom-20" // Above standard player
-            : "bottom-0" // At bottom when no player
+          isLiveMiniPlayerVisible
+            ? "bottom-12" // Above the live-listener mini-player (project_r#20)
+            : player.isPlayerBarOpen && !player.isMaximizedViewOpen
+              ? player.isPlayerMinimized
+                ? "bottom-12" // Above minimized player
+                : "bottom-20" // Above standard player
+              : "bottom-0" // At bottom when no player
         )}
       >
         {navItems.map((item) => (
@@ -121,7 +132,9 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
           "flex-1 overflow-y-auto p-4 md:p-6 lg:p-8",
           // The fixed player bar overlays content instead of pushing it —
           // without this, the bottom of the page is unreachable behind it.
-          player.isPlayerBarOpen && !player.isMaximizedViewOpen && !player.isPlayerMinimized && "pb-28 sm:pb-24"
+          isLiveMiniPlayerVisible
+            ? "pb-16"
+            : player.isPlayerBarOpen && !player.isMaximizedViewOpen && !player.isPlayerMinimized && "pb-28 sm:pb-24"
         )}
       >
         {children}
@@ -138,6 +151,8 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
       {player.isPlayerBarOpen && player.currentStation && player.isMaximizedViewOpen && (
         <MaximizedPlayerDialog station={player.currentStation} />
       )}
+
+      <LiveListenerMiniPlayer />
 
       <LiveBroadcastIndicator />
       <FeedbackButton />

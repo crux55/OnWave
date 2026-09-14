@@ -1,8 +1,8 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
-import { Loader2, Mic, MonitorUp } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Loader2, Mic, MonitorUp, Video, VideoOff } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -63,10 +63,23 @@ export function GoLiveDialog({ trigger, stationId, scheduledShows = [] }: GoLive
   const [desktopStream, setDesktopStream] = useState<MediaStream | null>(null);
   const [isRequestingAudio, setIsRequestingAudio] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
+  // Audio/video toggle (project_r#20) — camera capture is requested
+  // separately from mic/desktop audio, only when video mode is selected.
+  const [broadcastMode, setBroadcastMode] = useState<'audio' | 'video'>('audio');
+  const [videoStream, setVideoStream] = useState<MediaStream | null>(null);
+  const [isRequestingVideo, setIsRequestingVideo] = useState(false);
+  const videoPreviewRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    if (videoPreviewRef.current) {
+      videoPreviewRef.current.srcObject = videoStream;
+    }
+  }, [videoStream]);
 
   const reset = () => {
     micStream?.getTracks().forEach(t => t.stop());
     desktopStream?.getTracks().forEach(t => t.stop());
+    videoStream?.getTracks().forEach(t => t.stop());
     setStep('setup');
     setName('');
     setDescription('');
@@ -79,6 +92,8 @@ export function GoLiveDialog({ trigger, stationId, scheduledShows = [] }: GoLive
     setDesktopGain(100);
     setMicStream(null);
     setDesktopStream(null);
+    setBroadcastMode('audio');
+    setVideoStream(null);
   };
 
   const handleOpenChange = (next: boolean) => {
@@ -126,12 +141,24 @@ export function GoLiveDialog({ trigger, stationId, scheduledShows = [] }: GoLive
     }
   };
 
+  const requestCamera = async () => {
+    setIsRequestingVideo(true);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      setVideoStream(stream);
+    } catch (error: any) {
+      toast({ title: 'Camera access denied', description: error.message, variant: 'destructive' });
+    } finally {
+      setIsRequestingVideo(false);
+    }
+  };
+
   const handleStart = async () => {
     if (!micStream) return;
     setIsStarting(true);
     try {
       const result = attachMode === 'existing'
-        ? await goLive(selectedShowId, { agreed_to_terms: agreedToTerms, own_license: !noMusic && ownLicense, no_interaction: noInteraction, no_music: noMusic })
+        ? await goLive(selectedShowId, { agreed_to_terms: agreedToTerms, own_license: !noMusic && ownLicense, no_interaction: noInteraction, no_music: noMusic, is_video: broadcastMode === 'video' && !!videoStream })
         : await goLiveAdhoc({
             name: name.trim(),
             description: description.trim() || undefined,
@@ -140,6 +167,7 @@ export function GoLiveDialog({ trigger, stationId, scheduledShows = [] }: GoLive
             own_license: !noMusic && ownLicense,
             no_interaction: noInteraction,
             no_music: noMusic,
+            is_video: broadcastMode === 'video' && !!videoStream,
             tags: tags.trim() || undefined,
           });
 
@@ -148,6 +176,7 @@ export function GoLiveDialog({ trigger, stationId, scheduledShows = [] }: GoLive
         token: result.token,
         micStream,
         desktopStream,
+        videoStream: broadcastMode === 'video' ? videoStream : null,
         initialMicGain: micGain / 100,
         initialDesktopGain: desktopGain / 100,
       });
@@ -213,6 +242,28 @@ export function GoLiveDialog({ trigger, stationId, scheduledShows = [] }: GoLive
               </div>
             )}
 
+            <div className="space-y-1.5">
+              <Label>Broadcast type</Label>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant={broadcastMode === 'audio' ? 'default' : 'outline'}
+                  className="flex-1"
+                  onClick={() => setBroadcastMode('audio')}
+                >
+                  <Mic className="mr-2 h-4 w-4" /> Audio only
+                </Button>
+                <Button
+                  type="button"
+                  variant={broadcastMode === 'video' ? 'default' : 'outline'}
+                  className="flex-1"
+                  onClick={() => setBroadcastMode('video')}
+                >
+                  <Video className="mr-2 h-4 w-4" /> Video
+                </Button>
+              </div>
+            </div>
+
             <DialogFooter>
               <Button onClick={() => setStep('terms')} disabled={!canProceedFromSetup}>Next</Button>
             </DialogFooter>
@@ -269,11 +320,32 @@ export function GoLiveDialog({ trigger, stationId, scheduledShows = [] }: GoLive
         {step === 'audio' && (
           <>
             <DialogHeader>
-              <DialogTitle>Audio sources</DialogTitle>
+              <DialogTitle>{broadcastMode === 'video' ? 'Audio & video sources' : 'Audio sources'}</DialogTitle>
               <DialogDescription>Mic is required. Desktop audio is optional — lets you play music from your own player.</DialogDescription>
             </DialogHeader>
 
             <div className="space-y-4">
+              {broadcastMode === 'video' && (
+                <>
+                  <div className="flex items-center justify-between rounded-lg border border-border p-3">
+                    <div className="flex items-center gap-2">
+                      {videoStream ? <Video className="h-4 w-4 text-muted-foreground" /> : <VideoOff className="h-4 w-4 text-muted-foreground" />}
+                      <span className="text-sm font-medium">Camera</span>
+                    </div>
+                    {videoStream ? (
+                      <span className="text-xs text-accent">Connected</span>
+                    ) : (
+                      <Button size="sm" variant="secondary" onClick={requestCamera} disabled={isRequestingVideo}>
+                        {isRequestingVideo && <Loader2 className="mr-2 h-3 w-3 animate-spin" />}
+                        Allow camera
+                      </Button>
+                    )}
+                  </div>
+                  {videoStream && (
+                    <video ref={videoPreviewRef} autoPlay muted playsInline className="w-full rounded-lg bg-black aspect-video object-cover" />
+                  )}
+                </>
+              )}
               <div className="flex items-center justify-between rounded-lg border border-border p-3">
                 <div className="flex items-center gap-2">
                   <Mic className="h-4 w-4 text-muted-foreground" />

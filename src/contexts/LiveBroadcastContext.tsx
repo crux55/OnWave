@@ -18,6 +18,11 @@ interface LiveBroadcastState {
   micGain: number;
   desktopGain: number;
   hasDesktopAudio: boolean;
+  // videoStream is kept for the broadcaster's own local camera preview
+  // (BroadcasterView renders it directly, not via a LiveKit round-trip) —
+  // see project_r#20.
+  videoStream: MediaStream | null;
+  isCameraOn: boolean;
 }
 
 interface LiveBroadcastContextValue extends LiveBroadcastState {
@@ -26,11 +31,13 @@ interface LiveBroadcastContextValue extends LiveBroadcastState {
     token: string;
     micStream: MediaStream;
     desktopStream: MediaStream | null;
+    videoStream?: MediaStream | null;
     initialMicGain?: number;
     initialDesktopGain?: number;
   }) => Promise<void>;
   setMicGain: (value: number) => void;
   setDesktopGain: (value: number) => void;
+  toggleCamera: () => void;
   endBroadcasting: () => Promise<void>;
 }
 
@@ -47,18 +54,22 @@ export function LiveBroadcastProvider({ children }: { children: React.ReactNode 
     micGain: 1,
     desktopGain: 1,
     hasDesktopAudio: false,
+    videoStream: null,
+    isCameraOn: false,
   });
 
   const audioCtxRef = useRef<AudioContext | null>(null);
   const micGainNodeRef = useRef<GainNode | null>(null);
   const desktopGainNodeRef = useRef<GainNode | null>(null);
-  const rawStreamsRef = useRef<{ mic: MediaStream; desktop: MediaStream | null }>({ mic: null as any, desktop: null });
+  const rawStreamsRef = useRef<{ mic: MediaStream; desktop: MediaStream | null; video: MediaStream | null }>({ mic: null as any, desktop: null, video: null });
+  const videoPublicationRef = useRef<Awaited<ReturnType<Room['localParticipant']['publishTrack']>> | null>(null);
 
-  const startBroadcasting = useCallback(async ({ showId, token, micStream, desktopStream, initialMicGain = 1, initialDesktopGain = 1 }: {
+  const startBroadcasting = useCallback(async ({ showId, token, micStream, desktopStream, videoStream = null, initialMicGain = 1, initialDesktopGain = 1 }: {
     showId: string;
     token: string;
     micStream: MediaStream;
     desktopStream: MediaStream | null;
+    videoStream?: MediaStream | null;
     initialMicGain?: number;
     initialDesktopGain?: number;
   }) => {
@@ -82,7 +93,7 @@ export function LiveBroadcastProvider({ children }: { children: React.ReactNode 
     audioCtxRef.current = audioCtx;
     micGainNodeRef.current = micGainNode;
     desktopGainNodeRef.current = desktopGainNode;
-    rawStreamsRef.current = { mic: micStream, desktop: desktopStream };
+    rawStreamsRef.current = { mic: micStream, desktop: desktopStream, video: videoStream };
 
     const room = new Room();
     await room.connect(deriveWsUrl(), token);
@@ -92,8 +103,16 @@ export function LiveBroadcastProvider({ children }: { children: React.ReactNode 
       source: Track.Source.Microphone,
     });
 
+    const videoTrack = videoStream?.getVideoTracks()[0] ?? null;
+    if (videoTrack) {
+      videoPublicationRef.current = await room.localParticipant.publishTrack(videoTrack, {
+        name: 'camera',
+        source: Track.Source.Camera,
+      });
+    }
+
     room.on(RoomEvent.Disconnected, () => {
-      setState({ showId: null, room: null, isPublishing: false, micGain: 1, desktopGain: 1, hasDesktopAudio: false });
+      setState({ showId: null, room: null, isPublishing: false, micGain: 1, desktopGain: 1, hasDesktopAudio: false, videoStream: null, isCameraOn: false });
     });
 
     setState({
@@ -103,6 +122,8 @@ export function LiveBroadcastProvider({ children }: { children: React.ReactNode 
       micGain: initialMicGain,
       desktopGain: initialDesktopGain,
       hasDesktopAudio: desktopAudioTracks.length > 0,
+      videoStream,
+      isCameraOn: !!videoTrack,
     });
   }, []);
 
@@ -120,6 +141,22 @@ export function LiveBroadcastProvider({ children }: { children: React.ReactNode 
     setState(prev => ({ ...prev, desktopGain: value }));
   }, []);
 
+  // Mutes/unmutes the published camera track without re-negotiating the
+  // publication — a lightweight camera on/off toggle, not stop-and-restart.
+  const toggleCamera = useCallback(() => {
+    const publication = videoPublicationRef.current;
+    if (!publication?.track) return;
+    setState(prev => {
+      const next = !prev.isCameraOn;
+      if (next) {
+        publication.track!.unmute();
+      } else {
+        publication.track!.mute();
+      }
+      return { ...prev, isCameraOn: next };
+    });
+  }, []);
+
   const endBroadcasting = useCallback(async () => {
     const { showId, room } = state;
     if (!showId) return;
@@ -129,13 +166,15 @@ export function LiveBroadcastProvider({ children }: { children: React.ReactNode 
       room?.disconnect();
       rawStreamsRef.current.mic?.getTracks().forEach(t => t.stop());
       rawStreamsRef.current.desktop?.getTracks().forEach(t => t.stop());
+      rawStreamsRef.current.video?.getTracks().forEach(t => t.stop());
+      videoPublicationRef.current = null;
       audioCtxRef.current?.close().catch(() => {});
-      setState({ showId: null, room: null, isPublishing: false, micGain: 1, desktopGain: 1, hasDesktopAudio: false });
+      setState({ showId: null, room: null, isPublishing: false, micGain: 1, desktopGain: 1, hasDesktopAudio: false, videoStream: null, isCameraOn: false });
     }
   }, [state]);
 
   return (
-    <LiveBroadcastContext.Provider value={{ ...state, startBroadcasting, setMicGain, setDesktopGain, endBroadcasting }}>
+    <LiveBroadcastContext.Provider value={{ ...state, startBroadcasting, setMicGain, setDesktopGain, toggleCamera, endBroadcasting }}>
       {children}
     </LiveBroadcastContext.Provider>
   );

@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { LiveBroadcastPlayer } from '@/components/live/LiveBroadcastPlayer';
 import { LiveChatPanel } from '@/components/live/LiveChatPanel';
 import { useLiveBroadcast } from '@/contexts/LiveBroadcastContext';
-import { useListenerRoom } from '@/hooks/use-listener-room';
+import { useListenerBroadcast } from '@/contexts/ListenerBroadcastContext';
 import { useResolvedStationStream } from '@/hooks/use-external-live-streams';
 import { usePlayer } from '@/contexts/PlayerContext';
 import { fetchShow, closeRoom } from '@/lib/api';
@@ -140,10 +140,19 @@ export default function ShowDetailPage() {
   }, [show?.status, load]);
 
   const isOwnBroadcast = liveBroadcast.showId === show?.id;
-  const { room: listenerRoom, connectionState: listenerConnectionState } = useListenerRoom(
-    params.id,
-    show?.status === 'live' && !isOwnBroadcast
-  );
+  const listenerBroadcast = useListenerBroadcast();
+  useEffect(() => {
+    if (show?.status === 'live' && !isOwnBroadcast && show.id) {
+      listenerBroadcast.joinShow(show.id, show.name, show.is_video);
+    }
+    // Deliberately not calling leaveShow() on unmount — navigating away is
+    // meant to minimize into LiveListenerMiniPlayer, not disconnect. See
+    // project_r#20.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [show?.status, show?.id, isOwnBroadcast]);
+  const isListeningToThisShow = listenerBroadcast.currentShowId === show?.id;
+  const listenerRoom = isListeningToThisShow ? listenerBroadcast.room : null;
+  const listenerConnectionState = isListeningToThisShow ? listenerBroadcast.connectionState : 'connecting';
   const activeRoom = isOwnBroadcast ? liveBroadcast.room : listenerRoom;
   // Station members who aren't the current broadcaster don't get the
   // moderator UI here yet — the backend enforces the real permission
