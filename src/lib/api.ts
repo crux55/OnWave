@@ -1317,7 +1317,7 @@ export async function grantDJByUsername(username: string): Promise<string> {
   return result.user_id;
 }
 
-export type FeedbackType = 'bug' | 'feature';
+export type FeedbackType = 'bug' | 'feature' | 'station_suggestion';
 
 export interface FeedbackReport {
   id: string;

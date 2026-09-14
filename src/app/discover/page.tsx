@@ -13,6 +13,7 @@ import { fetchFromApi, toPlayerStation } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { useLikedStations } from '@/hooks/use-liked-stations';
 import { RadioStationCard } from '@/components/RadioStationCard';
+import { SuggestStationDialog } from '@/components/SuggestStationDialog';
 import {
   Select,
   SelectContent,
@@ -282,11 +283,20 @@ function DiscoverPageContent() {
   return (
     <div className="container mx-auto">
       <header className="mb-6">
-        <div className="flex items-center gap-3 mb-3">
-          <SearchIcon className="h-8 w-8 text-accent" />
-          <h1 className="font-display text-3xl font-bold tracking-tight text-foreground">
-            Discover
-          </h1>
+        <div className="flex items-center justify-between gap-3 mb-3">
+          <div className="flex items-center gap-3">
+            <SearchIcon className="h-8 w-8 text-accent" />
+            <h1 className="font-display text-3xl font-bold tracking-tight text-foreground">
+              Discover
+            </h1>
+          </div>
+          <SuggestStationDialog
+            trigger={
+              <Button variant="outline" size="sm">
+                Suggest a station
+              </Button>
+            }
+          />
         </div>
         <p className="text-md text-muted-foreground">
           Search thousands of stations worldwide, from radio-browser's global directory.

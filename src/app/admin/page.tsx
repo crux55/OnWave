@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { jwtDecode as jwt_decode } from 'jwt-decode';
-import { ShieldCheck, ShieldAlert, Loader2, Check, X, UserPlus, Sparkles, Copy, Bug, Lightbulb, MessageCircle } from 'lucide-react';
+import { ShieldCheck, ShieldAlert, Loader2, Check, X, UserPlus, Sparkles, Copy, Bug, Lightbulb, MessageCircle, Radio } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -302,7 +302,7 @@ export default function AdminPage() {
 
           <section>
             <h3 className="text-xl font-semibold text-foreground mb-3 flex items-center gap-2">
-              <MessageCircle className="h-5 w-5 text-accent" /> Bug Reports &amp; Feature Ideas
+              <MessageCircle className="h-5 w-5 text-accent" /> Bug Reports, Feature Ideas &amp; Station Suggestions
             </h3>
             {feedbackReports.length === 0 ? (
               <p className="text-sm text-muted-foreground">No reports yet.</p>
@@ -319,7 +319,13 @@ export default function AdminPage() {
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-                          {report.type === 'bug' ? <Bug className="h-3.5 w-3.5 text-destructive" /> : <Lightbulb className="h-3.5 w-3.5 text-accent" />}
+                          {report.type === 'bug' ? (
+                            <Bug className="h-3.5 w-3.5 text-destructive" />
+                          ) : report.type === 'station_suggestion' ? (
+                            <Radio className="h-3.5 w-3.5 text-accent" />
+                          ) : (
+                            <Lightbulb className="h-3.5 w-3.5 text-accent" />
+                          )}
                           {report.username || 'Anonymous'}
                           {report.page_url && <span className="font-normal text-muted-foreground">— {report.page_url}</span>}
                         </div>
