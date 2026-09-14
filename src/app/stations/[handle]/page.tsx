@@ -2,7 +2,7 @@
 
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { jwtDecode as jwt_decode } from 'jwt-decode';
 import { Radio, Loader2, Users, Heart, Calendar, Bell, UserCircle2, Clock, Award, Plus, ShieldCheck, UserPlus, UserMinus, Pencil, Check, X, Upload as UploadIcon } from 'lucide-react';
 import { BadgeIcon } from '@/components/BadgeIcon';
@@ -13,7 +13,8 @@ import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { GoLiveDialog } from '@/components/live/GoLiveDialog';
-import { fetchStation, fetchMyFollows, followTarget, unfollowTarget, createBadge, awardBadge, revokeBadge, uploadBadgeIcon, inviteStationMember, updateStation, removeStationMember, type StationDetail, type Follow, type ScrapedShowSummary } from '@/lib/api';
+import { ClipsList } from '@/components/live/ClipsList';
+import { fetchStation, fetchMyFollows, followTarget, unfollowTarget, createBadge, awardBadge, revokeBadge, uploadBadgeIcon, inviteStationMember, updateStation, removeStationMember, fetchStationClips, type StationDetail, type Follow, type ScrapedShowSummary } from '@/lib/api';
 import type { Token } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 
@@ -505,6 +506,9 @@ export default function StationPage() {
                     ))}
                   </div>
                 )}
+              </section>
+              <section className="mt-8">
+                <ClipsList fetcher={useCallback(() => fetchStationClips(station.id), [station.id])} />
               </section>
             </TabsContent>
 

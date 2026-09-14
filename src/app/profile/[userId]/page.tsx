@@ -2,14 +2,15 @@
 
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { UserCircle2, Loader2, Award, FileText, Radio } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { BadgeIcon } from '@/components/BadgeIcon';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { fetchPublicProfile, fetchUserBadges, fetchUserStations, type Badge, type Station } from '@/lib/api';
+import { ClipsList } from '@/components/live/ClipsList';
+import { fetchPublicProfile, fetchUserBadges, fetchUserStations, fetchDJClips, type Badge, type Station } from '@/lib/api';
 import type { Profile } from '@/lib/types';
 
 export default function PublicProfilePage() {
@@ -127,6 +128,13 @@ export default function PublicProfilePage() {
                   ))}
                 </div>
               </section>
+            </>
+          )}
+
+          {profile && (
+            <>
+              <Separator />
+              <ClipsList fetcher={useCallback(() => fetchDJClips(profile.user_id), [profile.user_id])} />
             </>
           )}
         </CardContent>

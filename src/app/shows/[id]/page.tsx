@@ -8,11 +8,12 @@ import { Loader2, Radio, CalendarClock, CircleOff, Play, Pause, Users, X } from 
 import { Button } from '@/components/ui/button';
 import { LiveBroadcastPlayer } from '@/components/live/LiveBroadcastPlayer';
 import { LiveChatPanel } from '@/components/live/LiveChatPanel';
+import { ClipsList } from '@/components/live/ClipsList';
 import { useLiveBroadcast } from '@/contexts/LiveBroadcastContext';
 import { useListenerBroadcast } from '@/contexts/ListenerBroadcastContext';
 import { useResolvedStationStream } from '@/hooks/use-external-live-streams';
 import { usePlayer } from '@/contexts/PlayerContext';
-import { fetchShow, closeRoom } from '@/lib/api';
+import { fetchShow, closeRoom, fetchShowClips } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import type { InternalShow, RadioStation, Token } from '@/lib/types';
 
@@ -239,6 +240,8 @@ export default function ShowDetailPage() {
           )}
         </div>
       )}
+
+      <ClipsList fetcher={useCallback(() => fetchShowClips(show.id), [show.id])} />
     </div>
   );
 }

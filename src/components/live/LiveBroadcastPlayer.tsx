@@ -23,6 +23,7 @@ import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { useLiveBroadcast } from '@/contexts/LiveBroadcastContext';
 import { terminateBroadcast } from '@/lib/api';
+import { ClipButton } from '@/components/live/ClipButton';
 import type { InternalShow } from '@/lib/types';
 import type { ListenerConnectionState } from '@/contexts/ListenerBroadcastContext';
 
@@ -182,7 +183,14 @@ function ListenerView({ show, isAdmin, room, connectionState }: {
           <Badge className="bg-red-600 hover:bg-red-600 text-white">LIVE</Badge>
           <span className="font-display text-lg font-semibold">{show.name}</span>
         </div>
-        <span className="text-sm text-muted-foreground">{show.viewer_count} listening</span>
+        <div className="flex items-center gap-3">
+          <span className="text-sm text-muted-foreground">{show.viewer_count} listening</span>
+          <ClipButton
+            showId={show.id}
+            mediaRef={show.is_video && hasVideoTrack ? videoRef : audioRef}
+            isReady={connectionState === 'connected' && (!show.is_video || hasVideoTrack)}
+          />
+        </div>
       </div>
 
       {show.is_video && (

@@ -1,4 +1,4 @@
-import type { RadioStation, TopTag, PBSShow, InternalShow, WebradioSearchResponse, TopStationsResponse, Profile } from '@/lib/types';
+import type { RadioStation, TopTag, PBSShow, InternalShow, WebradioSearchResponse, TopStationsResponse, Profile, Clip } from '@/lib/types';
 import { PINNED_STATIONS } from '@/lib/pinned-stations';
 import { isValidImageUrl } from '@/lib/utils';
 
@@ -1710,6 +1710,53 @@ export async function fetchUserBadges(userId: string): Promise<Badge[]> {
   }
   const result = await response.json();
   return result.badges || [];
+}
+
+// createClip uploads a ~30s webm recording (video or audio) captured by
+// ClipButton's rolling buffer, attributing it to the currently logged-in
+// user. See project_r#21.
+export async function createClip(showId: string, blob: Blob, durationSeconds: number): Promise<Clip> {
+  const token = localStorage.getItem('token');
+  if (!token) {
+    throw new Error('User not authenticated');
+  }
+  const auth = JSON.parse(token);
+  const formData = new FormData();
+  formData.append('clip', blob, 'clip.webm');
+  formData.append('duration_seconds', String(durationSeconds));
+
+  const response = await fetch(`/api/shows/${showId}/clips`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${auth.token}` },
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => '');
+    if (response.status === 401) {
+      throw new Error('UNAUTHORIZED');
+    }
+    throw new Error(errorText || 'Failed to save clip');
+  }
+  return response.json();
+}
+
+export async function fetchShowClips(showId: string): Promise<Clip[]> {
+  const response = await fetch(`/api/shows/${showId}/clips`);
+  if (!response.ok) return [];
+  return response.json();
+}
+
+export async function fetchStationClips(handle: string): Promise<Clip[]> {
+  const response = await fetch(`/api/stations/${handle}/clips`);
+  if (!response.ok) return [];
+  return response.json();
+}
+
+export async function fetchDJClips(userId: string): Promise<Clip[]> {
+  const response = await fetch(`/api/users/${userId}/clips`);
+  if (!response.ok) return [];
+  return response.json();
 }
 
 export async function fetchAllShows(): Promise<InternalShow[]> {

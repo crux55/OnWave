@@ -121,6 +121,20 @@ export interface InternalShow {
   tags?: string | null;
 }
 
+// A short (~30s) recording a listener captured of a live moment via
+// ClipButton's rolling buffer — surfaced on the show, station, and DJ
+// profile pages it came from (project_r#21).
+export interface Clip {
+  id: string;
+  show_id: string;
+  show_name: string;
+  user_id: string;
+  username: string;
+  media_url: string;
+  duration_seconds: number;
+  created_at: string;
+}
+
 export interface PBSShow {
   id: number;
   name: string;
