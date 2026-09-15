@@ -1,15 +1,16 @@
 'use client';
 
 import { useParams, useRouter } from 'next/navigation';
-import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
-import { UserCircle2, Loader2, Award, FileText, Radio } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { BadgeIcon } from '@/components/BadgeIcon';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { UserCircle2, Loader2 } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { ClipsList } from '@/components/live/ClipsList';
+import { ProfileHeader } from '@/components/profile/ProfileHeader';
+import { ProfileBioSection } from '@/components/profile/ProfileBioSection';
+import { ProfileBadgesSection } from '@/components/profile/ProfileBadgesSection';
+import { ProfileStationsSection } from '@/components/profile/ProfileStationsSection';
 import { fetchPublicProfile, fetchUserBadges, fetchUserStations, fetchDJClips, type Badge, type Station } from '@/lib/api';
 import type { Profile } from '@/lib/types';
 
@@ -66,77 +67,31 @@ export default function PublicProfilePage() {
   return (
     <div className="container mx-auto py-8 max-w-2xl">
       <Card className="shadow-xl">
-        <CardHeader className="items-center text-center border-b pb-6">
-          <Avatar className="h-24 w-24 border-4 border-primary mb-4 shadow-md">
-            <AvatarImage src={getAvatarUrl(profile.avatar)} alt="User Avatar" />
-            <AvatarFallback>
-              <UserCircle2 className="h-16 w-16 text-muted-foreground" />
-            </AvatarFallback>
-          </Avatar>
-          <CardTitle className="text-3xl">{profile.name || 'OnWave User'}</CardTitle>
-          {profile.location && <CardDescription>{profile.location}</CardDescription>}
-        </CardHeader>
+        <ProfileHeader
+          avatarUrl={getAvatarUrl(profile.avatar)}
+          name={profile.name || 'OnWave User'}
+          subtitle={profile.location}
+          size="md"
+        />
         <CardContent className="p-6 md:p-8 space-y-8">
-          <section>
-            <h3 className="text-xl font-semibold text-foreground mb-3 flex items-center gap-2">
-              <FileText className="h-5 w-5 text-primary" /> Bio
-            </h3>
-            <p className="text-sm text-muted-foreground leading-relaxed pl-2 border-l-2 border-primary/50">
-              {profile.bio || "This user hasn't added a bio yet."}
-            </p>
-          </section>
+          <ProfileBioSection bio={profile.bio} emptyText="This user hasn't added a bio yet." />
 
           {badges.length > 0 && (
             <>
               <Separator />
-              <section>
-                <h3 className="text-xl font-semibold text-foreground mb-3 flex items-center gap-2">
-                  <Award className="h-5 w-5 text-primary" /> Badges
-                </h3>
-                <div className="flex flex-wrap gap-2">
-                  {badges.map(badge => (
-                    <div
-                      key={badge.id}
-                      title={badge.issuer_name ? `${badge.description} — awarded by ${badge.issuer_name}` : badge.description}
-                      className="flex items-center gap-1.5 rounded-full border border-border bg-muted/30 px-3 py-1.5 text-sm"
-                    >
-                      <BadgeIcon badge={badge} size={18} />
-                      <span className="font-medium text-foreground">{badge.name}</span>
-                    </div>
-                  ))}
-                </div>
-              </section>
+              <ProfileBadgesSection badges={badges} />
             </>
           )}
 
           {stations.length > 0 && (
             <>
               <Separator />
-              <section>
-                <h3 className="text-xl font-semibold text-foreground mb-3 flex items-center gap-2">
-                  <Radio className="h-5 w-5 text-primary" /> Stations
-                </h3>
-                <div className="flex flex-wrap gap-2">
-                  {stations.map(station => (
-                    <Link
-                      key={station.id}
-                      href={`/stations/${station.slug || station.id}`}
-                      className="flex items-center gap-1.5 rounded-full border border-border bg-muted/30 px-3 py-1.5 text-sm hover:bg-muted/60 transition-colors"
-                    >
-                      <span className="font-medium text-foreground">{station.name}</span>
-                    </Link>
-                  ))}
-                </div>
-              </section>
+              <ProfileStationsSection stations={stations} />
             </>
           )}
 
-          {profile && (
-            <>
-              <Separator />
-              <ClipsList fetcher={useCallback(() => fetchDJClips(profile.user_id), [profile.user_id])} />
-            </>
-          )}
+          <Separator />
+          <ClipsList fetcher={useCallback(() => fetchDJClips(profile.user_id), [profile.user_id])} />
         </CardContent>
       </Card>
     </div>
