@@ -16,6 +16,8 @@ import { useLikedStations } from '@/hooks/use-liked-stations';
 import { useNowPlaying } from '@/hooks/use-now-playing';
 import { SafeImage } from '@/components/SafeImage';
 import { StationAvatar } from '@/components/StationAvatar';
+import { useMobileDock } from '@/contexts/MobileDockContext';
+import { useReportHeight } from '@/hooks/use-report-height';
 
 declare global {
   interface HTMLMediaElement {
@@ -49,6 +51,15 @@ export function RadioPlayer({ station, className }: RadioPlayerProps) {
   const streamUrl = station?.url_resolved || station?.url;
   const chromecast = useChromecast(streamUrl, station?.name, station?.codec);
   const { isLiked, toggleLike } = useLikedStations();
+  // On mobile, the standard bar (not the separate minimized corner-card
+  // below) only actually occupies screen space when it's the thing showing
+  // above MobileBottomDock's strip — otherwise it stays mounted (so
+  // playback/audio effects keep running) but hidden and reports 0 height.
+  // Desktop is unaffected; see the `sm:` overrides in playerRootClasses.
+  const dock = useMobileDock();
+  const mobileDockActive = dock.activeTab === 'player' && !dock.minimized;
+  const reportPlayerHeight = useCallback((h: number) => dock.reportHeight('player', h), [dock.reportHeight]);
+  const barRef = useReportHeight(mobileDockActive, reportPlayerHeight);
 
 
   // Single effect owning both the audio element's lifecycle (creating it,
@@ -266,9 +277,16 @@ export function RadioPlayer({ station, className }: RadioPlayerProps) {
     player.isPlayerMinimized
       ? "bottom-16 right-4 w-72 rounded-lg shadow-lg border"
       // Inset pill, not a flush-edge bar — the rounding only reads as a
-      // pill with margin around it, and the glow is the point.
-      : "left-2 right-2 sm:left-4 sm:right-4 rounded-full border border-border/60 shadow-[0_0_0_1px_hsl(var(--accent)/0.15),0_12px_32px_-8px_hsl(var(--accent)/0.35),0_12px_32px_-12px_hsl(var(--accent-2)/0.25)]",
-    className // Apply the className prop for positioning (bottom offset)
+      // pill with margin around it, and the glow is the point. Mobile:
+      // occupies space only while it's MobileBottomDock's active tab,
+      // sitting just above the dock's strip; desktop always shows at the
+      // bottom, unaffected by the dock (which doesn't exist there).
+      : cn(
+          "left-2 right-2 sm:left-4 sm:right-4 rounded-full border border-border/60 shadow-[0_0_0_1px_hsl(var(--accent)/0.15),0_12px_32px_-8px_hsl(var(--accent)/0.35),0_12px_32px_-12px_hsl(var(--accent-2)/0.25)]",
+          mobileDockActive ? "bottom-14" : "hidden",
+          "sm:block sm:bottom-0"
+        ),
+    className // Apply the className prop for extra overrides (e.g. invisible when maximized)
   );
 
   const playerContainerClasses = cn(
@@ -332,7 +350,7 @@ export function RadioPlayer({ station, className }: RadioPlayerProps) {
 
   // Standard Bar View
   return (
-    <div className={playerRootClasses}>
+    <div ref={barRef} className={playerRootClasses}>
         <div className={playerContainerClasses}>
             <div className={playerFlexClasses}>
                 <div className="flex items-center gap-3 md:gap-4 flex-grow overflow-hidden">

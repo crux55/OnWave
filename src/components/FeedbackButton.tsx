@@ -15,16 +15,17 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { usePlayer } from '@/contexts/PlayerContext';
+import { useMobileDock } from '@/contexts/MobileDockContext';
 import { submitFeedback, type FeedbackType } from '@/lib/api';
-import { cn } from '@/lib/utils';
 
 // Rendered once in the root layout so it floats on every page, per
-// project_r#27. Positioning tracks the same player-bar offset logic the
-// mobile bottom nav already uses (layout.tsx) so it never sits on top of
-// the persistent player bar.
+// project_r#27. On mobile, sits just above MobileBottomDock using its
+// reported real height (the same single source of truth `main`'s padding
+// uses) instead of re-deriving player state itself — that hand-copied
+// duplication was how this button used to fall out of sync with whatever
+// was actually showing at the bottom of the screen. Desktop is unaffected.
 export function FeedbackButton() {
-  const player = usePlayer();
+  const dock = useMobileDock();
   const pathname = usePathname();
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
@@ -48,8 +49,6 @@ export function FeedbackButton() {
     }
   };
 
-  const playerBarOpen = player.isPlayerBarOpen && !player.isMaximizedViewOpen;
-
   return (
     <>
       <Button
@@ -57,14 +56,8 @@ export function FeedbackButton() {
         size="icon"
         aria-label="Report a bug or suggest a feature"
         title="Report a bug or suggest a feature"
-        className={cn(
-          'fixed right-4 z-40 h-12 w-12 rounded-full shadow-lg transition-[bottom]',
-          playerBarOpen
-            ? player.isPlayerMinimized
-              ? 'bottom-16 sm:bottom-4'
-              : 'bottom-24 sm:bottom-4'
-            : 'bottom-20 sm:bottom-4'
-        )}
+        className="fixed right-4 z-40 h-12 w-12 rounded-full shadow-lg transition-[bottom] bottom-[var(--feedback-bottom)] sm:!bottom-4"
+        style={{ ['--feedback-bottom' as string]: `${dock.totalHeight + 16}px` }}
       >
         <MessageCirclePlus className="h-5 w-5" />
       </Button>

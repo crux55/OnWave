@@ -21,6 +21,9 @@ import { LiveListenerMiniPlayer } from '@/components/live/LiveListenerMiniPlayer
 import { FeedbackButton } from '@/components/FeedbackButton';
 import { RemindersProvider } from '@/contexts/RemindersContext';
 import { NotificationProvider } from '@/contexts/NotificationContext';
+import { MobileDockProvider, useMobileDock } from '@/contexts/MobileDockContext';
+import { InstallPromptProvider } from '@/contexts/InstallPromptContext';
+import { MobileBottomDock } from '@/components/MobileBottomDock';
 import { Toaster } from '@/components/ui/toaster';
 import { cn } from '@/lib/utils';
 
@@ -48,18 +51,22 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
       </head>
       <body>
-        <PlayerProvider>
-          <LiveBroadcastProvider>
-            <ListenerBroadcastProvider>
-              <RemindersProvider>
-                <NotificationProvider>
-                  <AppLayoutContent>{children}</AppLayoutContent>
-                  <Toaster />
-                </NotificationProvider>
-              </RemindersProvider>
-            </ListenerBroadcastProvider>
-          </LiveBroadcastProvider>
-        </PlayerProvider>
+        <InstallPromptProvider>
+          <PlayerProvider>
+            <LiveBroadcastProvider>
+              <ListenerBroadcastProvider>
+                <RemindersProvider>
+                  <NotificationProvider>
+                    <MobileDockProvider>
+                      <AppLayoutContent>{children}</AppLayoutContent>
+                      <Toaster />
+                    </MobileDockProvider>
+                  </NotificationProvider>
+                </RemindersProvider>
+              </ListenerBroadcastProvider>
+            </LiveBroadcastProvider>
+          </PlayerProvider>
+        </InstallPromptProvider>
       </body>
     </html>
   );
@@ -69,6 +76,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const player = usePlayer();
   const listener = useListenerBroadcast();
+  const dock = useMobileDock();
   // The live-listener mini-player is hidden on the show's own page (same
   // page it'd otherwise duplicate), same check the component itself makes.
   const isLiveMiniPlayerVisible = !!listener.room && !!listener.currentShowId && pathname !== `/shows/${listener.currentShowId}`;
@@ -99,52 +107,35 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
-      {/* Mobile Bottom Navigation */}
-      <nav
-        className={cn(
-          "sm:hidden fixed left-0 right-0 z-30 flex justify-around border-t bg-background p-2",
-          isLiveMiniPlayerVisible
-            ? "bottom-12" // Above the live-listener mini-player (project_r#20)
-            : player.isPlayerBarOpen && !player.isMaximizedViewOpen
-              ? player.isPlayerMinimized
-                ? "bottom-12" // Above minimized player
-                : "bottom-20" // Above standard player
-              : "bottom-0" // At bottom when no player
-        )}
-      >
-        {navItems.map((item) => (
-          <Button
-            key={item.href}
-            variant={pathname === item.href ? 'secondary' : 'ghost'}
-            asChild
-            className="flex flex-col items-center h-auto p-1 text-xs"
-          >
-            <Link href={item.href}>
-              <item.icon className="h-5 w-5 mb-0.5" />
-              {item.label}
-            </Link>
-          </Button>
-        ))}
-      </nav>
+      <MobileBottomDock navItems={navItems} />
 
       <main
         className={cn(
           "flex-1 overflow-y-auto p-4 md:p-6 lg:p-8",
-          // The fixed player bar overlays content instead of pushing it —
-          // without this, the bottom of the page is unreachable behind it.
+          // Desktop only (mutually-exclusive so exactly one `sm:!pb-*`
+          // class is ever present — two conflicting `!important` classes
+          // at the same breakpoint would leave the winner up to Tailwind's
+          // build-order, not this ternary). The fixed player bar overlays
+          // content instead of pushing it, so without this the bottom of
+          // the page is unreachable behind it. Mobile's own bottom-of-screen
+          // UI is a single dock (MobileBottomDock) that reports its true
+          // rendered height below instead of guessing an offset here.
           isLiveMiniPlayerVisible
-            ? "pb-16"
-            : player.isPlayerBarOpen && !player.isMaximizedViewOpen && !player.isPlayerMinimized && "pb-28 sm:pb-24"
+            ? "sm:!pb-16"
+            : player.isPlayerBarOpen && !player.isMaximizedViewOpen && !player.isPlayerMinimized
+              ? "sm:!pb-24"
+              : "sm:!pb-4 md:!pb-6 lg:!pb-8"
         )}
+        style={{ paddingBottom: dock.totalHeight }}
       >
         {children}
       </main>
 
       {/* Radio Player */}
       {player.isPlayerBarOpen && player.currentStation && (
-        <RadioPlayer 
-          station={player.currentStation} 
-          className={player.isMaximizedViewOpen ? "bottom-0 invisible pointer-events-none" : "bottom-0"}
+        <RadioPlayer
+          station={player.currentStation}
+          className={player.isMaximizedViewOpen ? "invisible pointer-events-none" : undefined}
         />
       )}
       
