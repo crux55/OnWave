@@ -7,12 +7,13 @@ import { usePlayer } from '@/contexts/PlayerContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Search as SearchIcon, AlertTriangle, SlidersHorizontal, ListPlus } from 'lucide-react';
+import { Search as SearchIcon, AlertTriangle, SlidersHorizontal, GalleryHorizontal } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { fetchFromApi, toPlayerStation } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { useLikedStations } from '@/hooks/use-liked-stations';
 import { RadioStationCard } from '@/components/RadioStationCard';
+import { SwipeableStationBrowser } from '@/components/discover/SwipeableStationBrowser';
 import { SuggestStationDialog } from '@/components/SuggestStationDialog';
 import {
   Select,
@@ -225,22 +226,13 @@ function DiscoverPageContent() {
     player.playStation(playerStation);
   };
 
-  const handleAddAllToQueue = () => {
+  const [isBrowserOpen, setIsBrowserOpen] = useState(false);
+
+  const handleOpenBrowser = () => {
     const playable = sortedStations.filter(s => s.url_resolved || s.url).map(toPlayerStation);
     if (playable.length === 0) return;
-
-    // Nothing playing yet means the player bar is closed — appending to
-    // the (nowhere-visible) queue would be a silent no-op from the user's
-    // perspective, so start playback immediately instead, with the rest
-    // queued up behind it. If something's already playing, keep the
-    // append-only behavior so it doesn't interrupt what's currently on.
-    if (!player.isPlayerBarOpen) {
-      player.playQueue(playable);
-      toast({ title: 'Playing queue', description: `Started ${playable[0].name} — ${playable.length} station${playable.length === 1 ? '' : 's'} queued.` });
-    } else {
-      player.addManyToQueue(playable);
-      toast({ title: 'Added to queue', description: `${playable.length} station${playable.length === 1 ? '' : 's'} added.` });
-    }
+    player.playQueue(playable);
+    setIsBrowserOpen(true);
   };
 
   const handleResetFilters = () => {
@@ -491,9 +483,9 @@ function DiscoverPageContent() {
                       ))}
                     </SelectContent>
                   </Select>
-                  <Button variant="outline" size="sm" onClick={handleAddAllToQueue}>
-                    <ListPlus className="mr-1.5 h-4 w-4" />
-                    Add All to Queue
+                  <Button variant="outline" size="sm" onClick={handleOpenBrowser}>
+                    <GalleryHorizontal className="mr-1.5 h-4 w-4" />
+                    Browse All
                   </Button>
                 </div>
               </div>
@@ -518,6 +510,13 @@ function DiscoverPageContent() {
             </div>
           )}
         </div>
+      {isBrowserOpen && (
+        <SwipeableStationBrowser
+          isLiked={isLiked}
+          onToggleLike={(station) => toggleLike(station)}
+          onClose={() => setIsBrowserOpen(false)}
+        />
+      )}
     </div>
   );
 }
