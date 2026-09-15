@@ -82,6 +82,8 @@ export function useChromecast(streamUrl: string | undefined, stationName: string
   const [isRemotePaused, setIsRemotePaused] = useState(false);
   const sessionListenerRef = useRef<((event: any) => void) | null>(null);
   const remotePlayerControllerRef = useRef<any>(null);
+  const remotePlayerRef = useRef<any>(null);
+  const stalledCastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { toast } = useToast();
 
   // The remote player mirrors and controls the cast session's own playback
@@ -95,6 +97,7 @@ export function useChromecast(streamUrl: string | undefined, stationName: string
     const remotePlayer = new window.cast.framework.RemotePlayer();
     const remotePlayerController = new window.cast.framework.RemotePlayerController(remotePlayer);
     remotePlayerControllerRef.current = remotePlayerController;
+    remotePlayerRef.current = remotePlayer;
 
     const onPausedChanged = () => setIsRemotePaused(remotePlayer.isPaused);
     remotePlayerController.addEventListener(
@@ -108,11 +111,18 @@ export function useChromecast(streamUrl: string | undefined, stationName: string
         onPausedChanged
       );
       remotePlayerControllerRef.current = null;
+      remotePlayerRef.current = null;
     };
   }, [available]);
 
   const toggleRemotePlayback = useCallback(() => {
     remotePlayerControllerRef.current?.playOrPause();
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (stalledCastTimeoutRef.current) clearTimeout(stalledCastTimeoutRef.current);
+    };
   }, []);
 
   useEffect(() => {
@@ -163,7 +173,25 @@ export function useChromecast(streamUrl: string | undefined, stationName: string
     mediaInfo.metadata.title = stationName || 'OnWave';
 
     const request = new window.chrome.cast.media.LoadRequest(mediaInfo);
-    session.loadMedia(request).catch(() => {
+
+    if (stalledCastTimeoutRef.current) clearTimeout(stalledCastTimeoutRef.current);
+
+    session.loadMedia(request).then(() => {
+      // loadMedia() resolving only means the receiver accepted the request —
+      // some receivers (seen with NVIDIA Shield, project_r#39/OnWave#39)
+      // then silently never actually start playback, with no further error
+      // on the sender side. Give it a few seconds, then check whether media
+      // genuinely loaded before treating this as a real success.
+      stalledCastTimeoutRef.current = setTimeout(() => {
+        if (!remotePlayerRef.current?.isMediaLoaded) {
+          toast({
+            title: 'Cast connected, but nothing is playing',
+            description: `${deviceName || 'The cast device'} accepted the connection but never started playback of ${stationName || 'this station'}.`,
+            variant: 'destructive',
+          });
+        }
+      }, 8000);
+    }).catch(() => {
       // Casting session exists but the receiver rejected this stream (format/
       // CORS/etc.) — leave the session open, just surface it so it's not a
       // silent failure.
@@ -173,7 +201,7 @@ export function useChromecast(streamUrl: string | undefined, stationName: string
         variant: 'destructive',
       });
     });
-  }, [streamUrl, stationName, codec, toast]);
+  }, [streamUrl, stationName, codec, toast, deviceName]);
 
   const toggleCast = useCallback(async () => {
     if (!available) return;
