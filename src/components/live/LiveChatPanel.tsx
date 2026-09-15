@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import { Room, RoomEvent } from 'livekit-client';
 import { Send, MoreVertical, Trash2, VolumeX, Settings, Loader2 } from 'lucide-react';
 
@@ -159,7 +160,9 @@ export function LiveChatPanel({ show, room, isModerator, currentUserId }: LiveCh
           {messages.map(message => (
             <div key={message.id} className="group flex items-start justify-between gap-2 text-sm">
               <p className="min-w-0 break-words">
-                <span className="font-medium text-foreground">{message.username}</span>
+                <Link href={`/profile/${message.user_id}`} className="font-medium text-foreground hover:underline">
+                  {message.username}
+                </Link>
                 {message.badges?.map(badge => (
                   <BadgeIcon key={badge.id} badge={badge} title={badge.name} size={14} className="mx-1 inline-block" />
                 ))}
