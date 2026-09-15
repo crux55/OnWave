@@ -1,38 +1,41 @@
-
 'use client';
 
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import type { RadioStation } from '@/lib/types';
 import { usePlayer } from '@/contexts/PlayerContext';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Slider } from '@/components/ui/slider';
-import Image from 'next/image';
 import {
-  Play, Pause, Volume2, VolumeX, SkipForward, SkipBack, Loader2, ExternalLink, Minimize2, Music2, X, Users
+  Play, Pause, SkipForward, SkipBack, ChevronLeft, ChevronRight, X,
 } from 'lucide-react';
-import { cn, getProxiedFaviconUrl } from '@/lib/utils';
-import { AudioVisualizer } from '@/components/AudioVisualizer';
-import { VisualizerStylePicker } from '@/components/VisualizerStylePicker';
-import { useAudioVisualizer } from '@/hooks/use-audio-visualizer';
-import { useVisualizerStyle } from '@/hooks/use-visualizer-style';
+import { cn } from '@/lib/utils';
+import { useButterchurn } from '@/hooks/use-butterchurn';
 import { useChromecast } from '@/hooks/use-chromecast';
-import { CreateRoomDialog } from '@/components/CreateRoomDialog';
 import { useNowPlaying } from '@/hooks/use-now-playing';
 
 interface MaximizedPlayerDialogProps {
   station: RadioStation;
 }
 
+const HIDE_DELAY_MS = 2000;
+
+// A genuinely fullscreen overlay, not a centered shadcn Dialog — the whole
+// screen is a real Butterchurn visualizer (see use-butterchurn.ts), with a
+// transport/preset control cluster that fades to transparent after 2s of
+// inactivity and reappears on mouse move / touch. Volume, "Open Stream",
+// and "Start a Room" are deliberately not carried into this view (not in
+// the requested control set) — they stay reachable from the standard
+// player bar / mobile dock.
 export function MaximizedPlayerDialog({ station }: MaximizedPlayerDialogProps) {
   const player = usePlayer();
   const streamUrl = station.url_resolved || station.url;
-  // isLoading and error states might need to be mirrored from RadioPlayer or context if they are specific to playback attempts.
-  // For simplicity, we'll rely on context's isPlaying for now.
-  const [lastVolumeBeforeMute, setLastVolumeBeforeMute] = React.useState(player.volume);
-  const { mode: visualizerMode, getFrequencyData, getTimeDomainData } = useAudioVisualizer(player.audioElementRef.current, player.isPlaying);
-  const { style: visualizerStyle, setStyle: setVisualizerStyle } = useVisualizerStyle();
   const chromecast = useChromecast(streamUrl, station.name, station.codec);
+
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const { presetName, nextPreset, previousPreset } = useButterchurn(
+    canvasRef,
+    player.audioElementRef.current,
+    player.isMaximizedViewOpen
+  );
 
   const togglePlayPause = useCallback(() => {
     if (!streamUrl) return;
@@ -48,160 +51,122 @@ export function MaximizedPlayerDialog({ station }: MaximizedPlayerDialogProps) {
   const isPlayingDisplay = chromecast.isCasting ? !chromecast.isRemotePaused : player.isPlaying;
   const nowPlaying = useNowPlaying(streamUrl, isPlayingDisplay);
 
-  const handleVolumeChange = useCallback((newVolume: number[]) => {
-    const vol = newVolume[0];
-    player.setVolume(vol);
-     if (vol > 0 && player.isMuted) {
-      player.setIsMuted(false);
-    } else if (vol === 0 && !player.isMuted) {
-      player.setIsMuted(true);
-    }
+  const [controlsVisible, setControlsVisible] = useState(true);
+  const hideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showControls = useCallback(() => {
+    setControlsVisible(true);
+    if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current);
+    hideTimeoutRef.current = setTimeout(() => setControlsVisible(false), HIDE_DELAY_MS);
+  }, []);
+
+  useEffect(() => {
+    if (!player.isMaximizedViewOpen) return;
+    showControls();
+    return () => {
+      if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current);
+    };
+  }, [player.isMaximizedViewOpen, showControls]);
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') player.closeMaximizedPlayer();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
   }, [player]);
 
-  const toggleMute = useCallback(() => {
-    const newMuted = !player.isMuted;
-    player.setIsMuted(newMuted);
-    if (newMuted) {
-      setLastVolumeBeforeMute(player.volume);
-      // player.setVolume(0); // Context handles this via audioRef listener
-    } else {
-      // player.setVolume(lastVolumeBeforeMute > 0 ? lastVolumeBeforeMute : 0.1); // Context handles this
-    }
-  }, [player.isMuted, player.volume, player.setIsMuted, player.setVolume, lastVolumeBeforeMute]);
-
-
-  // DialogClose X button is handled by ShadCN Dialog, which calls onOpenChange(false)
-  // onOpenChange for the dialog should call player.closeMaximizedPlayer()
-  const handleDialogClose = (open: boolean) => {
-    if (!open) {
-      player.closeMaximizedPlayer();
-    }
-  };
+  if (!player.isMaximizedViewOpen) return null;
 
   return (
-    <Dialog open={player.isMaximizedViewOpen} onOpenChange={handleDialogClose}>
-      <DialogContent hideCloseButton className="sm:max-w-2xl md:max-w-3xl lg:max-w-4xl p-0 overflow-hidden data-[state=open]:min-h-[70vh] flex flex-col">
-        <div className="relative h-60 sm:h-80 md:h-96 w-full">
-          <Image
-            src={getProxiedFaviconUrl(station.favicon) || `https://placehold.co/1200x800.png`}
-            alt={`${station.name} artwork`}
-            layout="fill"
-            objectFit="cover"
-            className="bg-muted blur-md scale-110 opacity-50"
-            data-ai-hint="radio station background"
-            // See SafeImage.tsx: a relative /api/favicon-cache path can't be
-            // optimized by next/image's self-fetch behind nginx's /api/
-            // routing, so this must go straight to the browser unoptimized.
-            unoptimized
-          />
-          <div className="absolute inset-0">
-            <AudioVisualizer
-              mode={visualizerMode}
-              style={visualizerStyle}
-              getFrequencyData={getFrequencyData}
-              getTimeDomainData={getTimeDomainData}
-              isPlaying={player.isPlaying}
-            />
-          </div>
-          <div className="absolute inset-0 bg-gradient-to-t from-card via-card/70 to-transparent" />
-          <VisualizerStylePicker
-            value={visualizerStyle}
-            onChange={setVisualizerStyle}
-            className="absolute top-4 left-4 z-10"
-          />
-          <div className="absolute bottom-0 left-0 p-6 w-full">
-            <DialogHeader>
-              <DialogTitle className="text-3xl sm:text-4xl font-bold text-card-foreground truncate">{station.name}</DialogTitle>
-              {nowPlaying && (
-                <p className="text-base font-medium text-card-foreground/90 truncate">{nowPlaying}</p>
-              )}
-              <p className="text-sm text-muted-foreground">{station.tags} &bull; {station.country}</p>
-            </DialogHeader>
-          </div>
-           <DialogClose asChild className="absolute top-4 right-4 z-50">
-            <Button variant="ghost" size="icon" className="bg-card/50 hover:bg-card/80 text-card-foreground hover:text-accent-foreground rounded-full">
-              <X className="h-5 w-5" />
-            </Button>
-          </DialogClose>
-        </div>
+    <div
+      className="fixed inset-0 z-50 bg-black"
+      onPointerMove={showControls}
+      onPointerDown={showControls}
+    >
+      <canvas ref={canvasRef} className="h-full w-full" />
 
-        <div className="flex-grow p-6 space-y-6">
-
-          {/* Player Controls */}
-          <div className="flex flex-col items-center space-y-4">
-            <div className="flex items-center gap-4">
-              <Button
-                onClick={player.playPrevious}
-                variant="ghost"
-                size="icon"
-                className={cn("w-12 h-12", !player.hasPrevious && "text-muted-foreground/70")}
-                disabled={!player.hasPrevious}
-                title="Previous in queue"
-              >
-                <SkipBack className="h-6 w-6" />
-              </Button>
-              <Button
-                onClick={togglePlayPause}
-                variant="outline"
-                size="icon"
-                className="w-16 h-16 rounded-full border-2 border-primary hover:bg-primary/10"
-                disabled={!streamUrl /* || player.isLoading - if isLoading is in context */}
-              >
-                {/* {player.isLoading ? <Loader2 className="h-8 w-8 animate-spin text-primary" /> : player.isPlaying ? <Pause className="h-8 w-8 text-primary" /> : <Play className="h-8 w-8 text-primary" />} */}
-                 {isPlayingDisplay ? <Pause className="h-8 w-8 text-primary" /> : <Play className="h-8 w-8 text-primary" />}
-              </Button>
-              <Button
-                onClick={player.playNext}
-                variant="ghost"
-                size="icon"
-                className={cn("w-12 h-12", !player.hasNext && "text-muted-foreground/70")}
-                disabled={!player.hasNext}
-                title="Next in queue"
-              >
-                <SkipForward className="h-6 w-6" />
-              </Button>
-            </div>
-
-            {/* Volume Control */}
-            <div className="flex items-center gap-3 w-full max-w-xs pt-4">
-              <Button onClick={toggleMute} variant="ghost" size="icon">
-                {player.isMuted || player.volume === 0 ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
-              </Button>
-              <Slider
-                value={[player.isMuted ? 0 : player.volume]}
-                max={1}
-                step={0.01}
-                onValueChange={handleVolumeChange}
-                className="flex-grow"
-                aria-label="Volume control"
-              />
-            </div>
+      <div
+        className={cn(
+          'absolute inset-0 flex flex-col justify-between bg-gradient-to-b from-black/60 via-transparent to-black/60 transition-opacity duration-500',
+          controlsVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'
+        )}
+      >
+        <div className="flex items-start justify-between p-6">
+          <div className="min-w-0">
+            <h2 className="truncate text-2xl font-bold text-white drop-shadow-md">{station.name}</h2>
+            {nowPlaying && <p className="truncate text-sm text-white/80 drop-shadow-md">{nowPlaying}</p>}
+            {presetName && <p className="truncate text-xs text-white/50 drop-shadow-md">{presetName}</p>}
           </div>
-        </div>
-
-        <DialogFooter className="p-6 border-t items-center justify-between sm:justify-between">
-          <div className="flex items-center gap-1">
-            <Button variant="ghost" asChild className="text-sm" disabled={!streamUrl}>
-              <a href={streamUrl} target="_blank" rel="noopener noreferrer" aria-label="Open stream URL">
-                <ExternalLink className="mr-2 h-4 w-4" /> Open Stream
-              </a>
-            </Button>
-            <CreateRoomDialog
-              station={station}
-              trigger={
-                <Button variant="ghost" className="text-sm" disabled={!streamUrl}>
-                  <Users className="mr-2 h-4 w-4" /> Start a Room
-                </Button>
-              }
-            />
-          </div>
-          <Button variant="outline" onClick={player.closeMaximizedPlayer}>
-            <Minimize2 className="mr-2 h-4 w-4" />
-            Collapse to Bar
+          <Button
+            onClick={player.closeMaximizedPlayer}
+            variant="ghost"
+            size="icon"
+            className="shrink-0 rounded-full bg-black/40 text-white hover:bg-black/60"
+            aria-label="Exit fullscreen"
+          >
+            <X className="h-5 w-5" />
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </div>
+
+        <div className="flex flex-col items-center gap-4 p-6">
+          <div className="flex items-center gap-3">
+            <Button
+              onClick={previousPreset}
+              variant="ghost"
+              size="icon"
+              className="rounded-full bg-black/40 text-white hover:bg-black/60"
+              aria-label="Previous preset"
+              title="Previous preset"
+            >
+              <ChevronLeft className="h-5 w-5" />
+            </Button>
+            <Button
+              onClick={nextPreset}
+              variant="ghost"
+              size="icon"
+              className="rounded-full bg-black/40 text-white hover:bg-black/60"
+              aria-label="Next preset"
+              title="Next preset"
+            >
+              <ChevronRight className="h-5 w-5" />
+            </Button>
+          </div>
+
+          <div className="flex items-center gap-5">
+            <Button
+              onClick={player.playPrevious}
+              variant="ghost"
+              size="icon"
+              className={cn('h-12 w-12 rounded-full bg-black/40 text-white hover:bg-black/60', !player.hasPrevious && 'opacity-40')}
+              disabled={!player.hasPrevious}
+              aria-label="Previous station"
+            >
+              <SkipBack className="h-6 w-6" />
+            </Button>
+            <Button
+              onClick={togglePlayPause}
+              variant="ghost"
+              size="icon"
+              className="h-16 w-16 rounded-full border-2 border-white/80 bg-black/40 text-white hover:bg-black/60"
+              disabled={!streamUrl}
+              aria-label={isPlayingDisplay ? 'Pause' : 'Play'}
+            >
+              {isPlayingDisplay ? <Pause className="h-8 w-8" /> : <Play className="h-8 w-8" />}
+            </Button>
+            <Button
+              onClick={player.playNext}
+              variant="ghost"
+              size="icon"
+              className={cn('h-12 w-12 rounded-full bg-black/40 text-white hover:bg-black/60', !player.hasNext && 'opacity-40')}
+              disabled={!player.hasNext}
+              aria-label="Next station"
+            >
+              <SkipForward className="h-6 w-6" />
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
-

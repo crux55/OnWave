@@ -35,6 +35,8 @@
     "@react-oauth/google": "^0.13.5",
     "@sentry/nextjs": "^10.74.0",
     "@tanstack/react-query": "^5.66.0",
+    "butterchurn": "^2.6.7",
+    "butterchurn-presets": "^2.4.7",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.0.0",
