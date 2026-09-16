@@ -35,6 +35,9 @@ interface RadioPlayerProps {
 
 export function RadioPlayer({ station, className }: RadioPlayerProps) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  // Tracks which streamUrl (if any) has already had a no-CORS retry — reset
+  // on every genuinely new station so each one gets its own fresh attempt.
+  const retriedWithoutCorsRef = useRef<string | null>(null);
   const player = usePlayer();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setErrorState] = useState<string | null>(null);
@@ -92,14 +95,21 @@ export function RadioPlayer({ station, className }: RadioPlayerProps) {
     if (!audioRef.current) {
       audioRef.current = new Audio();
       // Lets the visualizer attempt real frequency analysis via Web Audio —
-      // harmless for playback either way, streams that don't send CORS
-      // headers just stay untaint-able for analysis and keep playing normally.
+      // usually harmless even without CORS headers (the source just stays
+      // untaint-able for analysis and keeps playing normally), but some
+      // stream servers (e.g. KEXP's) reject a CORS-mode request outright
+      // instead of just omitting the headers — handleAudioError below
+      // detects that and retries without it, per station.
       audioRef.current.crossOrigin = 'anonymous';
       player.audioElementRef.current = audioRef.current;
     }
     const currentAudio = audioRef.current;
 
     if (streamUrl && currentAudio.src !== streamUrl) {
+      // Fresh attempt with CORS enabled for every new station, regardless
+      // of whether a previous station needed the no-CORS fallback below.
+      currentAudio.crossOrigin = 'anonymous';
+      retriedWithoutCorsRef.current = null;
       currentAudio.src = streamUrl;
       currentAudio.load();
     }
@@ -107,6 +117,15 @@ export function RadioPlayer({ station, className }: RadioPlayerProps) {
     const handleAudioError = (e: Event) => {
       const audioElement = e.target as HTMLAudioElement;
       const mediaError = audioElement.error;
+
+      // Retry once without CORS mode before surfacing a real error — losing
+      // visualizer support for this one stream beats losing audio entirely.
+      if (audioElement.crossOrigin && retriedWithoutCorsRef.current !== streamUrl) {
+        retriedWithoutCorsRef.current = streamUrl ?? null;
+        audioElement.crossOrigin = null;
+        audioElement.load();
+        return;
+      }
 
       let uiErrorMessage = 'Stream error';
 
