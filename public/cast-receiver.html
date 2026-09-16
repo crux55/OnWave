@@ -78,9 +78,12 @@
         hideTitleTimeout = setTimeout(() => titleOverlay.classList.remove('visible'), 5000);
       }
 
-      // No remote console access to a TV -- surface real errors on-screen
-      // (doesn't auto-hide, unlike the title) rather than debugging blind.
+      // On-screen error text is a fallback for when nobody has DevTools
+      // open -- console logging (below) is the real diagnostic path, via
+      // chrome://inspect/#devices on a computer on the same network while
+      // a cast session is active.
       function showError(message) {
+        console.error('[OnWave]', message);
         stationGenreEl.textContent = message;
         stationGenreEl.style.color = '#ff6b6b';
         titleOverlay.classList.add('visible');
@@ -90,6 +93,9 @@
         const err = audioEl.error;
         showError('Stream error' + (err ? ' (code ' + err.code + ')' : ''));
       });
+      ['loadstart', 'waiting', 'stalled', 'canplay', 'suspend'].forEach((eventName) => {
+        audioEl.addEventListener(eventName, () => console.log('[OnWave] audio event:', eventName));
+      });
 
       // AbortError from play() is documented, expected browser behavior --
       // it fires whenever a second command (even a legitimate one, like a
@@ -97,9 +103,11 @@
       // supersedes a still-pending play() call. It does NOT mean playback
       // actually failed, so this must never be surfaced as a real error.
       function attemptPlay() {
+        console.log('[OnWave] attemptPlay() called, src=', audioEl.src);
         const playPromise = audioEl.play();
         if (playPromise && typeof playPromise.catch === 'function') {
           playPromise.catch((err) => {
+            console.log('[OnWave] play() rejected:', err.name, err.message);
             if (err.name !== 'AbortError') showError('Playback failed: ' + err.message);
           });
         }
@@ -116,11 +124,13 @@
         cast.framework.messages.MessageType.LOAD,
         (loadRequestData) => {
           const media = loadRequestData.media;
+          console.log('[OnWave] LOAD received', media);
           // The sender builds MediaInfo via the legacy chrome.cast.media.MediaInfo
           // constructor (use-chromecast.ts), which sets contentId, not contentUrl --
           // those are different fields; contentUrl is only populated when a sender
           // sets it explicitly, which ours doesn't.
           audioEl.src = media.contentUrl || media.contentId;
+          console.log('[OnWave] audio src set to', audioEl.src);
           attemptPlay();
           const metadata = media.metadata || {};
           showTitle(metadata.title, metadata.artist);
@@ -155,11 +165,13 @@
       // in the app), since the receiver plays the stream itself rather than
       // receiving audio from the phone/laptop.
       function initVisualizer() {
+        console.log('[OnWave] initVisualizer() starting');
         try {
           if (typeof butterchurn === 'undefined' || typeof butterchurnPresets === 'undefined') {
             showError('Visualizer failed to load (CDN script blocked?)');
             return;
           }
+          console.log('[OnWave] butterchurn/butterchurnPresets globals present');
 
           const AudioContextClass = window.AudioContext || window.webkitAudioContext;
           const audioContext = new AudioContextClass();
@@ -167,10 +179,12 @@
           const analyser = audioContext.createAnalyser();
           source.connect(analyser);
           analyser.connect(audioContext.destination);
+          console.log('[OnWave] AudioContext state:', audioContext.state);
 
           const pixelRatio = window.devicePixelRatio || 1;
           canvas.width = window.innerWidth * pixelRatio;
           canvas.height = window.innerHeight * pixelRatio;
+          console.log('[OnWave] canvas size:', canvas.width, 'x', canvas.height, 'innerWidth/Height:', window.innerWidth, window.innerHeight);
 
           // The UMD bundle's harmony default export means the plain
           // <script>-tag global is {__esModule: true, default: Butterchurn},
@@ -183,9 +197,11 @@
             pixelRatio,
             textureRatio: 1,
           });
+          console.log('[OnWave] visualizer created:', !!visualizer);
 
           const presets = butterchurnPresets.getPresets();
           const presetNames = Object.keys(presets);
+          console.log('[OnWave] preset count:', presetNames.length, 'first:', presetNames[0]);
           if (presetNames.length > 0) {
             visualizer.loadPreset(presets[presetNames[0]], 0);
           }
@@ -197,11 +213,13 @@
             visualizer.setRendererSize(canvas.width, canvas.height);
           });
 
+          console.log('[OnWave] render loop starting');
           (function renderLoop() {
             visualizer.render();
             requestAnimationFrame(renderLoop);
           })();
         } catch (err) {
+          console.error('[OnWave] initVisualizer threw:', err);
           showError('Visualizer error: ' + err.message);
         }
       }
@@ -209,6 +227,7 @@
       // AudioContext needs a real media event before it can be driven
       // reliably on the receiver runtime -- first playback start is enough.
       audioEl.addEventListener('playing', () => {
+        console.log('[OnWave] audio "playing" event fired');
         if (!window.__onwaveVisualizerStarted) {
           window.__onwaveVisualizerStarted = true;
           initVisualizer();
