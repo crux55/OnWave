@@ -91,6 +91,20 @@
         showError('Stream error' + (err ? ' (code ' + err.code + ')' : ''));
       });
 
+      // AbortError from play() is documented, expected browser behavior --
+      // it fires whenever a second command (even a legitimate one, like a
+      // PLAY message arriving right after LOAD already started playback)
+      // supersedes a still-pending play() call. It does NOT mean playback
+      // actually failed, so this must never be surfaced as a real error.
+      function attemptPlay() {
+        const playPromise = audioEl.play();
+        if (playPromise && typeof playPromise.catch === 'function') {
+          playPromise.catch((err) => {
+            if (err.name !== 'AbortError') showError('Playback failed: ' + err.message);
+          });
+        }
+      }
+
       // Simple direct-play audio (no adaptive streaming) -- our streams are
       // plain MP3/AAC/OGG, so a bare <audio> element driven manually via
       // PlayerManager's message interceptors covers everything we need,
@@ -107,7 +121,7 @@
           // those are different fields; contentUrl is only populated when a sender
           // sets it explicitly, which ours doesn't.
           audioEl.src = media.contentUrl || media.contentId;
-          audioEl.play().catch((err) => showError('Playback failed: ' + err.message));
+          attemptPlay();
           const metadata = media.metadata || {};
           showTitle(metadata.title, metadata.artist);
           return loadRequestData;
@@ -118,11 +132,10 @@
         cast.framework.messages.MessageType.PLAY,
         (request) => {
           // Senders commonly send LOAD (which already starts playback below)
-          // immediately followed by an explicit PLAY -- calling .play() again
-          // while the first call's promise is still pending aborts it with
-          // "interrupted by a call to pause()/a new load request", which is
-          // what surfaced as a real on-screen error. Only act if genuinely paused.
-          if (audioEl.paused) audioEl.play().catch((err) => showError('Playback failed: ' + err.message));
+          // immediately followed by an explicit PLAY -- only act if genuinely
+          // paused, and attemptPlay() itself ignores the benign AbortError
+          // this would otherwise produce even so.
+          if (audioEl.paused) attemptPlay();
           return request;
         }
       );
