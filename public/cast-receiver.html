@@ -1,44 +1,167 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
   <head>
     <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>OnWave Cast Receiver</title>
     <script type="text/javascript" src="//www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/butterchurn@2.6.7/lib/butterchurn.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/butterchurn-presets@2.4.7/lib/butterchurnPresets.min.js"></script>
     <style>
       html, body {
         margin: 0;
         height: 100%;
+        overflow: hidden;
         background: #0A0A12;
+        font-family: 'Manrope', 'Segoe UI', sans-serif;
       }
 
-      cast-media-player {
-        --background: #0A0A12;
-        --background-color: #0A0A12;
+      canvas {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+      }
 
-        --theme-hue: 183;
-        --progress-color: hsl(183, 80%, 58%);
+      #title-overlay {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        padding: 48px;
+        background: linear-gradient(to top, rgba(0,0,0,0.75), transparent);
+        opacity: 0;
+        transition: opacity 1.2s ease;
+        pointer-events: none;
+      }
 
-        --logo-image: url('/icons/icon-512x512.png');
-        --logo-size: 30%;
-        --logo-repeat: no-repeat;
+      #title-overlay.visible {
+        opacity: 1;
+      }
 
-        --splash-image: url('/icons/icon-512x512.png');
-        --splash-background: #0A0A12;
-        --splash-size: 30%;
-        --splash-repeat: no-repeat;
+      #station-name {
+        font-size: 56px;
+        font-weight: 700;
+        color: #fff;
+        text-shadow: 0 2px 12px rgba(0,0,0,0.6);
+        margin: 0;
+      }
 
-        --watermark-image: url('/icons/icon-192x192.png');
-        --watermark-size: 48px;
-        --watermark-position: bottom right;
-
-        --font-family: 'Manrope', 'Segoe UI', sans-serif;
+      #station-genre {
+        font-size: 28px;
+        color: hsl(183, 80%, 68%);
+        margin: 8px 0 0;
       }
     </style>
   </head>
   <body>
-    <cast-media-player></cast-media-player>
+    <canvas id="visualizer"></canvas>
+    <audio id="media"></audio>
+    <div id="title-overlay">
+      <p id="station-name"></p>
+      <p id="station-genre"></p>
+    </div>
+
     <script>
-      cast.framework.CastReceiverContext.getInstance().start();
+      const audioEl = document.getElementById('media');
+      const canvas = document.getElementById('visualizer');
+      const titleOverlay = document.getElementById('title-overlay');
+      const stationNameEl = document.getElementById('station-name');
+      const stationGenreEl = document.getElementById('station-genre');
+
+      let hideTitleTimeout = null;
+      function showTitle(title, genre) {
+        stationNameEl.textContent = title || 'OnWave';
+        stationGenreEl.textContent = genre || '';
+        titleOverlay.classList.add('visible');
+        if (hideTitleTimeout) clearTimeout(hideTitleTimeout);
+        hideTitleTimeout = setTimeout(() => titleOverlay.classList.remove('visible'), 5000);
+      }
+
+      // Simple direct-play audio (no adaptive streaming) -- our streams are
+      // plain MP3/AAC/OGG, so a bare <audio> element driven manually via
+      // PlayerManager's message interceptors covers everything we need,
+      // without cast-media-player's heavier adaptive-streaming machinery.
+      const context = cast.framework.CastReceiverContext.getInstance();
+      const playerManager = context.getPlayerManager();
+
+      playerManager.setMessageInterceptor(
+        cast.framework.messages.MessageType.LOAD,
+        (loadRequestData) => {
+          const media = loadRequestData.media;
+          audioEl.src = media.contentUrl;
+          audioEl.play().catch(() => {});
+          const metadata = media.metadata || {};
+          showTitle(metadata.title, metadata.artist);
+          return loadRequestData;
+        }
+      );
+
+      playerManager.setMessageInterceptor(
+        cast.framework.messages.MessageType.PLAY,
+        (request) => { audioEl.play().catch(() => {}); return request; }
+      );
+      playerManager.setMessageInterceptor(
+        cast.framework.messages.MessageType.PAUSE,
+        (request) => { audioEl.pause(); return request; }
+      );
+      playerManager.setMessageInterceptor(
+        cast.framework.messages.MessageType.STOP,
+        (request) => { audioEl.pause(); audioEl.src = ''; return request; }
+      );
+
+      context.start();
+
+      // Butterchurn, tapping this receiver's own local audio element --
+      // entirely independent of the sender's own visualizer (use-butterchurn.ts
+      // in the app), since the receiver plays the stream itself rather than
+      // receiving audio from the phone/laptop.
+      function initVisualizer() {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        const audioContext = new AudioContextClass();
+        const source = audioContext.createMediaElementSource(audioEl);
+        const analyser = audioContext.createAnalyser();
+        source.connect(analyser);
+        analyser.connect(audioContext.destination);
+
+        const pixelRatio = window.devicePixelRatio || 1;
+        canvas.width = window.innerWidth * pixelRatio;
+        canvas.height = window.innerHeight * pixelRatio;
+
+        const visualizer = butterchurn.createVisualizer(audioContext, canvas, {
+          width: canvas.width,
+          height: canvas.height,
+          pixelRatio,
+          textureRatio: 1,
+        });
+
+        const presets = butterchurnPresets.getPresets();
+        const presetNames = Object.keys(presets);
+        if (presetNames.length > 0) {
+          visualizer.loadPreset(presets[presetNames[0]], 0);
+        }
+
+        window.addEventListener('resize', () => {
+          const ratio = window.devicePixelRatio || 1;
+          canvas.width = window.innerWidth * ratio;
+          canvas.height = window.innerHeight * ratio;
+          visualizer.setRendererSize(canvas.width, canvas.height);
+        });
+
+        (function renderLoop() {
+          visualizer.render();
+          requestAnimationFrame(renderLoop);
+        })();
+      }
+
+      // AudioContext needs a real media event before it can be driven
+      // reliably on the receiver runtime -- first playback start is enough.
+      audioEl.addEventListener('play', () => {
+        if (!window.__onwaveVisualizerStarted) {
+          window.__onwaveVisualizerStarted = true;
+          initVisualizer();
+        }
+      }, { once: true });
     </script>
   </body>
 </html>
