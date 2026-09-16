@@ -78,6 +78,19 @@
         hideTitleTimeout = setTimeout(() => titleOverlay.classList.remove('visible'), 5000);
       }
 
+      // No remote console access to a TV -- surface real errors on-screen
+      // (doesn't auto-hide, unlike the title) rather than debugging blind.
+      function showError(message) {
+        stationGenreEl.textContent = message;
+        stationGenreEl.style.color = '#ff6b6b';
+        titleOverlay.classList.add('visible');
+        if (hideTitleTimeout) clearTimeout(hideTitleTimeout);
+      }
+      audioEl.addEventListener('error', () => {
+        const err = audioEl.error;
+        showError('Stream error' + (err ? ' (code ' + err.code + ')' : ''));
+      });
+
       // Simple direct-play audio (no adaptive streaming) -- our streams are
       // plain MP3/AAC/OGG, so a bare <audio> element driven manually via
       // PlayerManager's message interceptors covers everything we need,
@@ -89,8 +102,12 @@
         cast.framework.messages.MessageType.LOAD,
         (loadRequestData) => {
           const media = loadRequestData.media;
-          audioEl.src = media.contentUrl;
-          audioEl.play().catch(() => {});
+          // The sender builds MediaInfo via the legacy chrome.cast.media.MediaInfo
+          // constructor (use-chromecast.ts), which sets contentId, not contentUrl --
+          // those are different fields; contentUrl is only populated when a sender
+          // sets it explicitly, which ours doesn't.
+          audioEl.src = media.contentUrl || media.contentId;
+          audioEl.play().catch((err) => showError('Playback failed: ' + err.message));
           const metadata = media.metadata || {};
           showTitle(metadata.title, metadata.artist);
           return loadRequestData;
@@ -117,46 +134,55 @@
       // in the app), since the receiver plays the stream itself rather than
       // receiving audio from the phone/laptop.
       function initVisualizer() {
-        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-        const audioContext = new AudioContextClass();
-        const source = audioContext.createMediaElementSource(audioEl);
-        const analyser = audioContext.createAnalyser();
-        source.connect(analyser);
-        analyser.connect(audioContext.destination);
+        try {
+          if (typeof butterchurn === 'undefined' || typeof butterchurnPresets === 'undefined') {
+            showError('Visualizer failed to load (CDN script blocked?)');
+            return;
+          }
 
-        const pixelRatio = window.devicePixelRatio || 1;
-        canvas.width = window.innerWidth * pixelRatio;
-        canvas.height = window.innerHeight * pixelRatio;
+          const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+          const audioContext = new AudioContextClass();
+          const source = audioContext.createMediaElementSource(audioEl);
+          const analyser = audioContext.createAnalyser();
+          source.connect(analyser);
+          analyser.connect(audioContext.destination);
 
-        const visualizer = butterchurn.createVisualizer(audioContext, canvas, {
-          width: canvas.width,
-          height: canvas.height,
-          pixelRatio,
-          textureRatio: 1,
-        });
+          const pixelRatio = window.devicePixelRatio || 1;
+          canvas.width = window.innerWidth * pixelRatio;
+          canvas.height = window.innerHeight * pixelRatio;
 
-        const presets = butterchurnPresets.getPresets();
-        const presetNames = Object.keys(presets);
-        if (presetNames.length > 0) {
-          visualizer.loadPreset(presets[presetNames[0]], 0);
+          const visualizer = butterchurn.createVisualizer(audioContext, canvas, {
+            width: canvas.width,
+            height: canvas.height,
+            pixelRatio,
+            textureRatio: 1,
+          });
+
+          const presets = butterchurnPresets.getPresets();
+          const presetNames = Object.keys(presets);
+          if (presetNames.length > 0) {
+            visualizer.loadPreset(presets[presetNames[0]], 0);
+          }
+
+          window.addEventListener('resize', () => {
+            const ratio = window.devicePixelRatio || 1;
+            canvas.width = window.innerWidth * ratio;
+            canvas.height = window.innerHeight * ratio;
+            visualizer.setRendererSize(canvas.width, canvas.height);
+          });
+
+          (function renderLoop() {
+            visualizer.render();
+            requestAnimationFrame(renderLoop);
+          })();
+        } catch (err) {
+          showError('Visualizer error: ' + err.message);
         }
-
-        window.addEventListener('resize', () => {
-          const ratio = window.devicePixelRatio || 1;
-          canvas.width = window.innerWidth * ratio;
-          canvas.height = window.innerHeight * ratio;
-          visualizer.setRendererSize(canvas.width, canvas.height);
-        });
-
-        (function renderLoop() {
-          visualizer.render();
-          requestAnimationFrame(renderLoop);
-        })();
       }
 
       // AudioContext needs a real media event before it can be driven
       // reliably on the receiver runtime -- first playback start is enough.
-      audioEl.addEventListener('play', () => {
+      audioEl.addEventListener('playing', () => {
         if (!window.__onwaveVisualizerStarted) {
           window.__onwaveVisualizerStarted = true;
           initVisualizer();
