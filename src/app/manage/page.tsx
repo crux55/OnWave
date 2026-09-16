@@ -626,7 +626,7 @@ function ManagePageInner() {
                 <NotificationSettings />
               </section>
 
-              {(install.canInstall || (install.isIOS && !install.isStandalone)) && (
+              {!install.isStandalone && (
                 <>
                   <Separator />
                   <section>
@@ -642,11 +642,21 @@ function ManagePageInner() {
                           <Download className="mr-2 h-4 w-4" /> Install
                         </Button>
                       </div>
-                    ) : (
+                    ) : install.isIOS ? (
                       <div className="rounded-md border p-3 text-sm text-muted-foreground">
                         <p className="flex items-center gap-1.5">
                           Tap <Share className="h-4 w-4 inline" /> Share, then <strong className="text-foreground">Add to Home Screen</strong>, to install OnWave for a full-screen, app-like experience.
                         </p>
+                      </div>
+                    ) : (
+                      // Android/desktop Chromium browsers decide on their own when
+                      // to offer installation (beforeinstallprompt) — usually after
+                      // a bit of repeat engagement — so there's a real gap between
+                      // "not installed yet" and "nothing to show here". Say so
+                      // explicitly rather than silently showing nothing, which
+                      // reads as broken.
+                      <div className="rounded-md border p-3 text-sm text-muted-foreground">
+                        Your browser hasn&apos;t offered to install OnWave yet — this is decided by the browser itself, usually after a bit more time using the site. Check back here later, or look for an install icon in your browser&apos;s address bar.
                       </div>
                     )}
                   </section>
