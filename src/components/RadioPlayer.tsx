@@ -49,7 +49,7 @@ export function RadioPlayer({ station, className }: RadioPlayerProps) {
   const [lastVolumeBeforeMute, setLastVolumeBeforeMute] = useState(player.volume);
   const [airPlayAvailable, setAirPlayAvailable] = useState(false);
   const streamUrl = station?.url_resolved || station?.url;
-  const chromecast = useChromecast(streamUrl, station?.name, station?.codec);
+  const chromecast = useChromecast(streamUrl, station?.name, station?.codec, station?.favicon, station?.tags);
   const { isLiked, toggleLike } = useLikedStations();
   // On mobile, the standard bar (not the separate minimized corner-card
   // below) only actually occupies screen space when it's the thing showing

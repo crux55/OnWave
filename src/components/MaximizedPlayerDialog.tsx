@@ -28,7 +28,7 @@ const HIDE_DELAY_MS = 2000;
 export function MaximizedPlayerDialog({ station }: MaximizedPlayerDialogProps) {
   const player = usePlayer();
   const streamUrl = station.url_resolved || station.url;
-  const chromecast = useChromecast(streamUrl, station.name, station.codec);
+  const chromecast = useChromecast(streamUrl, station.name, station.codec, station.favicon, station.tags);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const { presetName, nextPreset, previousPreset } = useButterchurn(

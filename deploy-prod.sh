@@ -24,6 +24,7 @@ docker build -f Dockerfile.production \
   --build-arg NEXT_PUBLIC_WS_URL=${NEXT_PUBLIC_WS_URL} \
   --build-arg NEXT_PUBLIC_SENTRY_DSN=${NEXT_PUBLIC_SENTRY_DSN} \
   --build-arg NEXT_PUBLIC_GOOGLE_CLIENT_ID=${NEXT_PUBLIC_GOOGLE_CLIENT_ID} \
+  --build-arg NEXT_PUBLIC_CAST_RECEIVER_APP_ID=${NEXT_PUBLIC_CAST_RECEIVER_APP_ID} \
   -t onwave-frontend:latest \
   -t onwave-frontend:${FRONTEND_SHA} .
 

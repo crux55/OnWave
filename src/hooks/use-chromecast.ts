@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
+import { getProxiedFaviconUrl } from '@/lib/utils';
 
 // The Cast Web Sender SDK types aren't in DOM lib — declare just what's used.
 declare global {
@@ -31,8 +32,15 @@ function loadCastSdk(): Promise<boolean> {
         return;
       }
       try {
+        // Unset (the default until the custom receiver is registered and
+        // its App ID added to prod's env) keeps every cast on Google's
+        // Default Media Receiver exactly as before — an unpublished custom
+        // receiver only works on Cast devices explicitly registered under
+        // the developer's own Google Cast account, so this must never be
+        // hardcoded to it, or casting would break for everyone else.
         window.cast.framework.CastContext.getInstance().setOptions({
-          receiverApplicationId: window.chrome.cast.media.DEFAULT_MEDIA_RECEIVER_APP_ID,
+          receiverApplicationId:
+            process.env.NEXT_PUBLIC_CAST_RECEIVER_APP_ID || window.chrome.cast.media.DEFAULT_MEDIA_RECEIVER_APP_ID,
           autoJoinPolicy: window.chrome.cast.AutoJoinPolicy.ORIGIN_SCOPED,
         });
         resolve(true);
@@ -75,7 +83,13 @@ function codecToContentType(codec: string | undefined): string {
   }
 }
 
-export function useChromecast(streamUrl: string | undefined, stationName: string | undefined, codec: string | undefined) {
+export function useChromecast(
+  streamUrl: string | undefined,
+  stationName: string | undefined,
+  codec: string | undefined,
+  favicon?: string,
+  tags?: string
+) {
   const [available, setAvailable] = useState(false);
   const [isCasting, setIsCasting] = useState(false);
   const [deviceName, setDeviceName] = useState<string | null>(null);
@@ -169,8 +183,18 @@ export function useChromecast(streamUrl: string | undefined, stationName: string
 
     const mediaInfo = new window.chrome.cast.media.MediaInfo(absoluteStreamUrl, codecToContentType(codec));
     mediaInfo.streamType = window.chrome.cast.media.StreamType.LIVE;
-    mediaInfo.metadata = new window.chrome.cast.media.GenericMediaMetadata();
+
+    // MusicTrackMediaMetadata (not Generic) is what both the Default
+    // Receiver and our own custom receiver (cast-receiver.html) render
+    // artwork/artist for — Generic only ever showed a bare title.
+    mediaInfo.metadata = new window.chrome.cast.media.MusicTrackMediaMetadata();
     mediaInfo.metadata.title = stationName || 'OnWave';
+    mediaInfo.metadata.artist = tags?.split(',')[0]?.trim() || 'Live Radio';
+    const proxiedFavicon = getProxiedFaviconUrl(favicon);
+    if (proxiedFavicon) {
+      const absoluteFaviconUrl = new URL(proxiedFavicon, window.location.origin).href;
+      mediaInfo.metadata.images = [new window.chrome.cast.Image(absoluteFaviconUrl)];
+    }
 
     const request = new window.chrome.cast.media.LoadRequest(mediaInfo);
 
@@ -201,7 +225,7 @@ export function useChromecast(streamUrl: string | undefined, stationName: string
         variant: 'destructive',
       });
     });
-  }, [streamUrl, stationName, codec, toast, deviceName]);
+  }, [streamUrl, stationName, codec, favicon, tags, toast, deviceName]);
 
   const toggleCast = useCallback(async () => {
     if (!available) return;
