@@ -24,6 +24,7 @@ import { cn } from '@/lib/utils';
 import { useLiveBroadcast } from '@/contexts/LiveBroadcastContext';
 import { terminateBroadcast } from '@/lib/api';
 import { ClipButton } from '@/components/live/ClipButton';
+import { useButterchurn } from '@/hooks/use-butterchurn';
 import type { InternalShow } from '@/lib/types';
 import type { ListenerConnectionState } from '@/contexts/ListenerBroadcastContext';
 
@@ -136,9 +137,16 @@ function ListenerView({ show, isAdmin, room, connectionState }: {
   const { toast } = useToast();
   const audioRef = useRef<HTMLAudioElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const [terminateReason, setTerminateReason] = useState('');
   const [isTerminating, setIsTerminating] = useState(false);
   const [hasVideoTrack, setHasVideoTrack] = useState(false);
+
+  // Audio-only rooms get a real visualizer instead of a static pulsing icon
+  // — same engine as the station player's maximized view, just tapping the
+  // LiveKit remote track's <audio> element instead of a radio stream.
+  const isAudioOnlyConnected = connectionState === 'connected' && !show.is_video;
+  useButterchurn(canvasRef, audioRef.current, isAudioOnlyConnected);
 
   useEffect(() => {
     if (!room) return;
@@ -203,14 +211,20 @@ function ListenerView({ show, isAdmin, room, connectionState }: {
       )}
 
       {(!show.is_video || !hasVideoTrack) && (
-        <div className="flex flex-col items-center justify-center gap-3 rounded-lg bg-background/40 py-10">
-          <Radio className={connectionState === 'connected' ? 'h-10 w-10 text-accent animate-pulse' : 'h-10 w-10 text-muted-foreground'} />
-          <p className="text-sm text-muted-foreground">
-            {connectionState === 'connecting' && 'Connecting...'}
-            {connectionState === 'connected' && (show.is_video ? 'Waiting for video…' : 'Audio streaming live')}
-            {connectionState === 'failed' && 'Connection lost'}
-          </p>
-        </div>
+        isAudioOnlyConnected ? (
+          <div className="relative w-full overflow-hidden rounded-lg bg-black aspect-video">
+            <canvas ref={canvasRef} className="h-full w-full" />
+          </div>
+        ) : (
+          <div className="flex flex-col items-center justify-center gap-3 rounded-lg bg-background/40 py-10">
+            <Radio className={connectionState === 'connected' ? 'h-10 w-10 text-accent animate-pulse' : 'h-10 w-10 text-muted-foreground'} />
+            <p className="text-sm text-muted-foreground">
+              {connectionState === 'connecting' && 'Connecting...'}
+              {connectionState === 'connected' && show.is_video && 'Waiting for video…'}
+              {connectionState === 'failed' && 'Connection lost'}
+            </p>
+          </div>
+        )
       )}
 
       <audio ref={audioRef} autoPlay />
