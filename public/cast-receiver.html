@@ -181,6 +181,21 @@
           analyser.connect(audioContext.destination);
           console.log('[OnWave] AudioContext state:', audioContext.state);
 
+          // AudioContexts start suspended until explicitly resumed -- once
+          // createMediaElementSource() reroutes the <audio> element's output
+          // through this graph, a suspended context means no sound actually
+          // reaches the speakers even though the element itself keeps
+          // reporting "playing" with advancing position (which is why
+          // Android's own media session showed it as playing while nothing
+          // was audible). The app's own use-butterchurn.ts already does
+          // this; this standalone page was missing it.
+          if (audioContext.state === 'suspended') {
+            audioContext.resume().then(
+              () => console.log('[OnWave] AudioContext resumed, state:', audioContext.state),
+              (err) => console.error('[OnWave] AudioContext resume failed:', err)
+            );
+          }
+
           const pixelRatio = window.devicePixelRatio || 1;
           canvas.width = window.innerWidth * pixelRatio;
           canvas.height = window.innerHeight * pixelRatio;
