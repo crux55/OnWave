@@ -1,7 +1,7 @@
 'use client';
 
 import { useParams, useRouter } from 'next/navigation';
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { jwtDecode as jwt_decode } from 'jwt-decode';
 import { Loader2, Radio, CalendarClock, CircleOff, Play, Pause, Users, X } from 'lucide-react';
 
@@ -15,6 +15,7 @@ import { useResolvedStationStream } from '@/hooks/use-external-live-streams';
 import { usePlayer } from '@/contexts/PlayerContext';
 import { fetchShow, closeRoom, fetchShowClips } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
+import { useButterchurn } from '@/hooks/use-butterchurn';
 import type { InternalShow, RadioStation, Token } from '@/lib/types';
 
 // External (PBS-scraped) show rooms (project_r#30) and user-opened rooms
@@ -48,6 +49,13 @@ function ExternalRoomTuneIn({ show, isOwnRoom, onClosed }: { show: InternalShow;
   // something else elsewhere shouldn't show up here.
   const thisStreamError = isThisStation && !player.isPlaying ? player.playbackError : null;
 
+  // Same visualizer engine as the maximized player and live rooms -- this
+  // room has no LiveKit broadcast to tap, but it plays through the same
+  // shared <audio> element (player.playStation below), so it works exactly
+  // the same way.
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  useButterchurn(canvasRef, player.audioElementRef.current, isThisPlaying);
+
   const handleClose = async () => {
     setIsClosing(true);
     try {
@@ -63,11 +71,22 @@ function ExternalRoomTuneIn({ show, isOwnRoom, onClosed }: { show: InternalShow;
 
   return (
     <div className="flex flex-col items-center justify-center gap-4 rounded-xl border border-border bg-card/60 p-8 text-center h-full min-h-[16rem]">
-      {show.is_room ? <Users className="h-8 w-8 text-muted-foreground" /> : <Radio className="h-8 w-8 text-muted-foreground" />}
-      <div>
-        <p className="font-medium text-foreground">{show.external_station_name}</p>
-        <p className="text-sm text-muted-foreground">Listening happens in your player, chat happens here.</p>
-      </div>
+      {isThisPlaying ? (
+        <div className="relative w-full overflow-hidden rounded-lg bg-black aspect-video">
+          <canvas ref={canvasRef} className="h-full w-full" />
+          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent px-3 py-2 text-left">
+            <p className="text-sm font-medium text-white">{show.external_station_name}</p>
+          </div>
+        </div>
+      ) : (
+        <>
+          {show.is_room ? <Users className="h-8 w-8 text-muted-foreground" /> : <Radio className="h-8 w-8 text-muted-foreground" />}
+          <div>
+            <p className="font-medium text-foreground">{show.external_station_name}</p>
+            <p className="text-sm text-muted-foreground">Listening happens in your player, chat happens here.</p>
+          </div>
+        </>
+      )}
       <Button
         onClick={() => stream && player.playStation(stream)}
         disabled={!stream}
