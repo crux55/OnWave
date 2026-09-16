@@ -116,7 +116,15 @@
 
       playerManager.setMessageInterceptor(
         cast.framework.messages.MessageType.PLAY,
-        (request) => { audioEl.play().catch(() => {}); return request; }
+        (request) => {
+          // Senders commonly send LOAD (which already starts playback below)
+          // immediately followed by an explicit PLAY -- calling .play() again
+          // while the first call's promise is still pending aborts it with
+          // "interrupted by a call to pause()/a new load request", which is
+          // what surfaced as a real on-screen error. Only act if genuinely paused.
+          if (audioEl.paused) audioEl.play().catch((err) => showError('Playback failed: ' + err.message));
+          return request;
+        }
       );
       playerManager.setMessageInterceptor(
         cast.framework.messages.MessageType.PAUSE,
@@ -151,7 +159,12 @@
           canvas.width = window.innerWidth * pixelRatio;
           canvas.height = window.innerHeight * pixelRatio;
 
-          const visualizer = butterchurn.createVisualizer(audioContext, canvas, {
+          // The UMD bundle's harmony default export means the plain
+          // <script>-tag global is {__esModule: true, default: Butterchurn},
+          // not Butterchurn itself -- same interop quirk already handled
+          // correctly in the app's own use-butterchurn.ts.
+          const butterchurnLib = butterchurn.default || butterchurn;
+          const visualizer = butterchurnLib.createVisualizer(audioContext, canvas, {
             width: canvas.width,
             height: canvas.height,
             pixelRatio,
