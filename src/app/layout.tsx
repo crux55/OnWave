@@ -24,6 +24,7 @@ import { NotificationProvider } from '@/contexts/NotificationContext';
 import { MobileDockProvider, useMobileDock } from '@/contexts/MobileDockContext';
 import { InstallPromptProvider } from '@/contexts/InstallPromptContext';
 import { MobileBottomDock } from '@/components/MobileBottomDock';
+import { ChunkErrorRecovery } from '@/components/ChunkErrorRecovery';
 import { Toaster } from '@/components/ui/toaster';
 import { cn } from '@/lib/utils';
 
@@ -51,6 +52,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
       </head>
       <body>
+        <ChunkErrorRecovery />
         <InstallPromptProvider>
           <PlayerProvider>
             <LiveBroadcastProvider>
