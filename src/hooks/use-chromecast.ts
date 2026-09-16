@@ -93,6 +93,18 @@ export function useChromecast(
   const [available, setAvailable] = useState(false);
   const [isCasting, setIsCasting] = useState(false);
   const [deviceName, setDeviceName] = useState<string | null>(null);
+  // deviceName is display-only (used in one toast string) but was in
+  // loadCurrentMedia's dependency array — since it updates in the same
+  // handler that flips isCasting true, that changed the callback's
+  // identity moments after mount, re-triggering the "load on cast" effect
+  // below and sending a spurious extra LOAD to the receiver (on top of the
+  // one toggleCast already sends directly), tearing down and recreating
+  // the receiver's media pipeline multiple times in a row — confirmed via
+  // three kWebMediaPlayerCreated events on the Shield for one cast
+  // attempt. Reading it via a ref decouples the callback's identity from
+  // this state without needing a stale closure.
+  const deviceNameRef = useRef<string | null>(null);
+  useEffect(() => { deviceNameRef.current = deviceName; }, [deviceName]);
   const [isRemotePaused, setIsRemotePaused] = useState(false);
   const sessionListenerRef = useRef<((event: any) => void) | null>(null);
   const remotePlayerControllerRef = useRef<any>(null);
@@ -210,7 +222,7 @@ export function useChromecast(
         if (!remotePlayerRef.current?.isMediaLoaded) {
           toast({
             title: 'Cast connected, but nothing is playing',
-            description: `${deviceName || 'The cast device'} accepted the connection but never started playback of ${stationName || 'this station'}.`,
+            description: `${deviceNameRef.current || 'The cast device'} accepted the connection but never started playback of ${stationName || 'this station'}.`,
             variant: 'destructive',
           });
         }
@@ -225,7 +237,7 @@ export function useChromecast(
         variant: 'destructive',
       });
     });
-  }, [streamUrl, stationName, codec, favicon, tags, toast, deviceName]);
+  }, [streamUrl, stationName, codec, favicon, tags, toast]);
 
   const toggleCast = useCallback(async () => {
     if (!available) return;
