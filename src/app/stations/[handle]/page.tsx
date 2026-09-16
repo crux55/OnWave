@@ -323,6 +323,13 @@ export default function StationPage() {
     }
   };
 
+  // Must be unconditional, before the isLoading early return below — a hook
+  // called only once station finishes loading changes the hook count
+  // between renders, crashing with "Rendered more hooks than during the
+  // previous render" (React error #310). ClipsList only invokes this once
+  // station is real.
+  const fetchClips = useCallback(() => fetchStationClips(station?.id ?? ''), [station?.id]);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[calc(100vh-10rem)]">
@@ -508,7 +515,7 @@ export default function StationPage() {
                 )}
               </section>
               <section className="mt-8">
-                <ClipsList fetcher={useCallback(() => fetchStationClips(station.id), [station.id])} />
+                <ClipsList fetcher={fetchClips} />
               </section>
             </TabsContent>
 

@@ -159,6 +159,12 @@ export default function ShowDetailPage() {
   // moderator UI here yet — the backend enforces the real permission
   // regardless, this is just the frontend's (simplified) show/hide gate.
   const isModerator = isAdmin || isOwnBroadcast;
+  // Must be called unconditionally, before the early returns below — a
+  // hook called only after `show` finishes loading changes the hook count
+  // between renders (loading state vs. loaded state), which is exactly a
+  // "Rendered more hooks than during the previous render" crash (React
+  // error #310). ClipsList only actually invokes this once show is real.
+  const fetchClips = useCallback(() => fetchShowClips(show?.id ?? ''), [show?.id]);
 
   if (isLoading) {
     return (
@@ -241,7 +247,7 @@ export default function ShowDetailPage() {
         </div>
       )}
 
-      <ClipsList fetcher={useCallback(() => fetchShowClips(show.id), [show.id])} />
+      <ClipsList fetcher={fetchClips} />
     </div>
   );
 }

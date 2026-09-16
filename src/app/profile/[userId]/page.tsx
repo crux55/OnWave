@@ -24,6 +24,12 @@ export default function PublicProfilePage() {
   const [stations, setStations] = useState<Station[]>([]);
 
   const getAvatarUrl = (filename: string | undefined) => filename ? `${apiHost}${filename}` : undefined;
+  // Must be unconditional, before the isLoading early return below — a hook
+  // called only once profile finishes loading changes the hook count
+  // between renders, crashing with "Rendered more hooks than during the
+  // previous render" (React error #310). ClipsList only invokes this once
+  // profile is real.
+  const fetchClips = useCallback(() => fetchDJClips(profile?.user_id ?? ''), [profile?.user_id]);
 
   useEffect(() => {
     const handle = params.userId;
@@ -91,7 +97,7 @@ export default function PublicProfilePage() {
           )}
 
           <Separator />
-          <ClipsList fetcher={useCallback(() => fetchDJClips(profile.user_id), [profile.user_id])} />
+          <ClipsList fetcher={fetchClips} />
         </CardContent>
       </Card>
     </div>
