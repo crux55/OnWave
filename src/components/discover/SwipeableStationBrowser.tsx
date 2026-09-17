@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { RadioStation } from '@/lib/types';
 import { usePlayer } from '@/contexts/PlayerContext';
+import { useMobileDock } from '@/contexts/MobileDockContext';
 import { useButterchurn } from '@/hooks/use-butterchurn';
 import { SafeImage } from '@/components/SafeImage';
 import { StationAvatar } from '@/components/StationAvatar';
@@ -81,6 +82,17 @@ function StationCard({ station, showVisualizer, errorMessage }: {
 // so the handoff has no flash/flicker, just a continuous flick.
 export function SwipeableStationBrowser({ isLiked, onToggleLike, onClose }: SwipeableStationBrowserProps) {
   const player = usePlayer();
+  const dock = useMobileDock();
+  // Closing this fullscreen overlay shouldn't just drop back to whatever
+  // the mobile dock's active tab happened to be before it opened (often
+  // "menu") -- the station that was playing should surface in the docked
+  // player bar, not disappear from view. No-op on desktop, where the bar
+  // is always visible regardless of dock state.
+  const handleClose = useCallback(() => {
+    dock.setActiveTab('player');
+    dock.setMinimized(false);
+    onClose();
+  }, [dock, onClose]);
   const [dragX, setDragX] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const [isExiting, setIsExiting] = useState(false);
@@ -124,11 +136,11 @@ export function SwipeableStationBrowser({ isLiked, onToggleLike, onClose }: Swip
       if (isExiting) return;
       if (e.key === 'ArrowRight' && player.hasNext) commitSwipe(-1);
       else if (e.key === 'ArrowLeft' && player.hasPrevious) commitSwipe(1);
-      else if (e.key === 'Escape') onClose();
+      else if (e.key === 'Escape') handleClose();
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [commitSwipe, isExiting, onClose, player.hasNext, player.hasPrevious]);
+  }, [commitSwipe, isExiting, handleClose, player.hasNext, player.hasPrevious]);
 
   const handlePointerDown = (e: React.PointerEvent) => {
     if (isExiting) return;
@@ -167,7 +179,7 @@ export function SwipeableStationBrowser({ isLiked, onToggleLike, onClose }: Swip
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-black">
       <button
-        onClick={onClose}
+        onClick={handleClose}
         aria-label="Close browser"
         className="absolute right-4 top-4 z-20 flex h-10 w-10 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm"
       >

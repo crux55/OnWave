@@ -224,9 +224,14 @@
 
           const presets = butterchurnPresets.getPresets();
           const presetNames = Object.keys(presets);
-          console.log('[OnWave] preset count:', presetNames.length, 'first:', presetNames[0]);
-          if (presetNames.length > 0) {
-            visualizer.loadPreset(presets[presetNames[0]], 0);
+          // "Unchained - Rewop" is the chosen default preset (matching
+          // use-butterchurn.ts, the in-app version) until OnWave#40's
+          // installable preset library lets users pick their own -- falls
+          // back to the first preset in the pack if it's ever missing.
+          const defaultPresetName = presetNames.includes('Unchained - Rewop') ? 'Unchained - Rewop' : presetNames[0];
+          console.log('[OnWave] preset count:', presetNames.length, 'default:', defaultPresetName);
+          if (defaultPresetName) {
+            visualizer.loadPreset(presets[defaultPresetName], 0);
           }
 
           window.addEventListener('resize', () => {
