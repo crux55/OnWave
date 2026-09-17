@@ -214,6 +214,14 @@
           });
           console.log('[OnWave] visualizer created:', !!visualizer);
 
+          // createVisualizer() alone doesn't wire up an audio source --
+          // without this, Butterchurn has no bass/mid/treb data internally
+          // and never renders anything, regardless of whether audio itself
+          // is genuinely playing. use-butterchurn.ts (the in-app version)
+          // already had this; this standalone page was missing it.
+          visualizer.connectAudio(analyser);
+          console.log('[OnWave] connectAudio() called');
+
           const presets = butterchurnPresets.getPresets();
           const presetNames = Object.keys(presets);
           console.log('[OnWave] preset count:', presetNames.length, 'first:', presetNames[0]);
