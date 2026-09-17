@@ -53,7 +53,11 @@ interface UseButterchurnResult {
 export function useButterchurn(
   canvasRef: React.RefObject<HTMLCanvasElement | null>,
   audioElement: HTMLAudioElement | null,
-  active: boolean
+  active: boolean,
+  // 'random' is for the swipeable browser (OnWave: "randomise the vis"),
+  // where variety station-to-station is the point — every other caller
+  // wants the same "Unchained - Rewop" default every time.
+  initialPreset: 'default' | 'random' = 'default'
 ): UseButterchurnResult {
   const visualizerRef = useRef<any>(null);
   const presetsRef = useRef<[string, any][]>([]);
@@ -109,10 +113,12 @@ export function useButterchurn(
         // installable preset library lets users pick their own) — falls
         // back to the first preset in the pack if it's ever missing (e.g. a
         // future butterchurn-presets version renaming/dropping it).
-        const defaultIndex = Math.max(0, presets.findIndex(([name]) => name === 'Unchained - Rewop'));
-        presetIndexRef.current = defaultIndex;
-        visualizer.loadPreset(presets[defaultIndex][1], 0);
-        setPresetName(presets[defaultIndex][0]);
+        const startIndex = initialPreset === 'random'
+          ? Math.floor(Math.random() * presets.length)
+          : Math.max(0, presets.findIndex(([name]) => name === 'Unchained - Rewop'));
+        presetIndexRef.current = startIndex;
+        visualizer.loadPreset(presets[startIndex][1], 0);
+        setPresetName(presets[startIndex][0]);
       }
       setIsReady(true);
 

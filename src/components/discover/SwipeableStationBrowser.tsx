@@ -5,10 +5,8 @@ import type { RadioStation } from '@/lib/types';
 import { usePlayer } from '@/contexts/PlayerContext';
 import { useMobileDock } from '@/contexts/MobileDockContext';
 import { useButterchurn } from '@/hooks/use-butterchurn';
-import { SafeImage } from '@/components/SafeImage';
-import { StationAvatar } from '@/components/StationAvatar';
 import { Heart, Pause, Play, X } from 'lucide-react';
-import { cn, getProxiedFaviconUrl } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 
 interface SwipeableStationBrowserProps {
   isLiked: (stationuuid: string) => boolean;
@@ -25,34 +23,23 @@ const FLICK_MIN_DISTANCE_PX = 32;
 const EXIT_DURATION_MS = 220;
 const SWIPE_TRANSITION = `transform ${EXIT_DURATION_MS}ms cubic-bezier(0.22, 1, 0.36, 1)`;
 
-// The currently-playing card gets the real Butterchurn visualizer (same
-// engine as the maximized player/live rooms, tapping the shared audio
-// element via PlayerContext) instead of a static logo -- the queued-up
-// neighbor card underneath stays a plain image since nothing is playing
-// through it yet.
-function StationCard({ station, showVisualizer, errorMessage }: {
+// Every card is Butterchurn, full stop -- no station logo/icon fallback.
+// The currently-playing card drives it off the real shared audio element;
+// the queued neighbor underneath (nothing is actually playing through it
+// yet) reuses that same live signal so it isn't just a frozen frame, paired
+// with its own independently-randomized preset so it reads as a distinct
+// station rather than a copy of the current card.
+function StationCard({ station, errorMessage }: {
   station: RadioStation;
-  showVisualizer: boolean;
   errorMessage?: string | null;
 }) {
   const player = usePlayer();
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  useButterchurn(canvasRef, showVisualizer ? player.activeAudioElement : null, showVisualizer);
+  useButterchurn(canvasRef, player.activeAudioElement, true, 'random');
 
   return (
     <div className="absolute inset-0">
-      {showVisualizer ? (
-        <canvas ref={canvasRef} className="h-full w-full bg-black" />
-      ) : (
-        <SafeImage
-          src={getProxiedFaviconUrl(station.favicon)}
-          alt={`${station.name} logo`}
-          width={800}
-          height={800}
-          className="h-full w-full object-cover"
-          fallback={<StationAvatar name={station.name} seed={station.stationuuid} className="text-6xl" />}
-        />
-      )}
+      <canvas ref={canvasRef} className="h-full w-full bg-black" />
       <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent p-6 pb-28 pointer-events-none">
         <h2 className="text-2xl font-bold text-white truncate">{station.name}</h2>
         <p className="mt-1 text-sm text-white/70 truncate">
@@ -73,13 +60,14 @@ function StationCard({ station, showVisualizer, errorMessage }: {
 // always player.currentStation, so the visual browser can never drift out
 // of sync with what's actually playing (OnWave#35).
 //
-// The queued neighbor in the live drag direction is rendered as a static
-// card sitting directly underneath the draggable top card, at rest (no
-// transform) exactly where it needs to end up. Committing a swipe animates
-// only the top card fully off-screen; once that finishes, the real player
-// state advances and the drag offset resets with the transition suppressed
-// for one frame — the neighbor was already painted in its final position,
-// so the handoff has no flash/flicker, just a continuous flick.
+// Vertical feed-style paging (drag up = next, down = previous), not
+// left/right — the queued neighbor in the live drag direction is rendered
+// as a static card sitting directly underneath the draggable top card, at
+// rest (no transform) exactly where it needs to end up. Committing a swipe
+// animates only the top card fully off-screen; once that finishes, the real
+// player state advances and the drag offset resets with the transition
+// suppressed for one frame — the neighbor was already painted in its final
+// position, so the handoff has no flash/flicker, just a continuous flick.
 export function SwipeableStationBrowser({ isLiked, onToggleLike, onClose }: SwipeableStationBrowserProps) {
   const player = usePlayer();
   const dock = useMobileDock();
@@ -93,12 +81,12 @@ export function SwipeableStationBrowser({ isLiked, onToggleLike, onClose }: Swip
     dock.setMinimized(false);
     onClose();
   }, [dock, onClose]);
-  const [dragX, setDragX] = useState(0);
+  const [dragY, setDragY] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const [isExiting, setIsExiting] = useState(false);
   const [suppressTransition, setSuppressTransition] = useState(false);
-  const lastDirectionRef = useRef<-1 | 1>(-1); // -1 = last dragged toward "next", 1 = toward "previous"
-  const dragStartRef = useRef<{ x: number; pointerId: number; time: number } | null>(null);
+  const lastDirectionRef = useRef<-1 | 1>(-1); // -1 = last dragged toward "next" (up), 1 = toward "previous" (down)
+  const dragStartRef = useRef<{ y: number; pointerId: number; time: number } | null>(null);
   const stageRef = useRef<HTMLDivElement>(null);
 
   const station = player.currentStation;
@@ -109,18 +97,18 @@ export function SwipeableStationBrowser({ isLiked, onToggleLike, onClose }: Swip
   const goPrevious = useCallback(() => { if (player.hasPrevious) player.playPrevious(); }, [player]);
 
   const commitSwipe = useCallback((direction: -1 | 1) => {
-    const width = stageRef.current?.offsetWidth || window.innerWidth;
+    const height = stageRef.current?.offsetHeight || window.innerHeight;
     setIsExiting(true);
-    setDragX(direction * -width);
+    setDragY(direction * -height);
     window.setTimeout(() => {
       if (direction === -1) goNext(); else goPrevious();
       setSuppressTransition(true);
-      setDragX(0);
+      setDragY(0);
       setIsExiting(false);
     }, EXIT_DURATION_MS);
   }, [goNext, goPrevious]);
 
-  // suppressTransition only needs to hold for the single frame where dragX
+  // suppressTransition only needs to hold for the single frame where dragY
   // resets to 0 right after the real station swap — flipping it back off on
   // the next frame restores normal animated behavior for the next drag
   // without itself causing any visible movement (the transform value isn't
@@ -134,8 +122,8 @@ export function SwipeableStationBrowser({ isLiked, onToggleLike, onClose }: Swip
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (isExiting) return;
-      if (e.key === 'ArrowRight' && player.hasNext) commitSwipe(-1);
-      else if (e.key === 'ArrowLeft' && player.hasPrevious) commitSwipe(1);
+      if (e.key === 'ArrowUp' && player.hasNext) commitSwipe(-1);
+      else if (e.key === 'ArrowDown' && player.hasPrevious) commitSwipe(1);
       else if (e.key === 'Escape') handleClose();
     };
     window.addEventListener('keydown', onKeyDown);
@@ -144,16 +132,16 @@ export function SwipeableStationBrowser({ isLiked, onToggleLike, onClose }: Swip
 
   const handlePointerDown = (e: React.PointerEvent) => {
     if (isExiting) return;
-    dragStartRef.current = { x: e.clientX, pointerId: e.pointerId, time: Date.now() };
+    dragStartRef.current = { y: e.clientY, pointerId: e.pointerId, time: Date.now() };
     setIsDragging(true);
     (e.target as Element).setPointerCapture(e.pointerId);
   };
 
   const handlePointerMove = (e: React.PointerEvent) => {
     if (!dragStartRef.current) return;
-    const delta = e.clientX - dragStartRef.current.x;
+    const delta = e.clientY - dragStartRef.current.y;
     if (delta !== 0) lastDirectionRef.current = delta < 0 ? -1 : 1;
-    setDragX(delta);
+    setDragY(delta);
   };
 
   const handlePointerUp = () => {
@@ -163,21 +151,21 @@ export function SwipeableStationBrowser({ isLiked, onToggleLike, onClose }: Swip
     setIsDragging(false);
 
     const elapsed = Date.now() - start.time;
-    const distance = Math.abs(dragX);
+    const distance = Math.abs(dragY);
     const isFlick = elapsed <= FLICK_MAX_MS && distance >= FLICK_MIN_DISTANCE_PX;
     const committed = distance >= COMMIT_DISTANCE_PX || isFlick;
 
-    if (committed && dragX < 0 && player.hasNext) commitSwipe(-1);
-    else if (committed && dragX > 0 && player.hasPrevious) commitSwipe(1);
-    else setDragX(0);
+    if (committed && dragY < 0 && player.hasNext) commitSwipe(-1);
+    else if (committed && dragY > 0 && player.hasPrevious) commitSwipe(1);
+    else setDragY(0);
   };
 
   if (!station) return null;
 
-  const underStation = dragX < 0 ? nextStation : dragX > 0 ? prevStation : (lastDirectionRef.current < 0 ? nextStation : prevStation);
+  const underStation = dragY < 0 ? nextStation : dragY > 0 ? prevStation : (lastDirectionRef.current < 0 ? nextStation : prevStation);
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-black">
+    <div className="fixed inset-0 z-50 flex flex-col overscroll-none bg-black">
       <button
         onClick={handleClose}
         aria-label="Close browser"
@@ -188,20 +176,20 @@ export function SwipeableStationBrowser({ isLiked, onToggleLike, onClose }: Swip
 
       <div ref={stageRef} className="relative flex-1 overflow-hidden">
         {underStation && (
-          <StationCard key={`under-${underStation.stationuuid}`} station={underStation} showVisualizer={false} />
+          <StationCard key={`under-${underStation.stationuuid}`} station={underStation} />
         )}
         <div
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
           onPointerCancel={handlePointerUp}
-          className="absolute inset-0 z-10 touch-pan-y select-none"
+          className="absolute inset-0 z-10 touch-none select-none"
           style={{
-            transform: `translateX(${dragX}px)`,
+            transform: `translateY(${dragY}px)`,
             transition: isDragging || suppressTransition ? 'none' : SWIPE_TRANSITION,
           }}
         >
-          <StationCard key={station.stationuuid} station={station} showVisualizer={player.isPlaying} errorMessage={player.playbackError} />
+          <StationCard key={station.stationuuid} station={station} errorMessage={player.playbackError} />
         </div>
       </div>
 
