@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { RadioStation } from '@/lib/types';
 import { usePlayer } from '@/contexts/PlayerContext';
+import { useButterchurn } from '@/hooks/use-butterchurn';
 import { SafeImage } from '@/components/SafeImage';
 import { StationAvatar } from '@/components/StationAvatar';
 import { Heart, Pause, Play, X } from 'lucide-react';
@@ -14,105 +15,185 @@ interface SwipeableStationBrowserProps {
   onClose: () => void;
 }
 
-// A skin over PlayerContext's existing queue, not a second copy of it —
-// forward/back always calls playNext()/playPrevious(), and the card shown
-// is always player.currentStation, so the visual browser can never drift
-// out of sync with what's actually playing (OnWave#35).
-const COMMIT_THRESHOLD_PX = 100;
+// A drag past this distance commits to the next/previous station outright.
+const COMMIT_DISTANCE_PX = 100;
+// A short, fast drag commits even under that distance -- matches how an
+// actual flick gesture feels versus a slow deliberate drag.
+const FLICK_MAX_MS = 260;
+const FLICK_MIN_DISTANCE_PX = 32;
+const EXIT_DURATION_MS = 220;
+const SWIPE_TRANSITION = `transform ${EXIT_DURATION_MS}ms cubic-bezier(0.22, 1, 0.36, 1)`;
 
+// The currently-playing card gets the real Butterchurn visualizer (same
+// engine as the maximized player/live rooms, tapping the shared audio
+// element via PlayerContext) instead of a static logo -- the queued-up
+// neighbor card underneath stays a plain image since nothing is playing
+// through it yet.
+function StationCard({ station, showVisualizer, errorMessage }: {
+  station: RadioStation;
+  showVisualizer: boolean;
+  errorMessage?: string | null;
+}) {
+  const player = usePlayer();
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  useButterchurn(canvasRef, showVisualizer ? player.activeAudioElement : null, showVisualizer);
+
+  return (
+    <div className="absolute inset-0">
+      {showVisualizer ? (
+        <canvas ref={canvasRef} className="h-full w-full bg-black" />
+      ) : (
+        <SafeImage
+          src={getProxiedFaviconUrl(station.favicon)}
+          alt={`${station.name} logo`}
+          width={800}
+          height={800}
+          className="h-full w-full object-cover"
+          fallback={<StationAvatar name={station.name} seed={station.stationuuid} className="text-6xl" />}
+        />
+      )}
+      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent p-6 pb-28 pointer-events-none">
+        <h2 className="text-2xl font-bold text-white truncate">{station.name}</h2>
+        <p className="mt-1 text-sm text-white/70 truncate">
+          {(station.tags?.split(',')[0]?.trim() || 'Unknown')} &bull; {station.country || 'Unknown'}
+        </p>
+        {errorMessage && (
+          <p className="mt-2 inline-block rounded bg-destructive/90 px-2 py-1 text-xs font-medium text-destructive-foreground">
+            {errorMessage}
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// A skin over PlayerContext's existing queue, not a second copy of it —
+// forward/back always calls playNext()/playPrevious(), and the top card is
+// always player.currentStation, so the visual browser can never drift out
+// of sync with what's actually playing (OnWave#35).
+//
+// The queued neighbor in the live drag direction is rendered as a static
+// card sitting directly underneath the draggable top card, at rest (no
+// transform) exactly where it needs to end up. Committing a swipe animates
+// only the top card fully off-screen; once that finishes, the real player
+// state advances and the drag offset resets with the transition suppressed
+// for one frame — the neighbor was already painted in its final position,
+// so the handoff has no flash/flicker, just a continuous flick.
 export function SwipeableStationBrowser({ isLiked, onToggleLike, onClose }: SwipeableStationBrowserProps) {
   const player = usePlayer();
   const [dragX, setDragX] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
-  const dragStartRef = useRef<{ x: number; pointerId: number } | null>(null);
+  const [isExiting, setIsExiting] = useState(false);
+  const [suppressTransition, setSuppressTransition] = useState(false);
+  const lastDirectionRef = useRef<-1 | 1>(-1); // -1 = last dragged toward "next", 1 = toward "previous"
+  const dragStartRef = useRef<{ x: number; pointerId: number; time: number } | null>(null);
+  const stageRef = useRef<HTMLDivElement>(null);
 
   const station = player.currentStation;
+  const nextStation = player.queueIndex >= 0 ? player.queue[player.queueIndex + 1] : undefined;
+  const prevStation = player.queueIndex >= 0 ? player.queue[player.queueIndex - 1] : undefined;
 
-  const goNext = useCallback(() => {
-    if (player.hasNext) player.playNext();
-  }, [player]);
+  const goNext = useCallback(() => { if (player.hasNext) player.playNext(); }, [player]);
+  const goPrevious = useCallback(() => { if (player.hasPrevious) player.playPrevious(); }, [player]);
 
-  const goPrevious = useCallback(() => {
-    if (player.hasPrevious) player.playPrevious();
-  }, [player]);
+  const commitSwipe = useCallback((direction: -1 | 1) => {
+    const width = stageRef.current?.offsetWidth || window.innerWidth;
+    setIsExiting(true);
+    setDragX(direction * -width);
+    window.setTimeout(() => {
+      if (direction === -1) goNext(); else goPrevious();
+      setSuppressTransition(true);
+      setDragX(0);
+      setIsExiting(false);
+    }, EXIT_DURATION_MS);
+  }, [goNext, goPrevious]);
+
+  // suppressTransition only needs to hold for the single frame where dragX
+  // resets to 0 right after the real station swap — flipping it back off on
+  // the next frame restores normal animated behavior for the next drag
+  // without itself causing any visible movement (the transform value isn't
+  // changing on that frame, just the transition property).
+  useEffect(() => {
+    if (!suppressTransition) return;
+    const id = requestAnimationFrame(() => setSuppressTransition(false));
+    return () => cancelAnimationFrame(id);
+  }, [suppressTransition]);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowRight') goNext();
-      else if (e.key === 'ArrowLeft') goPrevious();
+      if (isExiting) return;
+      if (e.key === 'ArrowRight' && player.hasNext) commitSwipe(-1);
+      else if (e.key === 'ArrowLeft' && player.hasPrevious) commitSwipe(1);
       else if (e.key === 'Escape') onClose();
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [goNext, goPrevious, onClose]);
+  }, [commitSwipe, isExiting, onClose, player.hasNext, player.hasPrevious]);
 
   const handlePointerDown = (e: React.PointerEvent) => {
-    dragStartRef.current = { x: e.clientX, pointerId: e.pointerId };
+    if (isExiting) return;
+    dragStartRef.current = { x: e.clientX, pointerId: e.pointerId, time: Date.now() };
     setIsDragging(true);
     (e.target as Element).setPointerCapture(e.pointerId);
   };
 
   const handlePointerMove = (e: React.PointerEvent) => {
     if (!dragStartRef.current) return;
-    setDragX(e.clientX - dragStartRef.current.x);
+    const delta = e.clientX - dragStartRef.current.x;
+    if (delta !== 0) lastDirectionRef.current = delta < 0 ? -1 : 1;
+    setDragX(delta);
   };
 
   const handlePointerUp = () => {
-    if (!dragStartRef.current) return;
+    const start = dragStartRef.current;
+    if (!start) return;
     dragStartRef.current = null;
     setIsDragging(false);
-    if (dragX <= -COMMIT_THRESHOLD_PX) goNext();
-    else if (dragX >= COMMIT_THRESHOLD_PX) goPrevious();
-    setDragX(0);
+
+    const elapsed = Date.now() - start.time;
+    const distance = Math.abs(dragX);
+    const isFlick = elapsed <= FLICK_MAX_MS && distance >= FLICK_MIN_DISTANCE_PX;
+    const committed = distance >= COMMIT_DISTANCE_PX || isFlick;
+
+    if (committed && dragX < 0 && player.hasNext) commitSwipe(-1);
+    else if (committed && dragX > 0 && player.hasPrevious) commitSwipe(1);
+    else setDragX(0);
   };
 
   if (!station) return null;
+
+  const underStation = dragX < 0 ? nextStation : dragX > 0 ? prevStation : (lastDirectionRef.current < 0 ? nextStation : prevStation);
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-black">
       <button
         onClick={onClose}
         aria-label="Close browser"
-        className="absolute right-4 top-4 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm"
+        className="absolute right-4 top-4 z-20 flex h-10 w-10 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm"
       >
         <X className="h-5 w-5" />
       </button>
 
-      <div className="relative flex-1 overflow-hidden">
+      <div ref={stageRef} className="relative flex-1 overflow-hidden">
+        {underStation && (
+          <StationCard key={`under-${underStation.stationuuid}`} station={underStation} showVisualizer={false} />
+        )}
         <div
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
           onPointerCancel={handlePointerUp}
-          className="absolute inset-0 touch-pan-y select-none"
+          className="absolute inset-0 z-10 touch-pan-y select-none"
           style={{
             transform: `translateX(${dragX}px)`,
-            transition: isDragging ? 'none' : 'transform 200ms ease-out',
+            transition: isDragging || suppressTransition ? 'none' : SWIPE_TRANSITION,
           }}
         >
-          <SafeImage
-            src={getProxiedFaviconUrl(station.favicon)}
-            alt={`${station.name} logo`}
-            width={800}
-            height={800}
-            className="h-full w-full object-cover"
-            fallback={<StationAvatar name={station.name} seed={station.stationuuid} className="text-6xl" />}
-          />
-          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent p-6 pb-28 pointer-events-none">
-            <h2 className="text-2xl font-bold text-white truncate">{station.name}</h2>
-            <p className="mt-1 text-sm text-white/70 truncate">
-              {(station.tags?.split(',')[0]?.trim() || 'Unknown')} &bull; {station.country || 'Unknown'}
-            </p>
-            {player.playbackError && (
-              <p className="mt-2 inline-block rounded bg-destructive/90 px-2 py-1 text-xs font-medium text-destructive-foreground">
-                {player.playbackError}
-              </p>
-            )}
-          </div>
+          <StationCard key={station.stationuuid} station={station} showVisualizer={player.isPlaying} errorMessage={player.playbackError} />
         </div>
       </div>
 
-      <div className="pointer-events-none absolute inset-x-0 bottom-8 flex items-center justify-center gap-6">
+      <div className="pointer-events-none absolute inset-x-0 bottom-8 z-20 flex items-center justify-center gap-6">
         <button
           onClick={() => onToggleLike(station)}
           aria-label={isLiked(station.stationuuid) ? `Unlike ${station.name}` : `Like ${station.name}`}

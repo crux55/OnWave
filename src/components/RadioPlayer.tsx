@@ -38,6 +38,12 @@ export function RadioPlayer({ station, className }: RadioPlayerProps) {
   // Tracks which streamUrl (if any) has already had a no-CORS retry — reset
   // on every genuinely new station so each one gets its own fresh attempt.
   const retriedWithoutCorsRef = useRef<string | null>(null);
+  // A second, always-muted <audio> element kept warm on whatever the queue's
+  // next station is (see the preload effect below) — lets a flick/skip to
+  // that station promote an already-buffering element instead of paying for
+  // a fresh connection + startup buffering on every advance.
+  const preloadAudioRef = useRef<HTMLAudioElement | null>(null);
+  const preloadedUrlRef = useRef<string | null>(null);
   const player = usePlayer();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setErrorState] = useState<string | null>(null);
@@ -102,16 +108,43 @@ export function RadioPlayer({ station, className }: RadioPlayerProps) {
       // detects that and retries without it, per station.
       audioRef.current.crossOrigin = 'anonymous';
       player.audioElementRef.current = audioRef.current;
+      player.setActiveAudioElement(audioRef.current);
     }
-    const currentAudio = audioRef.current;
+    let currentAudio = audioRef.current;
 
     if (streamUrl && currentAudio.src !== streamUrl) {
-      // Fresh attempt with CORS enabled for every new station, regardless
-      // of whether a previous station needed the no-CORS fallback below.
-      currentAudio.crossOrigin = 'anonymous';
-      retriedWithoutCorsRef.current = null;
-      currentAudio.src = streamUrl;
-      currentAudio.load();
+      const preload = preloadAudioRef.current;
+      // Compared against the raw (possibly relative, e.g. our own
+      // stream-proxy routes) streamUrl via preloadedUrlRef rather than
+      // preload.src, which the DOM always resolves to an absolute URL and
+      // so would never match a relative streamUrl even when it's the same
+      // stream.
+      if (preload && !preload.error && preloadedUrlRef.current === streamUrl) {
+        // The queue's preload effect already has this exact station warm
+        // and buffering on a separate element -- promote it in place of a
+        // cold load instead of starting a fresh connection on the element
+        // we've been using. The demoted element becomes the new preload
+        // slot once the (now-advanced) queue effect below picks a fresh
+        // "next" station to warm on it.
+        preload.muted = player.isMuted;
+        preload.volume = player.isMuted ? 0 : player.volume;
+        audioRef.current = preload;
+        player.audioElementRef.current = preload;
+        player.setActiveAudioElement(preload);
+        currentAudio.pause();
+        currentAudio.muted = true;
+        currentAudio.src = '';
+        preloadAudioRef.current = currentAudio;
+        preloadedUrlRef.current = null;
+        currentAudio = preload;
+      } else {
+        // Fresh attempt with CORS enabled for every new station, regardless
+        // of whether a previous station needed the no-CORS fallback below.
+        currentAudio.crossOrigin = 'anonymous';
+        retriedWithoutCorsRef.current = null;
+        currentAudio.src = streamUrl;
+        currentAudio.load();
+      }
     }
 
     const handleAudioError = (e: Event) => {
@@ -210,6 +243,43 @@ export function RadioPlayer({ station, className }: RadioPlayerProps) {
       currentAudio.removeEventListener('canplay', handleCanPlay);
     };
   }, [station, streamUrl, player.isPlayerBarOpen, player.isPlaying, player.setIsPlaying, chromecast.isCasting]);
+
+  // Keeps the queue's next station warm on a second, muted element so a
+  // flick/skip forward (SwipeableStationBrowser, the mini-player's skip
+  // button) can promote an already-buffering connection above instead of
+  // starting cold every time — see the promotion branch in the main effect
+  // above. Only the immediate next station is preloaded (not previous too)
+  // to keep the background bandwidth cost to at most one extra stream.
+  useEffect(() => {
+    if (!player.isPlayerBarOpen) return;
+    const nextStation = player.queueIndex >= 0 ? player.queue[player.queueIndex + 1] : undefined;
+    const nextUrl = nextStation?.url_resolved || nextStation?.url;
+
+    if (!nextUrl || nextUrl === streamUrl) return;
+    if (preloadedUrlRef.current === nextUrl) return;
+
+    if (!preloadAudioRef.current) preloadAudioRef.current = new Audio();
+    const preload = preloadAudioRef.current;
+    preload.crossOrigin = 'anonymous';
+    preload.muted = true;
+    preload.volume = 0;
+    preload.src = nextUrl;
+    preload.load();
+    // A muted play() (not just preload="auto"/load()) is what actually gets
+    // browsers to start pulling and decoding bytes ahead of time for a
+    // live/indefinite stream — plain preloading tends to only fetch enough
+    // to identify the format for something with no known duration.
+    preload.play().catch(() => {});
+    preloadedUrlRef.current = nextUrl;
+  }, [player.queue, player.queueIndex, player.isPlayerBarOpen, streamUrl]);
+
+  useEffect(() => {
+    return () => {
+      preloadAudioRef.current?.pause();
+      preloadAudioRef.current = null;
+      preloadedUrlRef.current = null;
+    };
+  }, []);
 
   // Closing the player (station -> null) makes the parent stop rendering
   // this component entirely rather than re-rendering it with the new props

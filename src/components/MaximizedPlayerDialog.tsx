@@ -33,7 +33,7 @@ export function MaximizedPlayerDialog({ station }: MaximizedPlayerDialogProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const { presetName, nextPreset, previousPreset } = useButterchurn(
     canvasRef,
-    player.audioElementRef.current,
+    player.activeAudioElement,
     player.isMaximizedViewOpen
   );
 

@@ -39,6 +39,16 @@ interface PlayerContextType {
   hasNext: boolean;
   hasPrevious: boolean;
   audioElementRef: React.MutableRefObject<HTMLAudioElement | null>;
+  // A reactive twin of audioElementRef.current -- RadioPlayer now swaps
+  // which DOM element is "active" mid-session (promoting a preloaded
+  // element for instant playback on a flick/skip, see OnWave's swipeable
+  // browser), and a plain ref mutation doesn't itself cause components
+  // elsewhere in the tree (rendered before RadioPlayer, so their effects
+  // run before RadioPlayer's own) to pick up the new element. Visualizer
+  // consumers (useButterchurn callers) should read this, not the ref
+  // directly, so they reliably re-render/rewire when it changes.
+  activeAudioElement: HTMLAudioElement | null;
+  setActiveAudioElement: (el: HTMLAudioElement | null) => void;
 }
 
 const PlayerContext = createContext<PlayerContextType | undefined>(undefined);
@@ -55,6 +65,7 @@ export const PlayerProvider = ({ children }: { children: ReactNode }) => {
   const [queueIndex, setQueueIndex] = useState(-1);
   const [playbackError, setPlaybackError] = useState<string | null>(null);
   const audioElementRef = useRef<HTMLAudioElement | null>(null);
+  const [activeAudioElement, setActiveAudioElement] = useState<HTMLAudioElement | null>(null);
 
 
   const playStation = useCallback((station: RadioStation) => {
@@ -207,7 +218,9 @@ export const PlayerProvider = ({ children }: { children: ReactNode }) => {
       playPrevious,
       hasNext,
       hasPrevious,
-      audioElementRef
+      audioElementRef,
+      activeAudioElement,
+      setActiveAudioElement
     }}>
       {children}
     </PlayerContext.Provider>

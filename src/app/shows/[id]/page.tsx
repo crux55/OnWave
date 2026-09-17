@@ -54,7 +54,7 @@ function ExternalRoomTuneIn({ show, isOwnRoom, onClosed }: { show: InternalShow;
   // shared <audio> element (player.playStation below), so it works exactly
   // the same way.
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  useButterchurn(canvasRef, player.audioElementRef.current, isThisPlaying);
+  useButterchurn(canvasRef, player.activeAudioElement, isThisPlaying);
 
   const handleClose = async () => {
     setIsClosing(true);
