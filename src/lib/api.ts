@@ -379,6 +379,31 @@ export async function fetchDiscoverSection(exclude: string[] = [], count: number
   }
 }
 
+// Mood-based discovery (OnWave#36) — fetches each tag in a mood's tag list
+// in parallel (same mode=tag search fetchGenreStations already uses), pools
+// and dedupes the results, and shuffles so the resulting queue mixes tags
+// rather than running through one tag at a time.
+export async function fetchMoodStations(tags: string[], count: number = 24): Promise<RadioStation[]> {
+  const results = await Promise.allSettled(
+    tags.map(tag => fetchFromApi({ term: tag, mode: 'tag', limit: '50', min_bitrate: '64' }))
+  );
+
+  const seen = new Set<string>();
+  const pooled: RadioStation[] = [];
+  for (const result of results) {
+    if (result.status !== 'fulfilled') continue;
+    for (const station of result.value.stations) {
+      if (!isQualityStation(station)) continue;
+      const key = station.stationuuid || station.name;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      pooled.push(station);
+    }
+  }
+
+  return fisherYatesShuffle(pooled).slice(0, count);
+}
+
 export async function fetchPBSShowsByDateRange(days: number = 7): Promise<PBSShow[]> {
   const startDate = new Date();
   const endDate = new Date();

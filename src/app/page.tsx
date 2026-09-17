@@ -7,12 +7,13 @@ import { RadioStationCard } from '@/components/RadioStationCard';
 import { InternalShowCard } from '@/components/InternalShowCard';
 import { usePlayer } from '@/contexts/PlayerContext';
 import { useLikedStations } from '@/hooks/use-liked-stations';
-import { RefreshCw, Sparkles, Shuffle, Heart, Play, Flame, Radio } from 'lucide-react';
+import { RefreshCw, Sparkles, Shuffle, Heart, Play, Flame, Radio, Wand2 } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { SafeImage } from '@/components/SafeImage';
 import { StationAvatar } from '@/components/StationAvatar';
+import { MoodPicker } from '@/components/discover/MoodPicker';
 import { cn, getProxiedFaviconUrl } from '@/lib/utils';
 
 function capitalize(s: string): string {
@@ -352,6 +353,24 @@ export default function HomePage() {
           Curated radio stations, discovered fresh every visit.
         </p>
       </header>
+
+      <MoodPicker
+        trigger={
+          <button
+            className="mb-10 flex w-full items-center gap-4 rounded-2xl border border-border/60 bg-card/40 p-5 text-left transition-colors hover:border-accent sm:p-6"
+          >
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-accent/15 text-accent">
+              <Wand2 className="h-5 w-5" />
+            </div>
+            <div className="min-w-0">
+              <p className="font-display text-lg font-semibold text-foreground">What&rsquo;s your vibe?</p>
+              <p className="truncate text-sm text-muted-foreground">
+                Describe a mood — we&rsquo;ll queue up stations to swipe through.
+              </p>
+            </div>
+          </button>
+        }
+      />
 
       <section className="mb-10">
         <h2 className="font-display text-2xl font-semibold mb-3 text-foreground">Browse by Genre</h2>
