@@ -87,7 +87,9 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
       <div className="flex flex-col min-h-screen">
       <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b bg-background px-4 sm:px-6">
         <div className="flex items-center gap-4">
-          <AppLogo iconOnly={false} />
+          <Link href="/" aria-label="OnWave home">
+            <AppLogo iconOnly={false} />
+          </Link>
         </div>
         <nav className="hidden sm:flex items-center gap-1 rounded-full border border-border bg-card/40 p-1">
           {navItems.map((item) => (

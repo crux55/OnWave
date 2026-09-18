@@ -30,9 +30,17 @@ export function useLikedStations() {
     loadLiked();
     window.addEventListener('authChange', loadLiked);
     window.addEventListener('storage', loadLiked);
+    // Every call site gets its own independent copy of likedUuids (this is
+    // a plain hook, not a shared context) -- a like/unlike toggled from one
+    // component (e.g. a station card) otherwise never reaches another
+    // instance showing the same station elsewhere (e.g. the player bar's
+    // heart), which is exactly the "heart stays lit on mobile" bug this
+    // event fixes: every instance also refreshes on any instance's toggle.
+    window.addEventListener('likedStationsChanged', loadLiked);
     return () => {
       window.removeEventListener('authChange', loadLiked);
       window.removeEventListener('storage', loadLiked);
+      window.removeEventListener('likedStationsChanged', loadLiked);
     };
   }, [loadLiked]);
 
@@ -63,6 +71,9 @@ export function useLikedStations() {
       } else {
         await likeStation(station);
       }
+      // Tell every other useLikedStations() instance on the page to
+      // refresh -- see the listener above for why this is needed.
+      window.dispatchEvent(new Event('likedStationsChanged'));
     } catch (err) {
       // Roll back the optimistic update.
       setLikedUuids(prev => {
