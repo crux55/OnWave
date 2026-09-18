@@ -54,10 +54,20 @@ export function useButterchurn(
   canvasRef: React.RefObject<HTMLCanvasElement | null>,
   audioElement: HTMLAudioElement | null,
   active: boolean,
-  // 'random' is for the swipeable browser (OnWave: "randomise the vis"),
-  // where variety station-to-station is the point — every other caller
-  // wants the same "Unchained - Rewop" default every time.
-  initialPreset: 'default' | 'random' = 'default'
+  // 'default' picks the fixed "Unchained - Rewop" preset every time (every
+  // caller except the swipeable browser). A number 0-1 is a caller-supplied
+  // random seed used to derive the starting preset index instead — the
+  // swipeable browser (OnWave: "randomise the vis") wants a DIFFERENT
+  // preset per station, but this effect's own `active` re-gates its setup
+  // (see the effect below) whenever a card's visualizer is paused and
+  // resumed, e.g. toggling off/on across a hesitant, uncommitted drag on
+  // the same station — rolling Math.random() fresh in here on every one of
+  // those restarts would re-randomize mid-gesture instead of staying
+  // stable for as long as the same station is showing. The caller picks
+  // the seed once (typically via useState(() => Math.random())) so it's
+  // stable across restarts and only actually changes when the caller
+  // itself remounts for a new station.
+  initialPreset: 'default' | number = 'default'
 ): UseButterchurnResult {
   const visualizerRef = useRef<any>(null);
   const presetsRef = useRef<[string, any][]>([]);
@@ -113,8 +123,8 @@ export function useButterchurn(
         // installable preset library lets users pick their own) — falls
         // back to the first preset in the pack if it's ever missing (e.g. a
         // future butterchurn-presets version renaming/dropping it).
-        const startIndex = initialPreset === 'random'
-          ? Math.floor(Math.random() * presets.length)
+        const startIndex = typeof initialPreset === 'number'
+          ? Math.min(presets.length - 1, Math.floor(initialPreset * presets.length))
           : Math.max(0, presets.findIndex(([name]) => name === 'Unchained - Rewop'));
         presetIndexRef.current = startIndex;
         visualizer.loadPreset(presets[startIndex][1], 0);
@@ -136,7 +146,7 @@ export function useButterchurn(
       visualizerRef.current = null;
       setIsReady(false);
     };
-  }, [active, audioElement, canvasRef]);
+  }, [active, audioElement, canvasRef, initialPreset]);
 
   // Tracks real fullscreen viewport size (orientation changes, mobile
   // browser chrome show/hide) rather than the size at mount time.

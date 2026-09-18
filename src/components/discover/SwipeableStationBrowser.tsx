@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import type { RadioStation } from '@/lib/types';
 import { usePlayer } from '@/contexts/PlayerContext';
 import { useMobileDock } from '@/contexts/MobileDockContext';
@@ -29,13 +29,26 @@ const SWIPE_TRANSITION = `transform ${EXIT_DURATION_MS}ms cubic-bezier(0.22, 1, 
 // yet) reuses that same live signal so it isn't just a frozen frame, paired
 // with its own independently-randomized preset so it reads as a distinct
 // station rather than a copy of the current card.
-function StationCard({ station, errorMessage }: {
+//
+// memo()'d because the parent re-renders on every single pointermove during
+// a drag (to update the live transform) -- without this, both cards (each
+// running their own WebGL render loop) get fully re-invoked dozens of times
+// a second for a prop set that never actually changed mid-drag, which reads
+// as dropped frames/jank rather than a smooth 1:1 drag.
+const StationCard = memo(function StationCard({ station, active, errorMessage }: {
   station: RadioStation;
+  active: boolean;
   errorMessage?: string | null;
 }) {
   const player = usePlayer();
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  useButterchurn(canvasRef, player.activeAudioElement, true, 'random');
+  // Picked once per station (stable for as long as this card's key/mount
+  // lasts) rather than letting useButterchurn roll a fresh random preset
+  // every time `active` toggles off/on -- otherwise a hesitant, uncommitted
+  // drag on the same upcoming station would flicker to a different preset
+  // each time it's re-engaged.
+  const [presetSeed] = useState(() => Math.random());
+  useButterchurn(canvasRef, active ? player.activeAudioElement : null, active, presetSeed);
 
   return (
     <div className="absolute inset-0">
@@ -53,7 +66,7 @@ function StationCard({ station, errorMessage }: {
       </div>
     </div>
   );
-}
+});
 
 // A skin over PlayerContext's existing queue, not a second copy of it —
 // forward/back always calls playNext()/playPrevious(), and the top card is
@@ -88,6 +101,20 @@ export function SwipeableStationBrowser({ isLiked, onToggleLike, onClose }: Swip
   const lastDirectionRef = useRef<-1 | 1>(-1); // -1 = last dragged toward "next" (up), 1 = toward "previous" (down)
   const dragStartRef = useRef<{ y: number; pointerId: number; time: number } | null>(null);
   const stageRef = useRef<HTMLDivElement>(null);
+
+  // With this overlay open, a vertical drag that starts even a frame before
+  // our own pointer handling takes hold can otherwise also scroll the page
+  // underneath (touch-action/pointer capture aren't always enough to fully
+  // claim a gesture on every mobile browser) — the page moving *and* our
+  // transform moving at once is exactly the kind of double-motion that
+  // reads as janky rather than a clean 1:1 drag.
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, []);
 
   const station = player.currentStation;
   const nextStation = player.queueIndex >= 0 ? player.queue[player.queueIndex + 1] : undefined;
@@ -176,7 +203,15 @@ export function SwipeableStationBrowser({ isLiked, onToggleLike, onClose }: Swip
 
       <div ref={stageRef} className="relative flex-1 overflow-hidden">
         {underStation && (
-          <StationCard key={`under-${underStation.stationuuid}`} station={underStation} />
+          <StationCard
+            key={`under-${underStation.stationuuid}`}
+            station={underStation}
+            // Only worth running a second full-screen WebGL visualizer while
+            // it's actually about to be revealed -- halves idle GPU cost
+            // the rest of the time, at the cost of a brief (well under the
+            // 100px commit distance) startup lag once a drag begins.
+            active={isDragging || isExiting}
+          />
         )}
         <div
           onPointerDown={handlePointerDown}
@@ -189,7 +224,7 @@ export function SwipeableStationBrowser({ isLiked, onToggleLike, onClose }: Swip
             transition: isDragging || suppressTransition ? 'none' : SWIPE_TRANSITION,
           }}
         >
-          <StationCard key={station.stationuuid} station={station} errorMessage={player.playbackError} />
+          <StationCard key={station.stationuuid} station={station} active errorMessage={player.playbackError} />
         </div>
       </div>
 
