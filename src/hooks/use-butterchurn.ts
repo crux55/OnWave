@@ -67,7 +67,14 @@ export function useButterchurn(
   // the seed once (typically via useState(() => Math.random())) so it's
   // stable across restarts and only actually changes when the caller
   // itself remounts for a new station.
-  initialPreset: 'default' | number = 'default'
+  initialPreset: 'default' | number = 'default',
+  // OnWave#40: a logged-in user's personal preset rotation, by name. When
+  // non-empty, cycling (manual prev/next and the #41 auto-cycle) is
+  // restricted to just these — when empty/undefined (the default for
+  // everyone who hasn't curated one, including logged-out listeners), the
+  // full butterchurn-presets pack is available exactly as before this
+  // ticket existed.
+  installedPresetNames?: string[]
 ): UseButterchurnResult {
   const visualizerRef = useRef<any>(null);
   const presetsRef = useRef<[string, any][]>([]);
@@ -75,6 +82,16 @@ export function useButterchurn(
   const [presetName, setPresetName] = useState<string | null>(null);
   const [isReady, setIsReady] = useState(false);
   const rafRef = useRef<number | null>(null);
+
+  // A content-based key, not the raw array, drives the effect below —
+  // callers that derive installedPresetNames inline (e.g. an inline .map()
+  // over fetched data) hand this hook a new array reference every render
+  // even when the actual names haven't changed, and this effect is
+  // expensive enough (full WebGL re-init) that reacting to reference
+  // churn instead of real content changes would be a real regression.
+  const installedKey = installedPresetNames && installedPresetNames.length > 0
+    ? [...installedPresetNames].sort().join(',')
+    : '';
 
   useEffect(() => {
     if (!active || !audioElement || !canvasRef.current) return;
@@ -116,13 +133,24 @@ export function useButterchurn(
       visualizer.connectAudio(analyser);
       visualizerRef.current = visualizer;
 
-      const presets = Object.entries(butterchurnPresets.getPresets());
+      const allPresets = Object.entries(butterchurnPresets.getPresets());
+      // OnWave#40: restrict to the user's installed rotation when they've
+      // curated one. An installed name that's since vanished from the pack
+      // (renamed/removed upstream) is silently dropped by the filter rather
+      // than erroring; falling back to the full pack if that leaves nothing
+      // usable avoids a curated-but-now-empty rotation going silent.
+      const installedSet = installedPresetNames && installedPresetNames.length > 0
+        ? new Set(installedPresetNames)
+        : null;
+      const filtered = installedSet ? allPresets.filter(([name]) => installedSet.has(name)) : allPresets;
+      const presets = filtered.length > 0 ? filtered : allPresets;
       presetsRef.current = presets;
       if (presets.length > 0) {
-        // "Unchained - Rewop" is the chosen default preset (until OnWave#40's
-        // installable preset library lets users pick their own) — falls
-        // back to the first preset in the pack if it's ever missing (e.g. a
-        // future butterchurn-presets version renaming/dropping it).
+        // "Unchained - Rewop" is the fallback starting preset when nothing
+        // more specific applies — falls back further to the first preset in
+        // whatever pool is active if it's ever missing there too (e.g. it
+        // isn't part of this user's installed rotation, or a future
+        // butterchurn-presets version renames/drops it).
         const startIndex = typeof initialPreset === 'number'
           ? Math.min(presets.length - 1, Math.floor(initialPreset * presets.length))
           : Math.max(0, presets.findIndex(([name]) => name === 'Unchained - Rewop'));
@@ -146,7 +174,7 @@ export function useButterchurn(
       visualizerRef.current = null;
       setIsReady(false);
     };
-  }, [active, audioElement, canvasRef, initialPreset]);
+  }, [active, audioElement, canvasRef, initialPreset, installedKey]);
 
   // Tracks real fullscreen viewport size (orientation changes, mobile
   // browser chrome show/hide) rather than the size at mount time.

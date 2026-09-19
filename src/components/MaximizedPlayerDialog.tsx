@@ -5,18 +5,23 @@ import type { RadioStation } from '@/lib/types';
 import { usePlayer } from '@/contexts/PlayerContext';
 import { Button } from '@/components/ui/button';
 import {
-  Play, Pause, SkipForward, SkipBack, ChevronLeft, ChevronRight, X,
+  Play, Pause, SkipForward, SkipBack, ChevronLeft, ChevronRight, X, Timer, LayoutGrid,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useButterchurn } from '@/hooks/use-butterchurn';
 import { useChromecast } from '@/hooks/use-chromecast';
 import { useNowPlaying } from '@/hooks/use-now-playing';
+import { PresetLibraryDialog } from '@/components/PresetLibraryDialog';
+import { fetchInstalledPresets } from '@/lib/api';
 
 interface MaximizedPlayerDialogProps {
   station: RadioStation;
 }
 
 const HIDE_DELAY_MS = 2000;
+// OnWave#41: how long each preset shows before auto-advancing.
+const AUTO_CYCLE_MS = 30000;
+const AUTO_CYCLE_STORAGE_KEY = 'butterchurnAutoCycle';
 
 // A genuinely fullscreen overlay, not a centered shadcn Dialog — the whole
 // screen is a real Butterchurn visualizer (see use-butterchurn.ts), with a
@@ -30,12 +35,64 @@ export function MaximizedPlayerDialog({ station }: MaximizedPlayerDialogProps) {
   const streamUrl = station.url_resolved || station.url;
   const chromecast = useChromecast(streamUrl, station.name, station.codec, station.favicon, station.tags);
 
+  // OnWave#40: a logged-out listener or one who hasn't starred anything
+  // gets an empty array here, which use-butterchurn.ts treats as "use the
+  // full pack" -- this only ever narrows the rotation, never blocks it.
+  const [installedPresetNames, setInstalledPresetNames] = useState<string[]>([]);
+  const [isPresetLibraryOpen, setIsPresetLibraryOpen] = useState(false);
+  useEffect(() => {
+    if (!player.isMaximizedViewOpen) return;
+    let cancelled = false;
+    fetchInstalledPresets()
+      .then(presets => { if (!cancelled) setInstalledPresetNames(presets.map(p => p.preset_name)); })
+      .catch(() => {}); // logged out, or a transient failure -- falls back to the full pack
+    return () => { cancelled = true; };
+  }, [player.isMaximizedViewOpen]);
+
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const { presetName, nextPreset, previousPreset } = useButterchurn(
     canvasRef,
     player.activeAudioElement,
-    player.isMaximizedViewOpen
+    player.isMaximizedViewOpen,
+    'default',
+    installedPresetNames
   );
+
+  // Defaults on -- the whole point of #41 is that presets change on their
+  // own; a viewer who doesn't want that turns it off, rather than everyone
+  // having to discover and opt in. Reads localStorage lazily (useState
+  // initializer) so this doesn't flash on then immediately off for a
+  // returning viewer who'd disabled it.
+  const [autoCycleEnabled, setAutoCycleEnabled] = useState(() => {
+    try {
+      return localStorage.getItem(AUTO_CYCLE_STORAGE_KEY) !== 'false';
+    } catch {
+      return true;
+    }
+  });
+  const toggleAutoCycle = useCallback(() => {
+    setAutoCycleEnabled(prev => {
+      const next = !prev;
+      try {
+        localStorage.setItem(AUTO_CYCLE_STORAGE_KEY, String(next));
+      } catch {
+        // Private browsing / storage disabled -- the toggle still works for
+        // this session, it just won't persist to the next one.
+      }
+      return next;
+    });
+  }, []);
+
+  // Re-arms on every preset change, whichever caused it -- including a
+  // manual prev/next click, so picking a preset by hand resets the clock
+  // instead of getting overridden a few seconds later. presetName is null
+  // until Butterchurn's finished loading, which doubles as the "don't start
+  // the timer before there's anything to advance from" guard.
+  useEffect(() => {
+    if (!autoCycleEnabled || !player.isMaximizedViewOpen || !presetName) return;
+    const timeout = setTimeout(nextPreset, AUTO_CYCLE_MS);
+    return () => clearTimeout(timeout);
+  }, [autoCycleEnabled, player.isMaximizedViewOpen, presetName, nextPreset]);
 
   const togglePlayPause = useCallback(() => {
     if (!streamUrl) return;
@@ -131,6 +188,30 @@ export function MaximizedPlayerDialog({ station }: MaximizedPlayerDialogProps) {
             >
               <ChevronRight className="h-5 w-5" />
             </Button>
+            <Button
+              onClick={toggleAutoCycle}
+              variant="ghost"
+              size="icon"
+              className={cn(
+                'rounded-full bg-black/40 text-white hover:bg-black/60',
+                autoCycleEnabled && 'text-primary'
+              )}
+              aria-label={autoCycleEnabled ? 'Turn off auto-cycling presets' : 'Turn on auto-cycling presets'}
+              aria-pressed={autoCycleEnabled}
+              title={autoCycleEnabled ? 'Auto-cycle: on (every 30s)' : 'Auto-cycle: off'}
+            >
+              <Timer className="h-5 w-5" />
+            </Button>
+            <Button
+              onClick={() => setIsPresetLibraryOpen(true)}
+              variant="ghost"
+              size="icon"
+              className="rounded-full bg-black/40 text-white hover:bg-black/60"
+              aria-label="Browse preset library"
+              title="Preset library"
+            >
+              <LayoutGrid className="h-5 w-5" />
+            </Button>
           </div>
 
           <div className="flex items-center gap-5">
@@ -167,6 +248,12 @@ export function MaximizedPlayerDialog({ station }: MaximizedPlayerDialogProps) {
           </div>
         </div>
       </div>
+
+      <PresetLibraryDialog
+        open={isPresetLibraryOpen}
+        onOpenChange={setIsPresetLibraryOpen}
+        onInstalledChange={setInstalledPresetNames}
+      />
     </div>
   );
 }

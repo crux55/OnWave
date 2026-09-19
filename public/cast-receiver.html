@@ -234,6 +234,21 @@
             visualizer.loadPreset(presets[defaultPresetName], 0);
           }
 
+          // OnWave#41: auto-cycle through presets on a timer -- a TV remote
+          // has no interactive input to change presets manually the way the
+          // in-app player does, so this always runs (no on/off toggle here;
+          // that only exists on the in-app side, see use-butterchurn.ts's
+          // caller in MaximizedPlayerDialog.tsx).
+          const AUTO_CYCLE_MS = 30000;
+          let presetCycleIndex = Math.max(0, presetNames.indexOf(defaultPresetName));
+          setInterval(() => {
+            if (presetNames.length === 0) return;
+            presetCycleIndex = (presetCycleIndex + 1) % presetNames.length;
+            const name = presetNames[presetCycleIndex];
+            console.log('[OnWave] auto-cycling to preset:', name);
+            visualizer.loadPreset(presets[name], 1.2);
+          }, AUTO_CYCLE_MS);
+
           window.addEventListener('resize', () => {
             const ratio = window.devicePixelRatio || 1;
             canvas.width = window.innerWidth * ratio;
