@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { Search, Heart, Mic2, Radio, MessagesSquare, Tv, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { QuickTipsDialog } from '@/components/QuickTipsDialog';
 
 const FEATURES = [
   {
@@ -40,6 +41,7 @@ const FEATURES = [
 export default function AboutPage() {
   return (
     <div className="mx-auto max-w-4xl px-4 py-10 sm:py-14">
+      <QuickTipsDialog />
       {/* Hero */}
       <section
         className="relative mb-14 overflow-hidden rounded-2xl border border-border/60 p-8 text-center sm:p-14"
