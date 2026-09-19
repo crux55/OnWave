@@ -20,13 +20,19 @@ import {
   fetchPublicProfile,
   fetchFeedbackReports,
   resolveFeedbackReport,
+  fetchBadges,
+  updateBadgeSplash,
   type StationRequest,
   type DJRequest,
   type FeedbackReport,
+  type Badge as BadgeData,
 } from '@/lib/api';
 import type { Token } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { BadgeIcon } from '@/components/BadgeIcon';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 
 function requesterLabel(names: Record<string, string>, requesterId: string): string {
   return names[requesterId] || `User ${requesterId.slice(0, 8)}`;
@@ -47,6 +53,8 @@ export default function AdminPage() {
   const [isGeneratingInvite, setIsGeneratingInvite] = useState(false);
   const [feedbackReports, setFeedbackReports] = useState<FeedbackReport[]>([]);
   const [resolvingId, setResolvingId] = useState<string | null>(null);
+  const [badges, setBadges] = useState<BadgeData[]>([]);
+  const [togglingSplashId, setTogglingSplashId] = useState<string | null>(null);
 
   useEffect(() => {
     const tokenString = localStorage.getItem('token');
@@ -69,11 +77,12 @@ export default function AdminPage() {
       return;
     }
 
-    Promise.all([fetchPendingStationRequests(), fetchPendingDJRequests(), fetchFeedbackReports()])
-      .then(async ([stations, djs, reports]) => {
+    Promise.all([fetchPendingStationRequests(), fetchPendingDJRequests(), fetchFeedbackReports(), fetchBadges()])
+      .then(async ([stations, djs, reports, badgeList]) => {
         setStationRequests(stations);
         setDjRequests(djs);
         setFeedbackReports(reports);
+        setBadges(badgeList);
 
         const requesterIds = Array.from(new Set([...stations.map(s => s.requester_id), ...djs.map(d => d.requester_id)]));
         const profiles = await Promise.all(requesterIds.map(id => fetchPublicProfile(id).catch(() => null)));
@@ -171,6 +180,20 @@ export default function AdminPage() {
   const handleCopyInviteLink = () => {
     navigator.clipboard.writeText(generatedInviteLink);
     toast({ title: 'Copied to clipboard' });
+  };
+
+  const handleToggleSplash = async (badgeId: string, next: boolean) => {
+    setTogglingSplashId(badgeId);
+    // Optimistic -- reverted in the catch block below on failure.
+    setBadges(prev => prev.map(b => (b.id === badgeId ? { ...b, announce_splash: next } : b)));
+    try {
+      await updateBadgeSplash(badgeId, next);
+    } catch (error: any) {
+      setBadges(prev => prev.map(b => (b.id === badgeId ? { ...b, announce_splash: !next } : b)));
+      toast({ title: 'Failed to update badge', description: error.message, variant: 'destructive' });
+    } finally {
+      setTogglingSplashId(null);
+    }
   };
 
   const handleResolveFeedback = async (id: string) => {
@@ -397,6 +420,43 @@ export default function AdminPage() {
                 <Button size="sm" variant="outline" onClick={handleCopyInviteLink}>
                   <Copy className="h-3.5 w-3.5" />
                 </Button>
+              </div>
+            )}
+          </section>
+
+          <Separator />
+
+          <section className="space-y-3">
+            <h3 className="text-sm font-semibold text-foreground">Badge Splash Announcements</h3>
+            <p className="text-xs text-muted-foreground">
+              On for a badge means every award interrupts with a full splash screen instead of the usual toast — reserve this for genuinely special badges, not every one a station or DJ creates.
+            </p>
+            {badges.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No badges yet.</p>
+            ) : (
+              <div className="space-y-2">
+                {badges.map(badge => (
+                  <div key={badge.id} className="flex items-center justify-between gap-3 rounded-md border border-border bg-card/40 p-2">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <BadgeIcon badge={badge} size={24} />
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium">{badge.name}</p>
+                        <p className="truncate text-xs text-muted-foreground">{badge.issuer_name || 'Global'}</p>
+                      </div>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <Label htmlFor={`splash-${badge.id}`} className="text-xs font-normal text-muted-foreground">
+                        Splash
+                      </Label>
+                      <Switch
+                        id={`splash-${badge.id}`}
+                        checked={badge.announce_splash}
+                        disabled={togglingSplashId === badge.id}
+                        onCheckedChange={(checked) => handleToggleSplash(badge.id, checked)}
+                      />
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </section>

@@ -777,6 +777,10 @@ export interface Badge {
   scope: BadgeScope;
   show_issuer_id?: string | null;
   award_rule?: BadgeAwardRule | null;
+  // Admin-only to set (see updateBadgeSplash) -- marks this badge special
+  // enough to interrupt with a full splash announcement when awarded,
+  // instead of the toast every other badge gets.
+  announce_splash: boolean;
   created_at: string;
 }
 
@@ -1016,6 +1020,28 @@ export async function revokeBadge(email: string, badgeId: string): Promise<void>
       throw new Error('UNAUTHORIZED');
     }
     throw new Error(errorData.message || 'Failed to revoke badge');
+  }
+}
+
+// Admin-only (enforced server-side) -- marks a badge special enough to
+// interrupt with a full splash announcement when awarded, instead of the
+// toast every other badge gets.
+export async function updateBadgeSplash(badgeId: string, announceSplash: boolean): Promise<void> {
+  const authToken = requireAuthToken();
+  const response = await fetch(`/api/badges/${badgeId}`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${authToken}`,
+    },
+    body: JSON.stringify({ announce_splash: announceSplash }),
+  });
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    if (response.status === 401) {
+      throw new Error('UNAUTHORIZED');
+    }
+    throw new Error(errorData.error || 'Failed to update badge');
   }
 }
 

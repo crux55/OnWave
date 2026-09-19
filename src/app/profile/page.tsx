@@ -10,7 +10,6 @@ import { useEffect, useState } from 'react';
 import { fetchCurrentUserProfile, fetchMyBadges, fetchMyStations, markBadgesSeen, type MyBadge, type Station } from '@/lib/api';
 import type { Profile, Token } from '@/lib/types';
 import { jwtDecode as jwt_decode } from 'jwt-decode';
-import { useToast } from '@/hooks/use-toast';
 import { ProfileHeader } from '@/components/profile/ProfileHeader';
 import { ProfileBioSection } from '@/components/profile/ProfileBioSection';
 import { ProfileBadgesSection } from '@/components/profile/ProfileBadgesSection';
@@ -19,7 +18,6 @@ import { ProfileStationsSection } from '@/components/profile/ProfileStationsSect
 export default function ProfilePage() {
   const router = useRouter();
   const apiHost = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080';
-  const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(true);
   const [userProfile, setUserProfile] = useState<Profile | null>(null);
   const [token, setToken] = useState<Token | null>(null);
@@ -55,10 +53,13 @@ export default function ProfilePage() {
     fetchMyBadges()
       .then(badges => {
         setMyBadges(badges);
+        // Notifying (toast or splash, depending on the badge) is
+        // BadgeAnnouncer's job now, mounted globally so it fires wherever
+        // the user happens to be, not just if/when they visit this page.
+        // Still marking seen here, though -- this page is what actually
+        // shows the "New" ribbon (ProfileBadgesSection), so it's the right
+        // place to clear it once shown, same as before.
         const newOnes = badges.filter(b => b.is_new);
-        newOnes.forEach(b => {
-          toast({ title: `New badge: ${b.icon} ${b.name}`, description: b.description || 'Check your profile to see it.' });
-        });
         if (newOnes.length > 0) {
           markBadgesSeen();
         }

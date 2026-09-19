@@ -27,6 +27,7 @@ import { ThemeProvider } from '@/contexts/ThemeContext';
 import { MobileBottomDock } from '@/components/MobileBottomDock';
 import { ChunkErrorRecovery } from '@/components/ChunkErrorRecovery';
 import { AmbientBackground } from '@/components/AmbientBackground';
+import { BadgeAnnouncer } from '@/components/BadgeAnnouncer';
 import { Toaster } from '@/components/ui/toaster';
 import { cn } from '@/lib/utils';
 
@@ -66,6 +67,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                       <MobileDockProvider>
                         <AppLayoutContent>{children}</AppLayoutContent>
                         <Toaster />
+                        <BadgeAnnouncer />
                       </MobileDockProvider>
                     </NotificationProvider>
                   </RemindersProvider>
