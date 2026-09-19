@@ -204,7 +204,7 @@ export function useChromecast(
     };
   }, []);
 
-  const loadCurrentMedia = useCallback(() => {
+  const loadCurrentMedia = useCallback(async () => {
     const session = window.cast?.framework?.CastContext.getInstance().getCurrentSession();
     if (!session || !streamUrl) return;
 
@@ -218,6 +218,10 @@ export function useChromecast(
     // instance (or an earlier effect run in this one) already sent this
     // exact URL moments ago, sending it again only makes the receiver
     // tear down and recreate its whole media pipeline for no reason.
+    // Deliberately updated synchronously, before the mint request below
+    // ever awaits anything -- doing it after would leave a real race where
+    // a second concurrent call (another mounted instance) could pass this
+    // check too before either one finishes.
     const now = Date.now();
     if (absoluteStreamUrl === lastLoadedStreamUrl && now - lastLoadedAt < DUPLICATE_LOAD_WINDOW_MS) {
       return;
@@ -225,7 +229,34 @@ export function useChromecast(
     lastLoadedStreamUrl = absoluteStreamUrl;
     lastLoadedAt = now;
 
-    const mediaInfo = new window.chrome.cast.media.MediaInfo(absoluteStreamUrl, codecToContentType(codec));
+    // OnWave/project_r#39: route every cast through our own stream-proxy
+    // instead of sending the raw external URL. A receiver's Web Audio graph
+    // (createMediaElementSource, needed for Butterchurn's frequency
+    // analysis) silences its OUTPUT entirely for a cross-origin source with
+    // no CORS headers -- confirmed via the Shield's logcat: no error
+    // anywhere, the native pipeline reports genuine "playing" state, just
+    // no sound. Third-party station servers aren't ours to add CORS headers
+    // to, but our own proxy can set whatever it wants on its own response.
+    // See project_r's internal/streamproxy/cast.go for the mint-then-fetch
+    // design (never a plain "fetch any URL" open relay). Falls back to the
+    // raw URL if minting fails for any reason -- casting still basically
+    // works without the fix rather than not casting at all.
+    let castUrl = absoluteStreamUrl;
+    try {
+      const mintResponse = await fetch('/api/stream-proxy/mint', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: absoluteStreamUrl }),
+      });
+      if (mintResponse.ok) {
+        const { proxy_path } = await mintResponse.json();
+        if (proxy_path) castUrl = new URL(proxy_path, window.location.origin).href;
+      }
+    } catch {
+      // Network hiccup reaching our own backend -- proceed with the raw URL.
+    }
+
+    const mediaInfo = new window.chrome.cast.media.MediaInfo(castUrl, codecToContentType(codec));
     mediaInfo.streamType = window.chrome.cast.media.StreamType.LIVE;
 
     // MusicTrackMediaMetadata (not Generic) is what both the Default
