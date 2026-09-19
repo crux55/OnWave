@@ -10,6 +10,9 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { Separator } from '@/components/ui/separator';
 import { StationAvatar } from '@/components/StationAvatar';
 import { fetchInstalledPresets, installPreset, uninstallPreset } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
@@ -22,6 +25,13 @@ interface PresetLibraryDialogProps {
   // in sync live as presets are starred/unstarred, without this dialog
   // needing to know anything about Butterchurn itself.
   onInstalledChange: (names: string[]) => void;
+  // OnWave#41's auto-cycle setting lives here now, not as its own always-
+  // visible icon in the maximized player's control row — it's an opt-in
+  // most people won't touch often, so it belongs behind the same "more
+  // preset options" popup as starring presets, not fighting for space
+  // (and fading in and out) alongside play/pause every time.
+  autoCycleEnabled: boolean;
+  onToggleAutoCycle: () => void;
 }
 
 // OnWave#40: browse the full Butterchurn preset pack and star/unstar which
@@ -29,7 +39,7 @@ interface PresetLibraryDialogProps {
 // initials placeholder for each preset's thumbnail rather than live-
 // rendering one — the same "lightweight, not a real render" tradeoff
 // search results already make for station art.
-export function PresetLibraryDialog({ open, onOpenChange, onInstalledChange }: PresetLibraryDialogProps) {
+export function PresetLibraryDialog({ open, onOpenChange, onInstalledChange, autoCycleEnabled, onToggleAutoCycle }: PresetLibraryDialogProps) {
   const { toast } = useToast();
   const [allNames, setAllNames] = useState<string[] | null>(null);
   const [installed, setInstalled] = useState<Set<string>>(new Set());
@@ -105,6 +115,15 @@ export function PresetLibraryDialog({ open, onOpenChange, onInstalledChange }: P
               : 'Star a few presets to build your own rotation. Nothing starred yet, so every preset in the pack cycles by default.'}
           </DialogDescription>
         </DialogHeader>
+
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-card/40 px-3 py-2.5">
+          <Label htmlFor="auto-cycle-toggle" className="text-sm font-normal text-foreground">
+            Auto-cycle presets every 30s
+          </Label>
+          <Switch id="auto-cycle-toggle" checked={autoCycleEnabled} onCheckedChange={onToggleAutoCycle} />
+        </div>
+        <Separator />
+
         <div className="-mx-1 overflow-y-auto px-1">
           {isLoading || !allNames ? (
             <div className="flex justify-center py-12">

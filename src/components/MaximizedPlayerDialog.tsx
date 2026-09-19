@@ -5,7 +5,7 @@ import type { RadioStation } from '@/lib/types';
 import { usePlayer } from '@/contexts/PlayerContext';
 import { Button } from '@/components/ui/button';
 import {
-  Play, Pause, SkipForward, SkipBack, ChevronLeft, ChevronRight, X, Timer, LayoutGrid,
+  Play, Pause, SkipForward, SkipBack, ChevronLeft, ChevronRight, X, LayoutGrid,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useButterchurn } from '@/hooks/use-butterchurn';
@@ -58,16 +58,16 @@ export function MaximizedPlayerDialog({ station }: MaximizedPlayerDialogProps) {
     installedPresetNames
   );
 
-  // Defaults on -- the whole point of #41 is that presets change on their
-  // own; a viewer who doesn't want that turns it off, rather than everyone
-  // having to discover and opt in. Reads localStorage lazily (useState
-  // initializer) so this doesn't flash on then immediately off for a
-  // returning viewer who'd disabled it.
+  // Defaults off -- auto-advancing presets is an opt-in the user turns on
+  // from the preset library popup, not a behavior sprung on everyone by
+  // default. Reads localStorage lazily (useState initializer) so this
+  // doesn't flash off then immediately on for a returning viewer who'd
+  // enabled it.
   const [autoCycleEnabled, setAutoCycleEnabled] = useState(() => {
     try {
-      return localStorage.getItem(AUTO_CYCLE_STORAGE_KEY) !== 'false';
+      return localStorage.getItem(AUTO_CYCLE_STORAGE_KEY) === 'true';
     } catch {
-      return true;
+      return false;
     }
   });
   const toggleAutoCycle = useCallback(() => {
@@ -189,20 +189,6 @@ export function MaximizedPlayerDialog({ station }: MaximizedPlayerDialogProps) {
               <ChevronRight className="h-5 w-5" />
             </Button>
             <Button
-              onClick={toggleAutoCycle}
-              variant="ghost"
-              size="icon"
-              className={cn(
-                'rounded-full bg-black/40 text-white hover:bg-black/60',
-                autoCycleEnabled && 'text-primary'
-              )}
-              aria-label={autoCycleEnabled ? 'Turn off auto-cycling presets' : 'Turn on auto-cycling presets'}
-              aria-pressed={autoCycleEnabled}
-              title={autoCycleEnabled ? 'Auto-cycle: on (every 30s)' : 'Auto-cycle: off'}
-            >
-              <Timer className="h-5 w-5" />
-            </Button>
-            <Button
               onClick={() => setIsPresetLibraryOpen(true)}
               variant="ghost"
               size="icon"
@@ -253,6 +239,8 @@ export function MaximizedPlayerDialog({ station }: MaximizedPlayerDialogProps) {
         open={isPresetLibraryOpen}
         onOpenChange={setIsPresetLibraryOpen}
         onInstalledChange={setInstalledPresetNames}
+        autoCycleEnabled={autoCycleEnabled}
+        onToggleAutoCycle={toggleAutoCycle}
       />
     </div>
   );
