@@ -16,10 +16,19 @@ interface SwipeableStationBrowserProps {
 
 // A drag past this distance commits to the next/previous station outright.
 const COMMIT_DISTANCE_PX = 100;
-// A short, fast drag commits even under that distance -- matches how an
-// actual flick gesture feels versus a slow deliberate drag.
-const FLICK_MAX_MS = 260;
-const FLICK_MIN_DISTANCE_PX = 32;
+// Movement below this doesn't move the card at all yet -- without a dead
+// zone, the tiniest jitter (or the start of a tap on a button underneath)
+// immediately shifts the card, which reads as twitchy rather than a
+// deliberate drag (OnWave#36).
+const DRAG_DEADZONE_PX = 6;
+// A fast drag commits even under COMMIT_DISTANCE_PX -- matches how an actual
+// flick gesture feels versus a slow deliberate drag. Velocity-based rather
+// than a fixed max-duration cutoff (the previous FLICK_MAX_MS = 260 rejected
+// perfectly normal flicks that happened to take slightly longer, forcing a
+// full COMMIT_DISTANCE_PX drag instead -- reported as "how high you have to
+// flick to change" in OnWave#36).
+const FLICK_MIN_VELOCITY_PX_MS = 0.5;
+const FLICK_MIN_DISTANCE_PX = 24;
 const EXIT_DURATION_MS = 220;
 const SWIPE_TRANSITION = `transform ${EXIT_DURATION_MS}ms cubic-bezier(0.22, 1, 0.36, 1)`;
 
@@ -79,8 +88,20 @@ const StationCard = memo(function StationCard({ station, active, errorMessage }:
 // rest (no transform) exactly where it needs to end up. Committing a swipe
 // animates only the top card fully off-screen; once that finishes, the real
 // player state advances and the drag offset resets with the transition
-// suppressed for one frame — the neighbor was already painted in its final
-// position, so the handoff has no flash/flicker, just a continuous flick.
+// suppressed for one frame.
+//
+// The two cards live in two permanent "slots" (topSlot below), not one kept
+// by station identity — each slot's StationCard/Butterchurn instance is
+// mounted once and simply gets handed a different station to display over
+// time, rather than being torn down and recreated. Butterchurn's visuals
+// are generic audio-reactive art, not per-station content, so there's
+// nothing gained by resetting the WebGL canvas/preset on every commit — and
+// doing so was exactly the bug in OnWave#36 ("jerk"/"flip to new cards"):
+// the neighbor card that had already been rendering smoothly underneath got
+// discarded and replaced by a freshly-initialized, freshly-re-randomized-
+// preset instance at the exact moment it should have just continued.
+// Swapping which slot is "top" instead means the already-running visual
+// keeps flowing straight through the handoff; only the text label changes.
 export function SwipeableStationBrowser({ isLiked, onToggleLike, onClose }: SwipeableStationBrowserProps) {
   const player = usePlayer();
   const dock = useMobileDock();
@@ -98,6 +119,12 @@ export function SwipeableStationBrowser({ isLiked, onToggleLike, onClose }: Swip
   const [isDragging, setIsDragging] = useState(false);
   const [isExiting, setIsExiting] = useState(false);
   const [suppressTransition, setSuppressTransition] = useState(false);
+  // Which of the two permanent card slots is currently "top" (the
+  // interactive, always-active one showing player.currentStation) versus
+  // "under" (the revealed neighbor, only active during a drag/exit) — see
+  // the comment above this component for why identity is tracked this way
+  // instead of by station id.
+  const [topSlot, setTopSlot] = useState<0 | 1>(0);
   const lastDirectionRef = useRef<-1 | 1>(-1); // -1 = last dragged toward "next" (up), 1 = toward "previous" (down)
   const dragStartRef = useRef<{ y: number; pointerId: number; time: number } | null>(null);
   const stageRef = useRef<HTMLDivElement>(null);
@@ -129,6 +156,11 @@ export function SwipeableStationBrowser({ isLiked, onToggleLike, onClose }: Swip
     setDragY(direction * -height);
     window.setTimeout(() => {
       if (direction === -1) goNext(); else goPrevious();
+      // The slot that was "under" (already rendering the station we're
+      // committing to) becomes "top" -- its Butterchurn instance never
+      // stops, so nothing visibly resets here. The old "top" slot becomes
+      // "under" and will pick up whatever the new neighbor is next render.
+      setTopSlot(prev => (prev === 0 ? 1 : 0));
       setSuppressTransition(true);
       setDragY(0);
       setIsExiting(false);
@@ -160,13 +192,23 @@ export function SwipeableStationBrowser({ isLiked, onToggleLike, onClose }: Swip
   const handlePointerDown = (e: React.PointerEvent) => {
     if (isExiting) return;
     dragStartRef.current = { y: e.clientY, pointerId: e.pointerId, time: Date.now() };
-    setIsDragging(true);
+    // isDragging deliberately isn't set yet -- see the dead zone in
+    // handlePointerMove below. Capture starts immediately regardless, so a
+    // gesture that does turn into a drag keeps receiving move events even
+    // once the pointer leaves this element's bounds.
     (e.target as Element).setPointerCapture(e.pointerId);
   };
 
   const handlePointerMove = (e: React.PointerEvent) => {
-    if (!dragStartRef.current) return;
-    const delta = e.clientY - dragStartRef.current.y;
+    const start = dragStartRef.current;
+    if (!start) return;
+    const delta = e.clientY - start.y;
+    if (!isDragging) {
+      // Still inside the dead zone -- a tap or a hand tremor, not a
+      // deliberate drag yet. Don't move the card at all until it's real.
+      if (Math.abs(delta) < DRAG_DEADZONE_PX) return;
+      setIsDragging(true);
+    }
     if (delta !== 0) lastDirectionRef.current = delta < 0 ? -1 : 1;
     setDragY(delta);
   };
@@ -175,11 +217,14 @@ export function SwipeableStationBrowser({ isLiked, onToggleLike, onClose }: Swip
     const start = dragStartRef.current;
     if (!start) return;
     dragStartRef.current = null;
+    if (!isDragging) return; // never left the dead zone -- a tap, nothing to settle
+
     setIsDragging(false);
 
     const elapsed = Date.now() - start.time;
     const distance = Math.abs(dragY);
-    const isFlick = elapsed <= FLICK_MAX_MS && distance >= FLICK_MIN_DISTANCE_PX;
+    const velocity = distance / Math.max(1, elapsed); // px/ms
+    const isFlick = distance >= FLICK_MIN_DISTANCE_PX && velocity >= FLICK_MIN_VELOCITY_PX_MS;
     const committed = distance >= COMMIT_DISTANCE_PX || isFlick;
 
     if (committed && dragY < 0 && player.hasNext) commitSwipe(-1);
@@ -202,30 +247,35 @@ export function SwipeableStationBrowser({ isLiked, onToggleLike, onClose }: Swip
       </button>
 
       <div ref={stageRef} className="relative flex-1 overflow-hidden">
-        {underStation && (
-          <StationCard
-            key={`under-${underStation.stationuuid}`}
-            station={underStation}
-            // Only worth running a second full-screen WebGL visualizer while
-            // it's actually about to be revealed -- halves idle GPU cost
-            // the rest of the time, at the cost of a brief (well under the
-            // 100px commit distance) startup lag once a drag begins.
-            active={isDragging || isExiting}
-          />
-        )}
-        <div
-          onPointerDown={handlePointerDown}
-          onPointerMove={handlePointerMove}
-          onPointerUp={handlePointerUp}
-          onPointerCancel={handlePointerUp}
-          className="absolute inset-0 z-10 touch-none select-none"
-          style={{
-            transform: `translateY(${dragY}px)`,
-            transition: isDragging || suppressTransition ? 'none' : SWIPE_TRANSITION,
-          }}
-        >
-          <StationCard key={station.stationuuid} station={station} active errorMessage={player.playbackError} />
-        </div>
+        {([0, 1] as const).map((slotIndex) => {
+          const isTop = slotIndex === topSlot;
+          const slotStation = isTop ? station : underStation;
+          if (!slotStation) return null; // no neighbor yet (start/end of queue) -- this slot sits unused
+          return (
+            <div
+              key={`slot-${slotIndex}`}
+              onPointerDown={isTop ? handlePointerDown : undefined}
+              onPointerMove={isTop ? handlePointerMove : undefined}
+              onPointerUp={isTop ? handlePointerUp : undefined}
+              onPointerCancel={isTop ? handlePointerUp : undefined}
+              className={cn('absolute inset-0', isTop && 'z-10 touch-none select-none')}
+              style={isTop ? {
+                transform: `translateY(${dragY}px)`,
+                transition: isDragging || suppressTransition ? 'none' : SWIPE_TRANSITION,
+              } : undefined}
+            >
+              <StationCard
+                station={slotStation}
+                // The top slot is always live; the under slot only bothers
+                // running its WebGL renderer while it's actually about to
+                // be revealed (or was just committed to and hasn't taken
+                // over as top yet) -- halves idle GPU cost otherwise.
+                active={isTop || isDragging || isExiting}
+                errorMessage={isTop ? player.playbackError : undefined}
+              />
+            </div>
+          );
+        })}
       </div>
 
       <div className="pointer-events-none absolute inset-x-0 bottom-8 z-20 flex items-center justify-center gap-6">
