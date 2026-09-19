@@ -1045,6 +1045,61 @@ export async function updateBadgeSplash(badgeId: string, announceSplash: boolean
   }
 }
 
+export interface AdminUserStats {
+  total_users: number;
+  active_last_24h: number;
+  active_last_7d: number;
+  active_last_30d: number;
+  never_logged_in: number;
+}
+
+export async function fetchAdminUserStats(): Promise<AdminUserStats> {
+  const authToken = requireAuthToken();
+  const response = await fetch('/api/admin/user-stats', {
+    headers: { 'Authorization': `Bearer ${authToken}` },
+  });
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error('UNAUTHORIZED');
+    }
+    throw new Error('Failed to fetch user stats');
+  }
+  return response.json();
+}
+
+export interface FailingStation {
+  station_uuid: string;
+  station_name: string;
+  error_count: number;
+  last_error: string;
+}
+
+export async function fetchAdminPlaybackErrors(): Promise<{ failing_stations: FailingStation[]; exclusion_threshold: number }> {
+  const authToken = requireAuthToken();
+  const response = await fetch('/api/admin/playback-errors', {
+    headers: { 'Authorization': `Bearer ${authToken}` },
+  });
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error('UNAUTHORIZED');
+    }
+    throw new Error('Failed to fetch playback error stats');
+  }
+  return response.json();
+}
+
+// Reports a station that failed to actually start playing -- unauthenticated
+// (any listener can hit this, logged in or not) and best-effort: a failure
+// here should never surface to the person who just had a station fail on
+// them, so callers should fire-and-forget rather than await+toast this.
+export async function reportStationPlaybackError(stationUuid: string, stationName: string, errorType: string): Promise<void> {
+  await fetch('/api/webradio/playback-error', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ station_uuid: stationUuid, station_name: stationName, error_type: errorType }),
+  });
+}
+
 // fetchBadgeLoadout / setBadgeLoadout manage a user's standing preference
 // for which of their held badges to display in chat, and in what order —
 // separate from award/revoke, which is about who holds a badge at all.

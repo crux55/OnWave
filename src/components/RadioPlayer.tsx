@@ -18,6 +18,7 @@ import { SafeImage } from '@/components/SafeImage';
 import { StationAvatar } from '@/components/StationAvatar';
 import { useMobileDock } from '@/contexts/MobileDockContext';
 import { useReportHeight } from '@/hooks/use-report-height';
+import { reportStationPlaybackError } from '@/lib/api';
 
 declare global {
   interface HTMLMediaElement {
@@ -164,6 +165,9 @@ export function RadioPlayer({ station, className }: RadioPlayerProps) {
       let uiErrorMessage = 'Stream error';
 
       if (!mediaError) {
+        if (station) {
+          reportStationPlaybackError(station.stationuuid, station.name, 'unknown').catch(() => {});
+        }
         setError(uiErrorMessage);
         player.setIsPlaying(false);
         setIsLoading(false);
@@ -175,21 +179,32 @@ export function RadioPlayer({ station, className }: RadioPlayerProps) {
       const MEDIA_ERR_DECODE = (window.MediaError && window.MediaError.MEDIA_ERR_DECODE) || 3;
       const MEDIA_ERR_SRC_NOT_SUPPORTED = (window.MediaError && window.MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED) || 4;
 
+      let errorType = 'unknown';
       switch (mediaError.code) {
         case MEDIA_ERR_ABORTED:
           uiErrorMessage = 'Playback aborted.';
+          errorType = 'aborted';
           break;
         case MEDIA_ERR_NETWORK:
           uiErrorMessage = 'Network error.';
+          errorType = 'network';
           break;
         case MEDIA_ERR_DECODE:
           uiErrorMessage = 'Decode error.';
+          errorType = 'decode';
           break;
         case MEDIA_ERR_SRC_NOT_SUPPORTED:
           uiErrorMessage = 'Format not supported.';
+          errorType = 'format_not_supported';
           break;
         default:
           uiErrorMessage = 'Unknown stream error.';
+      }
+
+      // Fire-and-forget -- see reportStationPlaybackError's own comment for
+      // why this never surfaces to the listener who just hit the failure.
+      if (station) {
+        reportStationPlaybackError(station.stationuuid, station.name, errorType).catch(() => {});
       }
 
       setError(uiErrorMessage);

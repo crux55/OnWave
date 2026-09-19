@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { jwtDecode as jwt_decode } from 'jwt-decode';
-import { ShieldCheck, ShieldAlert, Loader2, Check, X, UserPlus, Sparkles, Copy, Bug, Lightbulb, MessageCircle, Radio } from 'lucide-react';
+import { ShieldCheck, ShieldAlert, Loader2, Check, X, UserPlus, Sparkles, Copy, Bug, Lightbulb, MessageCircle, Radio, Users, AlertTriangle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,10 +22,14 @@ import {
   resolveFeedbackReport,
   fetchBadges,
   updateBadgeSplash,
+  fetchAdminUserStats,
+  fetchAdminPlaybackErrors,
   type StationRequest,
   type DJRequest,
   type FeedbackReport,
   type Badge as BadgeData,
+  type AdminUserStats,
+  type FailingStation,
 } from '@/lib/api';
 import type { Token } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
@@ -55,6 +59,9 @@ export default function AdminPage() {
   const [resolvingId, setResolvingId] = useState<string | null>(null);
   const [badges, setBadges] = useState<BadgeData[]>([]);
   const [togglingSplashId, setTogglingSplashId] = useState<string | null>(null);
+  const [userStats, setUserStats] = useState<AdminUserStats | null>(null);
+  const [failingStations, setFailingStations] = useState<FailingStation[]>([]);
+  const [exclusionThreshold, setExclusionThreshold] = useState<number | null>(null);
 
   useEffect(() => {
     const tokenString = localStorage.getItem('token');
@@ -77,12 +84,24 @@ export default function AdminPage() {
       return;
     }
 
-    Promise.all([fetchPendingStationRequests(), fetchPendingDJRequests(), fetchFeedbackReports(), fetchBadges()])
-      .then(async ([stations, djs, reports, badgeList]) => {
+    Promise.all([
+      fetchPendingStationRequests(),
+      fetchPendingDJRequests(),
+      fetchFeedbackReports(),
+      fetchBadges(),
+      fetchAdminUserStats().catch(() => null),
+      fetchAdminPlaybackErrors().catch(() => null),
+    ])
+      .then(async ([stations, djs, reports, badgeList, stats, playbackErrors]) => {
         setStationRequests(stations);
         setDjRequests(djs);
         setFeedbackReports(reports);
         setBadges(badgeList);
+        if (stats) setUserStats(stats);
+        if (playbackErrors) {
+          setFailingStations(playbackErrors.failing_stations || []);
+          setExclusionThreshold(playbackErrors.exclusion_threshold);
+        }
 
         const requesterIds = Array.from(new Set([...stations.map(s => s.requester_id), ...djs.map(d => d.requester_id)]));
         const profiles = await Promise.all(requesterIds.map(id => fetchPublicProfile(id).catch(() => null)));
@@ -237,6 +256,34 @@ export default function AdminPage() {
           <CardDescription>Pending station and DJ requests.</CardDescription>
         </CardHeader>
         <CardContent className="p-6 md:p-8 space-y-8">
+          {userStats && (
+            <section>
+              <h3 className="text-xl font-semibold text-foreground mb-3 flex items-center gap-2">
+                <Users className="h-5 w-5 text-accent" /> Active Users
+              </h3>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="rounded-md border border-border bg-muted/30 p-3 text-center">
+                  <p className="text-2xl font-semibold text-foreground">{userStats.active_last_24h}</p>
+                  <p className="text-xs text-muted-foreground">Last 24 hours</p>
+                </div>
+                <div className="rounded-md border border-border bg-muted/30 p-3 text-center">
+                  <p className="text-2xl font-semibold text-foreground">{userStats.active_last_7d}</p>
+                  <p className="text-xs text-muted-foreground">Last 7 days</p>
+                </div>
+                <div className="rounded-md border border-border bg-muted/30 p-3 text-center">
+                  <p className="text-2xl font-semibold text-foreground">{userStats.active_last_30d}</p>
+                  <p className="text-xs text-muted-foreground">Last 30 days</p>
+                </div>
+                <div className="rounded-md border border-border bg-muted/30 p-3 text-center">
+                  <p className="text-2xl font-semibold text-foreground">{userStats.total_users}</p>
+                  <p className="text-xs text-muted-foreground">Total accounts</p>
+                </div>
+              </div>
+            </section>
+          )}
+
+          <Separator />
+
           <section>
             <h3 className="text-xl font-semibold text-foreground mb-3">Station Requests</h3>
             {stationRequests.length === 0 ? (
@@ -455,6 +502,44 @@ export default function AdminPage() {
                         onCheckedChange={(checked) => handleToggleSplash(badge.id, checked)}
                       />
                     </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+
+          <Separator />
+
+          <section className="space-y-3">
+            <h3 className="text-xl font-semibold text-foreground mb-1 flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-accent" /> Failing Stations
+            </h3>
+            <p className="text-xs text-muted-foreground">
+              Stations listeners have reported playback failures for in the last 24 hours.
+              {exclusionThreshold != null && (
+                <> Stations with {exclusionThreshold}+ reports are automatically kept out of search, top, and tag results.</>
+              )}
+            </p>
+            {failingStations.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No playback failures reported recently.</p>
+            ) : (
+              <div className="space-y-2">
+                {failingStations.map(fs => (
+                  <div key={fs.station_uuid} className="flex items-center justify-between gap-3 rounded-md border border-border bg-muted/30 p-3">
+                    <div className="min-w-0">
+                      <p className="truncate font-medium text-foreground">{fs.station_name || fs.station_uuid}</p>
+                      <p className="text-xs text-muted-foreground">Last failure: {new Date(fs.last_error).toLocaleString()}</p>
+                    </div>
+                    <span
+                      className={cn(
+                        'flex-shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold',
+                        exclusionThreshold != null && fs.error_count >= exclusionThreshold
+                          ? 'bg-destructive/15 text-destructive'
+                          : 'bg-muted text-muted-foreground'
+                      )}
+                    >
+                      {fs.error_count} error{fs.error_count === 1 ? '' : 's'}
+                    </span>
                   </div>
                 ))}
               </div>
