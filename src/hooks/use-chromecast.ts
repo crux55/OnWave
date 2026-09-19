@@ -250,7 +250,17 @@ export function useChromecast(
       });
       if (mintResponse.ok) {
         const { proxy_path } = await mintResponse.json();
-        if (proxy_path) castUrl = new URL(proxy_path, window.location.origin).href;
+        // proxy_path is the backend's OWN route (e.g. "/stream-proxy/cast/...")
+        // with no /api prefix -- correct from the backend's perspective,
+        // since nginx is what strips /api/ before forwarding to it (see
+        // nginx.prod.conf), not something the backend itself should know
+        // about. But the receiver fetches this as a plain public URL, which
+        // has to go back through nginx to reach the backend at all -- so the
+        // prefix has to be added back here. Missing it sent the receiver to
+        // Next.js's own catch-all route instead of the backend, silently
+        // trying to play a 404 HTML page as audio (confirmed live: the
+        // Shield accepted the cast but never actually started playback).
+        if (proxy_path) castUrl = new URL(`/api${proxy_path}`, window.location.origin).href;
       }
     } catch {
       // Network hiccup reaching our own backend -- proceed with the raw URL.
