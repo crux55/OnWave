@@ -44,9 +44,15 @@ const SWIPE_TRANSITION = `transform ${EXIT_DURATION_MS}ms cubic-bezier(0.22, 1, 
 // running their own WebGL render loop) get fully re-invoked dozens of times
 // a second for a prop set that never actually changed mid-drag, which reads
 // as dropped frames/jank rather than a smooth 1:1 drag.
-const StationCard = memo(function StationCard({ station, active, errorMessage }: {
+const StationCard = memo(function StationCard({ station, active, isTop, errorMessage }: {
   station: RadioStation;
   active: boolean;
+  // The under slot renders at reduced internal resolution -- it's glimpsed
+  // mid-drag but never actually the one in focus, and running two full-
+  // resolution WebGL instances at once during a drag was a real GPU-load
+  // contributor to reported jank there (OnWave#36), on top of the
+  // remount-on-commit bug already fixed separately.
+  isTop: boolean;
   errorMessage?: string | null;
 }) {
   const player = usePlayer();
@@ -57,7 +63,7 @@ const StationCard = memo(function StationCard({ station, active, errorMessage }:
   // drag on the same upcoming station would flicker to a different preset
   // each time it's re-engaged.
   const [presetSeed] = useState(() => Math.random());
-  useButterchurn(canvasRef, active ? player.activeAudioElement : null, active, presetSeed);
+  useButterchurn(canvasRef, active ? player.activeAudioElement : null, active, presetSeed, undefined, isTop ? 1 : 0.5);
 
   return (
     <div className="absolute inset-0">
@@ -271,6 +277,7 @@ export function SwipeableStationBrowser({ isLiked, onToggleLike, onClose }: Swip
                 // be revealed (or was just committed to and hasn't taken
                 // over as top yet) -- halves idle GPU cost otherwise.
                 active={isTop || isDragging || isExiting}
+                isTop={isTop}
                 errorMessage={isTop ? player.playbackError : undefined}
               />
             </div>

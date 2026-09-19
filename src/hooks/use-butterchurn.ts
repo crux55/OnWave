@@ -74,7 +74,15 @@ export function useButterchurn(
   // everyone who hasn't curated one, including logged-out listeners), the
   // full butterchurn-presets pack is available exactly as before this
   // ticket existed.
-  installedPresetNames?: string[]
+  installedPresetNames?: string[],
+  // Butterchurn's own internal render-texture resolution, 0-1 of the
+  // canvas's real size — full quality (1) unless a caller overrides it.
+  // The swipeable browser's non-interactive "under" card (revealed mid-
+  // drag, glimpsed but never actually focused on) passes a lower value so
+  // two full-resolution WebGL instances running at once during a drag
+  // isn't as much GPU load — a likely contributor to reported drag jank
+  // there (OnWave#36) beyond the remount-on-commit bug already fixed.
+  renderQuality: number = 1
 ): UseButterchurnResult {
   const visualizerRef = useRef<any>(null);
   const presetsRef = useRef<[string, any][]>([]);
@@ -128,7 +136,7 @@ export function useButterchurn(
         width: canvas.width,
         height: canvas.height,
         pixelRatio,
-        textureRatio: 1,
+        textureRatio: renderQuality,
       });
       visualizer.connectAudio(analyser);
       visualizerRef.current = visualizer;
@@ -174,7 +182,7 @@ export function useButterchurn(
       visualizerRef.current = null;
       setIsReady(false);
     };
-  }, [active, audioElement, canvasRef, initialPreset, installedKey]);
+  }, [active, audioElement, canvasRef, initialPreset, installedKey, renderQuality]);
 
   // Tracks real fullscreen viewport size (orientation changes, mobile
   // browser chrome show/hide) rather than the size at mount time.
