@@ -164,37 +164,83 @@
       // entirely independent of the sender's own visualizer (use-butterchurn.ts
       // in the app), since the receiver plays the stream itself rather than
       // receiving audio from the phone/laptop.
-      function initVisualizer() {
-        console.log('[OnWave] initVisualizer() starting');
+      //
+      // Split into two parts with very different lifetimes:
+      //  - the audio graph (AudioContext/analyser/MediaElementSourceNode) can
+      //    only ever be created ONCE per <audio> element -- a second
+      //    createMediaElementSource() call throws.
+      //  - the WebGL visualizer itself has no such restriction and needs to
+      //    be re-creatable, because a WebGL context can be lost outright
+      //    (confirmed live: Android reclaims GPU resources when this
+      //    receiver is backgrounded -- TV screensaver, switching inputs,
+      //    remote navigation -- with no automatic recovery). The previous
+      //    version of this file only ever tried once, for the whole
+      //    lifetime of the page: one lost context meant a permanently black
+      //    canvas for the rest of the session, regardless of how many
+      //    stations played correctly afterward -- audio doesn't depend on
+      //    any of this, so it kept working fine the whole time, masking how
+      //    badly broken the visual half was.
+      let audioContext = null;
+      let analyser = null;
+      let butterchurnLib = null;
+      let visualizer = null;
+      let presets = null;
+      let presetNames = null;
+      let presetCycleIndex = 0;
+      let renderLoopActive = false;
+      const AUTO_CYCLE_MS = 30000;
+
+      function ensureAudioGraph() {
+        if (analyser) return analyser; // already created -- can't do this twice
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        audioContext = new AudioContextClass();
+        const source = audioContext.createMediaElementSource(audioEl);
+        analyser = audioContext.createAnalyser();
+        source.connect(analyser);
+        analyser.connect(audioContext.destination);
+        console.log('[OnWave] audio graph created, AudioContext state:', audioContext.state);
+        return analyser;
+      }
+
+      function resumeAudioContextIfNeeded() {
+        // AudioContexts start suspended until explicitly resumed -- once
+        // createMediaElementSource() reroutes the <audio> element's output
+        // through this graph, a suspended context means no sound actually
+        // reaches the speakers even though the element itself keeps
+        // reporting "playing" with advancing position.
+        if (audioContext && audioContext.state === 'suspended') {
+          audioContext.resume().then(
+            () => console.log('[OnWave] AudioContext resumed, state:', audioContext.state),
+            (err) => console.error('[OnWave] AudioContext resume failed:', err)
+          );
+        }
+      }
+
+      function startRenderLoop() {
+        if (renderLoopActive) return; // never run two loops at once
+        renderLoopActive = true;
+        console.log('[OnWave] render loop starting');
+        (function renderLoop() {
+          if (!visualizer) { renderLoopActive = false; return; } // torn down (context lost) -- stop cleanly
+          visualizer.render();
+          requestAnimationFrame(renderLoop);
+        })();
+      }
+
+      // Safe to call more than once, unlike ensureAudioGraph() above --
+      // this is what actually recovers from a lost WebGL context, or
+      // brings the visualizer up at all if it never managed to the first
+      // time.
+      function initOrRecoverVisualizer() {
+        console.log('[OnWave] initOrRecoverVisualizer() starting');
         try {
           if (typeof butterchurn === 'undefined' || typeof butterchurnPresets === 'undefined') {
             showError('Visualizer failed to load (CDN script blocked?)');
             return;
           }
-          console.log('[OnWave] butterchurn/butterchurnPresets globals present');
 
-          const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-          const audioContext = new AudioContextClass();
-          const source = audioContext.createMediaElementSource(audioEl);
-          const analyser = audioContext.createAnalyser();
-          source.connect(analyser);
-          analyser.connect(audioContext.destination);
-          console.log('[OnWave] AudioContext state:', audioContext.state);
-
-          // AudioContexts start suspended until explicitly resumed -- once
-          // createMediaElementSource() reroutes the <audio> element's output
-          // through this graph, a suspended context means no sound actually
-          // reaches the speakers even though the element itself keeps
-          // reporting "playing" with advancing position (which is why
-          // Android's own media session showed it as playing while nothing
-          // was audible). The app's own use-butterchurn.ts already does
-          // this; this standalone page was missing it.
-          if (audioContext.state === 'suspended') {
-            audioContext.resume().then(
-              () => console.log('[OnWave] AudioContext resumed, state:', audioContext.state),
-              (err) => console.error('[OnWave] AudioContext resume failed:', err)
-            );
-          }
+          const currentAnalyser = ensureAudioGraph();
+          resumeAudioContextIfNeeded();
 
           const pixelRatio = window.devicePixelRatio || 1;
           canvas.width = window.innerWidth * pixelRatio;
@@ -205,8 +251,8 @@
           // <script>-tag global is {__esModule: true, default: Butterchurn},
           // not Butterchurn itself -- same interop quirk already handled
           // correctly in the app's own use-butterchurn.ts.
-          const butterchurnLib = butterchurn.default || butterchurn;
-          const visualizer = butterchurnLib.createVisualizer(audioContext, canvas, {
+          butterchurnLib = butterchurnLib || (butterchurn.default || butterchurn);
+          visualizer = butterchurnLib.createVisualizer(audioContext, canvas, {
             width: canvas.width,
             height: canvas.height,
             pixelRatio,
@@ -217,65 +263,94 @@
           // createVisualizer() alone doesn't wire up an audio source --
           // without this, Butterchurn has no bass/mid/treb data internally
           // and never renders anything, regardless of whether audio itself
-          // is genuinely playing. use-butterchurn.ts (the in-app version)
-          // already had this; this standalone page was missing it.
-          visualizer.connectAudio(analyser);
+          // is genuinely playing.
+          visualizer.connectAudio(currentAnalyser);
           console.log('[OnWave] connectAudio() called');
 
-          const presets = butterchurnPresets.getPresets();
-          const presetNames = Object.keys(presets);
+          if (!presets) {
+            presets = butterchurnPresets.getPresets();
+            presetNames = Object.keys(presets);
+          }
           // "Unchained - Rewop" is the chosen default preset (matching
           // use-butterchurn.ts, the in-app version) until OnWave#40's
           // installable preset library lets users pick their own -- falls
           // back to the first preset in the pack if it's ever missing.
           const defaultPresetName = presetNames.includes('Unchained - Rewop') ? 'Unchained - Rewop' : presetNames[0];
+          presetCycleIndex = Math.max(0, presetNames.indexOf(defaultPresetName));
           console.log('[OnWave] preset count:', presetNames.length, 'default:', defaultPresetName);
           if (defaultPresetName) {
             visualizer.loadPreset(presets[defaultPresetName], 0);
           }
 
-          // OnWave#41: auto-cycle through presets on a timer -- a TV remote
-          // has no interactive input to change presets manually the way the
-          // in-app player does, so this always runs (no on/off toggle here;
-          // that only exists on the in-app side, see use-butterchurn.ts's
-          // caller in MaximizedPlayerDialog.tsx).
-          const AUTO_CYCLE_MS = 30000;
-          let presetCycleIndex = Math.max(0, presetNames.indexOf(defaultPresetName));
-          setInterval(() => {
-            if (presetNames.length === 0) return;
-            presetCycleIndex = (presetCycleIndex + 1) % presetNames.length;
-            const name = presetNames[presetCycleIndex];
-            console.log('[OnWave] auto-cycling to preset:', name);
-            visualizer.loadPreset(presets[name], 1.2);
-          }, AUTO_CYCLE_MS);
-
-          window.addEventListener('resize', () => {
-            const ratio = window.devicePixelRatio || 1;
-            canvas.width = window.innerWidth * ratio;
-            canvas.height = window.innerHeight * ratio;
-            visualizer.setRendererSize(canvas.width, canvas.height);
-          });
-
-          console.log('[OnWave] render loop starting');
-          (function renderLoop() {
-            visualizer.render();
-            requestAnimationFrame(renderLoop);
-          })();
+          startRenderLoop();
         } catch (err) {
-          console.error('[OnWave] initVisualizer threw:', err);
+          console.error('[OnWave] initOrRecoverVisualizer threw:', err);
           showError('Visualizer error: ' + err.message);
         }
       }
 
-      // AudioContext needs a real media event before it can be driven
-      // reliably on the receiver runtime -- first playback start is enough.
+      // A lost WebGL context doesn't throw a JS exception -- render() calls
+      // just silently stop drawing anything, leaving a permanently black
+      // canvas unless something explicitly notices and rebuilds the
+      // visualizer. preventDefault() here is what tells the browser
+      // recovery is even possible; without it, 'webglcontextrestored' never
+      // fires at all.
+      canvas.addEventListener('webglcontextlost', (e) => {
+        console.warn('[OnWave] WebGL context lost');
+        e.preventDefault();
+        visualizer = null;
+      });
+      canvas.addEventListener('webglcontextrestored', () => {
+        console.log('[OnWave] WebGL context restored, reinitializing visualizer');
+        initOrRecoverVisualizer();
+      });
+
+      // The other half of the same recovery story, for devices/firmware
+      // that silently kill rendering on backgrounding without firing a
+      // formal context-lost event at all (this Shield's TV screensaver /
+      // remote navigation being the case actually observed). Re-check
+      // whenever the page becomes visible again while audio should still
+      // be playing but nothing's drawing.
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible' && !audioEl.paused && !visualizer) {
+          console.log('[OnWave] page visible again with no active visualizer -- reinitializing');
+          initOrRecoverVisualizer();
+        }
+      });
+
+      // OnWave#41: auto-cycle through presets on a timer -- a TV remote has
+      // no interactive input to change presets manually the way the in-app
+      // player does, so this always runs (no on/off toggle here; that only
+      // exists on the in-app side, see use-butterchurn.ts's caller in
+      // MaximizedPlayerDialog.tsx). A single persistent interval, not
+      // recreated every time the visualizer (re)initializes -- it would
+      // otherwise stack up a duplicate overlapping interval on every
+      // recovery instead of just cycling once.
+      setInterval(() => {
+        if (!visualizer || !presetNames || presetNames.length === 0) return;
+        presetCycleIndex = (presetCycleIndex + 1) % presetNames.length;
+        const name = presetNames[presetCycleIndex];
+        console.log('[OnWave] auto-cycling to preset:', name);
+        visualizer.loadPreset(presets[name], 1.2);
+      }, AUTO_CYCLE_MS);
+
+      window.addEventListener('resize', () => {
+        if (!visualizer) return;
+        const ratio = window.devicePixelRatio || 1;
+        canvas.width = window.innerWidth * ratio;
+        canvas.height = window.innerHeight * ratio;
+        visualizer.setRendererSize(canvas.width, canvas.height);
+      });
+
+      // Not gated to "only the very first playback ever" anymore -- every
+      // subsequent 'playing' event (i.e. every station switch) is another
+      // chance to bring the visualizer back if it isn't currently running,
+      // rather than a black canvas being permanent for the rest of the
+      // session the moment it fails or its context is lost once.
       audioEl.addEventListener('playing', () => {
         console.log('[OnWave] audio "playing" event fired');
-        if (!window.__onwaveVisualizerStarted) {
-          window.__onwaveVisualizerStarted = true;
-          initVisualizer();
-        }
-      }, { once: true });
+        if (!visualizer) initOrRecoverVisualizer();
+      });
     </script>
   </body>
 </html>
