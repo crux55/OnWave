@@ -183,6 +183,28 @@ export async function updateProfile(fields: {
   }
 }
 
+// OnWave#43: site-wide theme, persisted per-account. Its own tiny endpoint
+// rather than folded into updateProfile above -- that one is a full-form
+// PATCH that would blank out name/bio/etc. if called with just a theme.
+export async function updateTheme(theme: string): Promise<void> {
+  const authToken = requireAuthToken();
+  const response = await fetch('/api/profile/theme', {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${authToken}`,
+    },
+    body: JSON.stringify({ theme }),
+  });
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    if (response.status === 401) {
+      throw new Error('UNAUTHORIZED');
+    }
+    throw new Error(errorData.error || 'Failed to update theme');
+  }
+}
+
 export async function uploadAvatar(file: File): Promise<string> {
   const token = localStorage.getItem("token");
   if (!token) {
@@ -876,7 +898,8 @@ export async function fetchAllStations(): Promise<Station[]> {
 }
 
 export async function fetchUserStations(userId: string): Promise<Station[]> {
-  const response = await fetch(`/api/users/${userId}/stations`);
+  // See fetchPublicProfile's comment -- same owner-preview exception applies.
+  const response = await fetch(`/api/users/${userId}/stations`, { headers: optionalAuthHeaders() });
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
     throw new Error(errorData.message || 'Failed to fetch stations');
@@ -1718,7 +1741,11 @@ export async function fetchStation(handle: string): Promise<StationDetail | null
 }
 
 export async function fetchPublicProfile(userId: string): Promise<Profile | null> {
-  const response = await fetch(`/api/users/${userId}/profile`);
+  // Sent when available, but never required -- an anonymous/logged-out
+  // viewer still gets a real public profile fine. Only matters for the one
+  // case the backend special-cases: the profile's own owner previewing
+  // their own currently-private profile.
+  const response = await fetch(`/api/users/${userId}/profile`, { headers: optionalAuthHeaders() });
   if (!response.ok) {
     if (response.status === 404) return null;
     const errorData = await response.json().catch(() => ({}));
@@ -1728,7 +1755,8 @@ export async function fetchPublicProfile(userId: string): Promise<Profile | null
 }
 
 export async function fetchUserBadges(userId: string): Promise<Badge[]> {
-  const response = await fetch(`/api/users/${userId}/badges`);
+  // See fetchPublicProfile's comment -- same owner-preview exception applies.
+  const response = await fetch(`/api/users/${userId}/badges`, { headers: optionalAuthHeaders() });
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
     throw new Error(errorData.message || 'Failed to fetch badges');
@@ -1938,6 +1966,22 @@ function requireAuthToken(): string {
     throw new Error('User not authenticated');
   }
   return JSON.parse(token).token;
+}
+
+// For an endpoint that's reachable anonymously but behaves differently for
+// a recognized caller (e.g. the profile-privacy owner-exception on
+// fetchPublicProfile/fetchUserBadges/fetchUserStations below) — never
+// throws, since being logged out is a normal, expected case here, not an
+// error. Returns {} (no Authorization header at all) rather than a header
+// with an empty/invalid value when there's nothing usable stored.
+function optionalAuthHeaders(): HeadersInit {
+  try {
+    const tokenString = localStorage.getItem('token');
+    if (!tokenString) return {};
+    return { 'Authorization': `Bearer ${JSON.parse(tokenString).token}` };
+  } catch {
+    return {};
+  }
 }
 
 // goLive starts broadcasting on an existing scheduled show.
@@ -2325,5 +2369,65 @@ export async function deleteAccount(confirmation: {
       throw new Error('UNAUTHORIZED');
     }
     throw new Error(errorData.error || 'Failed to delete account');
+  }
+}
+
+// OnWave#40: a user's personal Butterchurn preset rotation. Presets are
+// identified by name (butterchurn-presets' own key, e.g. "Unchained -
+// Rewop") since the preset library itself is a client-side npm package with
+// no separate numeric id -- this only remembers which names one particular
+// account picked.
+export interface InstalledPreset {
+  preset_name: string;
+  installed_at: string;
+}
+
+export async function fetchInstalledPresets(): Promise<InstalledPreset[]> {
+  const authToken = requireAuthToken();
+  const response = await fetch('/api/installed-presets', {
+    headers: { 'Authorization': `Bearer ${authToken}` },
+  });
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    if (response.status === 401) {
+      throw new Error('UNAUTHORIZED');
+    }
+    throw new Error(errorData.error || 'Failed to fetch installed presets');
+  }
+  const data = await response.json();
+  return data.presets ?? [];
+}
+
+export async function installPreset(presetName: string): Promise<void> {
+  const authToken = requireAuthToken();
+  const response = await fetch('/api/installed-presets', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${authToken}`,
+    },
+    body: JSON.stringify({ preset_name: presetName }),
+  });
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    if (response.status === 401) {
+      throw new Error('UNAUTHORIZED');
+    }
+    throw new Error(errorData.error || 'Failed to install preset');
+  }
+}
+
+export async function uninstallPreset(presetName: string): Promise<void> {
+  const authToken = requireAuthToken();
+  const response = await fetch(`/api/installed-presets/${encodeURIComponent(presetName)}`, {
+    method: 'DELETE',
+    headers: { 'Authorization': `Bearer ${authToken}` },
+  });
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    if (response.status === 401) {
+      throw new Error('UNAUTHORIZED');
+    }
+    throw new Error(errorData.error || 'Failed to uninstall preset');
   }
 }

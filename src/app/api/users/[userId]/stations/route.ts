@@ -5,10 +5,16 @@ export async function GET(
   { params }: { params: { userId: string } }
 ) {
   const apiHost = process.env.API_BASE_URL || 'http://backend:8080';
+  // Optional -- this stays reachable with no token for a real public
+  // profile's stations. Forwarding it when present lets the backend
+  // recognize the profile's own owner previewing their own private one.
+  const token = request.cookies.get('token')?.value ||
+                request.headers.get('Authorization')?.replace('Bearer ', '');
 
   try {
     const response = await fetch(`${apiHost}/users/${params.userId}/stations`, {
       method: 'GET',
+      headers: token ? { 'Authorization': `Bearer ${token}` } : undefined,
     });
 
     if (!response.ok) {

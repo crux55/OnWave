@@ -173,6 +173,10 @@ export interface Profile {
   is_public: boolean;
   slug?: string;
   favorite_genre?: string;
+  // Site-wide appearance choice (OnWave#43), persisted per-account. 'dark'
+  // is the existing look and the default for every account that hasn't
+  // changed it; see AVAILABLE_THEMES in ThemeContext.tsx for the full set.
+  theme?: string;
   last_updated: Date;
 }
 
