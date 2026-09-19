@@ -23,8 +23,10 @@ import { RemindersProvider } from '@/contexts/RemindersContext';
 import { NotificationProvider } from '@/contexts/NotificationContext';
 import { MobileDockProvider, useMobileDock } from '@/contexts/MobileDockContext';
 import { InstallPromptProvider } from '@/contexts/InstallPromptContext';
+import { ThemeProvider } from '@/contexts/ThemeContext';
 import { MobileBottomDock } from '@/components/MobileBottomDock';
 import { ChunkErrorRecovery } from '@/components/ChunkErrorRecovery';
+import { AmbientBackground } from '@/components/AmbientBackground';
 import { Toaster } from '@/components/ui/toaster';
 import { cn } from '@/lib/utils';
 
@@ -53,22 +55,25 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       </head>
       <body>
         <ChunkErrorRecovery />
-        <InstallPromptProvider>
-          <PlayerProvider>
-            <LiveBroadcastProvider>
-              <ListenerBroadcastProvider>
-                <RemindersProvider>
-                  <NotificationProvider>
-                    <MobileDockProvider>
-                      <AppLayoutContent>{children}</AppLayoutContent>
-                      <Toaster />
-                    </MobileDockProvider>
-                  </NotificationProvider>
-                </RemindersProvider>
-              </ListenerBroadcastProvider>
-            </LiveBroadcastProvider>
-          </PlayerProvider>
-        </InstallPromptProvider>
+        <ThemeProvider>
+          <AmbientBackground />
+          <InstallPromptProvider>
+            <PlayerProvider>
+              <LiveBroadcastProvider>
+                <ListenerBroadcastProvider>
+                  <RemindersProvider>
+                    <NotificationProvider>
+                      <MobileDockProvider>
+                        <AppLayoutContent>{children}</AppLayoutContent>
+                        <Toaster />
+                      </MobileDockProvider>
+                    </NotificationProvider>
+                  </RemindersProvider>
+                </ListenerBroadcastProvider>
+              </LiveBroadcastProvider>
+            </PlayerProvider>
+          </InstallPromptProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

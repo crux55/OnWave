@@ -10,8 +10,10 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
-import { ArrowLeft, Save, Upload, X, Loader2, ShieldAlert, Download, Trash2 } from 'lucide-react';
+import { ArrowLeft, Save, Upload, X, Loader2, ShieldAlert, Download, Trash2, Palette, Check } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
+import { useTheme, AVAILABLE_THEMES } from '@/contexts/ThemeContext';
 import { Profile, Token } from '@/lib/types';
 import {
   fetchCurrentUserProfile,
@@ -34,6 +36,7 @@ const apiHost = process.env.NEXT_PUBLIC_API_BASE_URL || '';
 export default function EditProfilePage() {
   const router = useRouter();
   const { toast } = useToast();
+  const { theme, setTheme, isSaving: isSavingTheme } = useTheme();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -196,6 +199,15 @@ export default function EditProfilePage() {
       }
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleThemeChange = async (nextTheme: typeof AVAILABLE_THEMES[number]['id']) => {
+    if (nextTheme === theme) return;
+    try {
+      await setTheme(nextTheme);
+    } catch (error: any) {
+      toast({ title: 'Failed to save theme', description: error.message, variant: 'destructive' });
     }
   };
 
@@ -534,6 +546,37 @@ export default function EditProfilePage() {
               <p className="text-sm text-muted-foreground mt-1">Signed in with Google — no password to change.</p>
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      <Card className="mt-6">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Palette className="h-5 w-5" /> Appearance
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 gap-3 sm:max-w-md sm:grid-cols-2">
+            {AVAILABLE_THEMES.map((option) => (
+              <button
+                key={option.id}
+                type="button"
+                onClick={() => handleThemeChange(option.id)}
+                disabled={isSavingTheme}
+                className={cn(
+                  'rounded-lg border p-3 text-left transition-colors',
+                  theme === option.id ? 'border-accent bg-accent/10' : 'border-border hover:border-muted-foreground/40'
+                )}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-medium text-foreground">{option.label}</span>
+                  {theme === option.id && <Check className="h-4 w-4 text-accent" />}
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">{option.description}</p>
+              </button>
+            ))}
+          </div>
+          <p className="mt-3 text-xs text-muted-foreground">Synced to your account — applies wherever you're signed in.</p>
         </CardContent>
       </Card>
 

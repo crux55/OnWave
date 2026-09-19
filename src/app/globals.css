@@ -104,3 +104,54 @@ body {
     color-scheme: dark;
   }
 }
+
+/* OnWave#43 "lava lamp" theme -- three large, heavily blurred blobs on the
+   app's own accent colors, each drifting on its own slow, offset loop so
+   the combination never quite repeats. Pure CSS, no JS render loop. */
+.onwave-lava-blob {
+  position: absolute;
+  width: 60vmax;
+  height: 60vmax;
+  border-radius: 9999px;
+  filter: blur(80px);
+  opacity: 0.35;
+  will-change: transform;
+}
+.onwave-lava-blob-1 {
+  top: -20%;
+  left: -10%;
+  background: hsl(183 80% 58%); /* cyan, mirrors --accent */
+  animation: onwave-lava-drift-1 42s ease-in-out infinite;
+}
+.onwave-lava-blob-2 {
+  bottom: -25%;
+  right: -15%;
+  background: hsl(331 90% 62%); /* magenta, mirrors --accent-2 */
+  animation: onwave-lava-drift-2 55s ease-in-out infinite;
+}
+.onwave-lava-blob-3 {
+  top: 30%;
+  right: 10%;
+  width: 45vmax;
+  height: 45vmax;
+  background: hsl(35 90% 55%); /* warm amber, the third "lava" hue */
+  animation: onwave-lava-drift-3 48s ease-in-out infinite;
+}
+@keyframes onwave-lava-drift-1 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(15vw, 10vh) scale(1.15); }
+}
+@keyframes onwave-lava-drift-2 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(-12vw, -8vh) scale(1.1); }
+}
+@keyframes onwave-lava-drift-3 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(-10vw, 12vh) scale(0.9); }
+}
+/* Motion-sensitive viewers still get the color/ambience, just static. */
+@media (prefers-reduced-motion: reduce) {
+  .onwave-lava-blob {
+    animation: none;
+  }
+}
