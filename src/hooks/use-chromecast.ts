@@ -20,6 +20,29 @@ const CAST_SDK_URL = 'https://www.gstatic.com/cv/js/sender/v1/cast_sender.js?loa
 
 let sdkLoadPromise: Promise<boolean> | null = null;
 
+// CastContext is a genuine global singleton (one real cast session for the
+// whole page/app), but useChromecast() is called independently by multiple
+// mounted components at once (RadioPlayer + MaximizedPlayerDialog — the
+// player bar stays mounted, just CSS-hidden, under the maximized view) —
+// each with its own React state, each observing the same shared session.
+// Rather than trying to reason about which component "owns" sending a
+// given LOAD, or distinguishing why a particular call happened, this pair
+// tracks the last stream actually sent and when, at the module level —
+// shared across every hook instance — so a second call for the identical
+// URL within a short window is a guaranteed no-op regardless of which
+// instance or effect triggered it. Time-windowed rather than keyed off the
+// CAF session's identity deliberately — the exact shape/availability of a
+// session-id accessor on cast.framework.CastSession isn't something to
+// stake correctness on, whereas "the same URL requested again a few
+// milliseconds later" is exactly the failure signature actually observed
+// (three kWebMediaPlayerCreated events within 33ms on a Shield receiver
+// for one cast start, project_r/OnWave#39) and needs no such assumption.
+// A genuine intentional re-cast of the same station is never seconds-fast
+// like that, so the window is generous without risking a legitimate load.
+const DUPLICATE_LOAD_WINDOW_MS = 3000;
+let lastLoadedStreamUrl: string | null = null;
+let lastLoadedAt = 0;
+
 function loadCastSdk(): Promise<boolean> {
   if (typeof window === 'undefined') return Promise.resolve(false);
   if (window.cast?.framework) return Promise.resolve(true);
@@ -96,13 +119,11 @@ export function useChromecast(
   // deviceName is display-only (used in one toast string) but was in
   // loadCurrentMedia's dependency array — since it updates in the same
   // handler that flips isCasting true, that changed the callback's
-  // identity moments after mount, re-triggering the "load on cast" effect
-  // below and sending a spurious extra LOAD to the receiver (on top of the
-  // one toggleCast already sends directly), tearing down and recreating
-  // the receiver's media pipeline multiple times in a row — confirmed via
-  // three kWebMediaPlayerCreated events on the Shield for one cast
-  // attempt. Reading it via a ref decouples the callback's identity from
-  // this state without needing a stale closure.
+  // identity moments after mount, contributing to the duplicate-LOAD
+  // pattern documented in full above lastLoadedStreamUrl/lastLoadedAt.
+  // Reading it via a ref decouples the callback's identity from this state
+  // without needing a stale closure — necessary, but not sufficient on its
+  // own, which is why that module-level dedup exists too.
   const deviceNameRef = useRef<string | null>(null);
   useEffect(() => { deviceNameRef.current = deviceName; }, [deviceName]);
   const [isRemotePaused, setIsRemotePaused] = useState(false);
@@ -193,6 +214,17 @@ export function useChromecast(
     // handing it off, or the receiver can't fetch it at all.
     const absoluteStreamUrl = new URL(streamUrl, window.location.origin).href;
 
+    // Dedup against the module-level state above -- if some other mounted
+    // instance (or an earlier effect run in this one) already sent this
+    // exact URL moments ago, sending it again only makes the receiver
+    // tear down and recreate its whole media pipeline for no reason.
+    const now = Date.now();
+    if (absoluteStreamUrl === lastLoadedStreamUrl && now - lastLoadedAt < DUPLICATE_LOAD_WINDOW_MS) {
+      return;
+    }
+    lastLoadedStreamUrl = absoluteStreamUrl;
+    lastLoadedAt = now;
+
     const mediaInfo = new window.chrome.cast.media.MediaInfo(absoluteStreamUrl, codecToContentType(codec));
     mediaInfo.streamType = window.chrome.cast.media.StreamType.LIVE;
 
@@ -258,6 +290,13 @@ export function useChromecast(
   }, [available, loadCurrentMedia]);
 
   // If the station changes while already casting, load the new stream.
+  // Safe to call unconditionally on every isCasting/loadCurrentMedia
+  // change, including the initial false->true transition that toggleCast()
+  // already handles directly -- loadCurrentMedia's own module-level dedup
+  // (see lastLoadedStreamUrl/lastLoadedAt above) makes a redundant call
+  // here, or from another mounted useChromecast instance reacting to the
+  // same shared session (RadioPlayer + MaximizedPlayerDialog are both
+  // mounted at once), a guaranteed no-op rather than a real extra LOAD.
   useEffect(() => {
     if (isCasting) loadCurrentMedia();
   }, [isCasting, loadCurrentMedia]);
