@@ -6,6 +6,7 @@ import { fetchPBSShowsByDateRange, fetchAllShows as fetchAllInternalShows, fetch
 import type { PBSShow, InternalShow } from '@/lib/types';
 import { PBSShowCard } from '@/components/PBSShowCard';
 import { InternalShowCard } from '@/components/InternalShowCard';
+import { ShowGuideGrid } from '@/components/ShowGuideGrid';
 import { StationAvatar } from '@/components/StationAvatar';
 import { showStatus } from '@/lib/show-schedule';
 import { useShowFollows, showFollowKey } from '@/hooks/use-show-follows';
@@ -33,11 +34,28 @@ export default function ShowsPage() {
   const [isStationDirectoryLoading, setIsStationDirectoryLoading] = useState(true);
   const [stationDirectoryError, setStationDirectoryError] = useState(false);
   const [isCreateStationOpen, setIsCreateStationOpen] = useState(false);
+  const [selectedDayIndex, setSelectedDayIndex] = useState(0);
+  const [selectedShow, setSelectedShow] = useState<PBSShow | null>(null);
   const { toast } = useToast();
   const {
     followedShowNames, togglingShowName, toggleShowFollow,
     followedProgramIds, togglingProgramId, toggleProgramFollow,
   } = useShowFollows();
+
+  // Guide grid shows one day at a time (a full 24h/6-station grid for
+  // every day at once would be unreadable) — real calendar dates, not
+  // just "today plus N", so the labels/filtering stay correct across a
+  // midnight rollover while the tab is open.
+  const dayOptions = useMemo(() => {
+    return Array.from({ length: 3 }, (_, i) => {
+      const d = new Date();
+      d.setDate(d.getDate() + i);
+      return {
+        key: d.toISOString().split('T')[0],
+        label: i === 0 ? 'Today' : i === 1 ? 'Tomorrow' : d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
+      };
+    });
+  }, []);
 
   const stationNames = useMemo(() => {
     const names = new Set<string>();
@@ -68,6 +86,17 @@ export default function ShowsPage() {
     currentShows: allShows.filter(show => show.status === 'live' && isStationVisible(show.station_name)),
     upcomingShows: allShows.filter(show => show.status === 'upcoming' && isStationVisible(show.station_name))
   }), [allShows, isStationVisible]);
+
+  // The grid shows every status (including already-expired) for the
+  // selected day, not just upcoming — otherwise "Today" would have a gap
+  // for every hour that's already passed instead of showing the day's
+  // real shape. Filtered to the one selected day: a full month at once
+  // would be exactly the unreadable flat dump this replaces.
+  const selectedDayShows = useMemo(() => {
+    const dayKey = dayOptions[selectedDayIndex]?.key;
+    if (!dayKey) return [];
+    return allShows.filter(show => show.date?.split('T')[0] === dayKey && isStationVisible(show.station_name));
+  }, [allShows, dayOptions, selectedDayIndex, isStationVisible]);
 
   // "Live now" isn't browsed from here anymore (that's /live's job) — this
   // count only feeds the banner below, pointing there.
@@ -211,22 +240,42 @@ export default function ShowsPage() {
             </Card>
           </div>
 
-          {(upcomingShows.length > 0 || upcomingInternalShows.length > 0) && (
+          {stationNames.length > 0 && (
+            <section className="mb-12">
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                <h2 className="text-2xl font-semibold tracking-tight">Schedule</h2>
+                <div className="flex gap-2">
+                  {dayOptions.map((day, i) => (
+                    <button
+                      key={day.key}
+                      type="button"
+                      onClick={() => setSelectedDayIndex(i)}
+                      className={
+                        i === selectedDayIndex
+                          ? 'rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-foreground'
+                          : 'rounded-lg border border-border bg-card px-4 py-2 text-sm font-semibold text-muted-foreground hover:text-foreground'
+                      }
+                    >
+                      {day.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <ShowGuideGrid
+                shows={selectedDayShows}
+                isToday={selectedDayIndex === 0}
+                onSelectShow={setSelectedShow}
+              />
+            </section>
+          )}
+
+          {upcomingInternalShows.length > 0 && (
             <section className="mb-12">
               <div className="flex items-center mb-6">
                 <Calendar className="h-6 w-6 text-blue-500 mr-3" />
-                <h2 className="text-3xl font-semibold tracking-tight">Upcoming Shows</h2>
+                <h2 className="text-3xl font-semibold tracking-tight">OnWave Shows</h2>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                {upcomingShows.map(show => (
-                  <PBSShowCard
-                    key={show.id}
-                    show={show}
-                    isFollowing={followedShowNames.has(showFollowKey(show))}
-                    onToggleFollow={() => toggleShowFollow(show)}
-                    isTogglingFollow={togglingShowName === showFollowKey(show)}
-                  />
-                ))}
                 {upcomingInternalShows.map(show => (
                   <InternalShowCard
                     key={show.id}
@@ -239,6 +288,20 @@ export default function ShowsPage() {
               </div>
             </section>
           )}
+
+          <Dialog open={!!selectedShow} onOpenChange={(open) => !open && setSelectedShow(null)}>
+            <DialogContent className="max-w-md p-0 border-0 bg-transparent shadow-none">
+              <DialogTitle className="sr-only">{selectedShow?.name}</DialogTitle>
+              {selectedShow && (
+                <PBSShowCard
+                  show={selectedShow}
+                  isFollowing={followedShowNames.has(showFollowKey(selectedShow))}
+                  onToggleFollow={() => toggleShowFollow(selectedShow)}
+                  isTogglingFollow={togglingShowName === showFollowKey(selectedShow)}
+                />
+              )}
+            </DialogContent>
+          </Dialog>
 
           {totalShowCount === 0 && (
             <div className="text-center py-16">
