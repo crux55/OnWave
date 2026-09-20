@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>OnWave Cast Receiver</title>
     <script type="text/javascript" src="//www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
+    <script type="text/javascript" src="//www.gstatic.com/cast/sdk/libs/devtools/debug_layer/caf_receiver_logger.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/butterchurn@2.6.7/lib/butterchurn.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/butterchurn-presets@2.4.7/lib/butterchurnPresets.min.js"></script>
     <!-- Reports to the same self-hosted GlitchTip instance the main app uses
@@ -141,6 +142,29 @@
       const context = cast.framework.CastReceiverContext.getInstance();
       const playerManager = context.getPlayerManager();
 
+      // On-screen console overlay, drawn directly on the TV -- no
+      // chrome://inspect, no ADB, nothing to log into, since it's entirely
+      // self-contained in the receiver's own JS. CastDebugLogger doesn't
+      // capture plain console.* calls on its own, so every one of them is
+      // mirrored into it here rather than converting the ~20 existing
+      // console.log/warn/error call sites throughout this file individually.
+      // Temporarily forced on (setEnabled/showDebugLogs both true,
+      // unconditionally) while actively debugging OnWave/project_r#39's
+      // remaining casting issues -- revert to leaving it disabled (Google's
+      // own guidance for a production receiver) once resolved, so real
+      // listeners don't see a console overlay on every cast.
+      const castDebugLogger = cast.debug.CastDebugLogger.getInstance();
+      ['log', 'warn', 'error'].forEach((level) => {
+        const original = console[level].bind(console);
+        const loggerMethod = level === 'log' ? 'info' : level;
+        console[level] = (...args) => {
+          original(...args);
+          try {
+            castDebugLogger[loggerMethod]('OnWave', args.map(String).join(' '));
+          } catch {}
+        };
+      });
+
       playerManager.setMessageInterceptor(
         cast.framework.messages.MessageType.LOAD,
         (loadRequestData) => {
@@ -178,6 +202,13 @@
         cast.framework.messages.MessageType.STOP,
         (request) => { audioEl.pause(); audioEl.src = ''; return request; }
       );
+
+      // Per Google's documented pattern, enabling has to wait for the
+      // receiver context's own READY event rather than firing immediately.
+      context.addEventListener(cast.framework.system.EventType.READY, () => {
+        castDebugLogger.setEnabled(true);
+        castDebugLogger.showDebugLogs(true);
+      });
 
       context.start();
 
