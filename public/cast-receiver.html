@@ -210,6 +210,33 @@
         castDebugLogger.showDebugLogs(true);
       });
 
+      // urn:x-cast: is a hard requirement of the Cast custom-message API --
+      // any other prefix is silently rejected. { action: 'next' | 'previous' }
+      // jumps a preset (and resets the auto-cycle clock either way, so
+      // manually stepping away from a slideshow doesn't get immediately
+      // overridden); { action: 'setAutoCycle', enabled } is the on/off
+      // switch a viewer uses once they've found a preset worth sticking
+      // with. applyPresetByIndex/scheduleAutoCycle/autoCycleEnabled are
+      // defined further down alongside the rest of the visualizer setup --
+      // safe to reference here since this callback only ever runs later,
+      // once a sender actually sends a command, by which point the whole
+      // script has already finished its first pass.
+      const VISUALIZER_CHANNEL = 'urn:x-cast:com.onwave.visualizer';
+      context.addCustomMessageListener(VISUALIZER_CHANNEL, (event) => {
+        const msg = event.data || {};
+        console.log('[OnWave] visualizer command received:', JSON.stringify(msg));
+        if (msg.action === 'next') {
+          applyPresetByIndex(presetCycleIndex + 1);
+          scheduleAutoCycle();
+        } else if (msg.action === 'previous') {
+          applyPresetByIndex(presetCycleIndex - 1);
+          scheduleAutoCycle();
+        } else if (msg.action === 'setAutoCycle') {
+          autoCycleEnabled = !!msg.enabled;
+          scheduleAutoCycle();
+        }
+      });
+
       context.start();
 
       // Butterchurn, tapping this receiver's own local audio element --
@@ -370,6 +397,7 @@
           }
 
           startRenderLoop();
+          scheduleAutoCycle();
         } catch (err) {
           console.error('[OnWave] initOrRecoverVisualizer threw:', err);
           showError('Visualizer error: ' + err.message);
@@ -406,21 +434,36 @@
         }
       });
 
-      // OnWave#41: auto-cycle through presets on a timer -- a TV remote has
-      // no interactive input to change presets manually the way the in-app
-      // player does, so this always runs (no on/off toggle here; that only
-      // exists on the in-app side, see use-butterchurn.ts's caller in
-      // MaximizedPlayerDialog.tsx). A single persistent interval, not
-      // recreated every time the visualizer (re)initializes -- it would
-      // otherwise stack up a duplicate overlapping interval on every
-      // recovery instead of just cycling once.
-      setInterval(() => {
+      // OnWave/project_r#39 follow-up: a TV remote has no interactive input
+      // of its own, but the phone/laptop that started the cast does --
+      // wired up above via a custom Cast message channel (VISUALIZER_CHANNEL)
+      // so the sender can flip between "slideshow" (auto-cycle, the long-
+      // standing default) and manually picking/sticking with one preset,
+      // the same choice already available for in-app (non-cast) viewing.
+      let autoCycleEnabled = true;
+      let autoCycleTimeoutId = null;
+
+      function applyPresetByIndex(index) {
         if (!visualizer || !presetNames || presetNames.length === 0) return;
-        presetCycleIndex = (presetCycleIndex + 1) % presetNames.length;
+        presetCycleIndex = ((index % presetNames.length) + presetNames.length) % presetNames.length;
         const name = presetNames[presetCycleIndex];
-        console.log('[OnWave] auto-cycling to preset:', name);
+        console.log('[OnWave] applying preset:', name);
         visualizer.loadPreset(presets[name], 1.2);
-      }, AUTO_CYCLE_MS);
+      }
+
+      // Reschedules from scratch every time it's called -- both the timer
+      // firing and a manual next/previous command call this, so picking a
+      // preset by hand resets the clock instead of auto-cycle yanking away
+      // from it moments later (matching the in-app player's own behavior).
+      function scheduleAutoCycle() {
+        if (autoCycleTimeoutId) clearTimeout(autoCycleTimeoutId);
+        autoCycleTimeoutId = null;
+        if (!autoCycleEnabled) return;
+        autoCycleTimeoutId = setTimeout(() => {
+          applyPresetByIndex(presetCycleIndex + 1);
+          scheduleAutoCycle();
+        }, AUTO_CYCLE_MS);
+      }
 
       window.addEventListener('resize', () => {
         if (!visualizer) return;

@@ -355,6 +355,28 @@ export function useChromecast(
     }
   }, [available, loadCurrentMedia]);
 
+  // Lets the sender (phone/laptop) control the receiver's own independent
+  // Butterchurn instance (cast-receiver.html) -- previously a TV had no way
+  // to be told to stop auto-cycling on a preset the viewer actually likes,
+  // or to be manually stepped through presets at all. "Best effort, not
+  // guaranteed" delivery per Cast's own docs, so failures here are logged
+  // rather than surfaced to the user -- worst case a tap does nothing and
+  // they try again, not worth a toast over.
+  const VISUALIZER_CHANNEL = 'urn:x-cast:com.onwave.visualizer';
+  const sendVisualizerCommand = useCallback((payload: Record<string, unknown>) => {
+    const session = window.cast?.framework?.CastContext.getInstance().getCurrentSession();
+    if (!session) return;
+    session.sendMessage(VISUALIZER_CHANNEL, payload).catch((err: any) => {
+      console.warn('[OnWave cast] failed to send visualizer command', payload, err);
+    });
+  }, []);
+  const castNextPreset = useCallback(() => sendVisualizerCommand({ action: 'next' }), [sendVisualizerCommand]);
+  const castPreviousPreset = useCallback(() => sendVisualizerCommand({ action: 'previous' }), [sendVisualizerCommand]);
+  const castSetAutoCycle = useCallback(
+    (enabled: boolean) => sendVisualizerCommand({ action: 'setAutoCycle', enabled }),
+    [sendVisualizerCommand]
+  );
+
   // If the station changes while already casting, load the new stream.
   // Safe to call unconditionally on every isCasting/loadCurrentMedia
   // change, including the initial false->true transition that toggleCast()
@@ -367,5 +389,15 @@ export function useChromecast(
     if (isCasting) loadCurrentMedia();
   }, [isCasting, loadCurrentMedia]);
 
-  return { available, isCasting, deviceName, toggleCast, isRemotePaused, toggleRemotePlayback };
+  return {
+    available,
+    isCasting,
+    deviceName,
+    toggleCast,
+    isRemotePaused,
+    toggleRemotePlayback,
+    castNextPreset,
+    castPreviousPreset,
+    castSetAutoCycle,
+  };
 }

@@ -79,9 +79,14 @@ export function MaximizedPlayerDialog({ station }: MaximizedPlayerDialogProps) {
         // Private browsing / storage disabled -- the toggle still works for
         // this session, it just won't persist to the next one.
       }
+      // While casting, this switch controls the TV's own independent
+      // visualizer (see cast-receiver.html's VISUALIZER_CHANNEL listener),
+      // not the local canvas underneath it -- the local one keeps its own
+      // auto-cycle state too, but it's not what's actually on screen.
+      if (chromecast.isCasting) chromecast.castSetAutoCycle(next);
       return next;
     });
-  }, []);
+  }, [chromecast]);
 
   // Re-arms on every preset change, whichever caused it -- including a
   // manual prev/next click, so picking a preset by hand resets the clock
@@ -153,7 +158,15 @@ export function MaximizedPlayerDialog({ station }: MaximizedPlayerDialogProps) {
           <div className="min-w-0">
             <h2 className="truncate text-2xl font-bold text-white drop-shadow-md">{station.name}</h2>
             {nowPlaying && <p className="truncate text-sm text-white/80 drop-shadow-md">{nowPlaying}</p>}
-            {presetName && <p className="truncate text-xs text-white/50 drop-shadow-md">{presetName}</p>}
+            {chromecast.isCasting ? (
+              // The local canvas's own presetName has no relation to
+              // whatever the TV is actually showing (it's a separate,
+              // independently-cycling Butterchurn instance) -- showing it
+              // here while casting would just be wrong information.
+              <p className="truncate text-xs text-white/50 drop-shadow-md">Casting to {chromecast.deviceName || 'device'}</p>
+            ) : (
+              presetName && <p className="truncate text-xs text-white/50 drop-shadow-md">{presetName}</p>
+            )}
           </div>
           <Button
             onClick={player.closeMaximizedPlayer}
@@ -169,7 +182,7 @@ export function MaximizedPlayerDialog({ station }: MaximizedPlayerDialogProps) {
         <div className="flex flex-col items-center gap-4 p-6">
           <div className="flex items-center gap-3">
             <Button
-              onClick={previousPreset}
+              onClick={chromecast.isCasting ? chromecast.castPreviousPreset : previousPreset}
               variant="ghost"
               size="icon"
               className="rounded-full bg-black/40 text-white hover:bg-black/60"
@@ -179,7 +192,7 @@ export function MaximizedPlayerDialog({ station }: MaximizedPlayerDialogProps) {
               <ChevronLeft className="h-5 w-5" />
             </Button>
             <Button
-              onClick={nextPreset}
+              onClick={chromecast.isCasting ? chromecast.castNextPreset : nextPreset}
               variant="ghost"
               size="icon"
               className="rounded-full bg-black/40 text-white hover:bg-black/60"
