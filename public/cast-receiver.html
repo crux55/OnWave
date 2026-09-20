@@ -279,6 +279,39 @@
         })();
       }
 
+      // "createVisualizer() succeeded and the render loop is running with no
+      // JS errors" turned out to still leave a fully black screen on the
+      // Shield (confirmed via a GlitchTip breadcrumb trail showing 25
+      // minutes of error-free preset auto-cycling with nothing visible on
+      // the TV) -- meaning the failure is downstream of our own code, in
+      // whatever this specific CrKey receiver runtime's WebGL stack
+      // actually does with the draws. This reads back an actual pixel to
+      // tell those two failure modes apart: if it comes back non-black,
+      // Butterchurn IS drawing real frames and this is a compositing/
+      // visibility problem; if it's stuck at black, WebGL itself isn't
+      // producing output on this device.
+      function logWebglDiagnostics(reasonTag) {
+        try {
+          const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+          if (!gl) {
+            console.warn('[OnWave][webgl:' + reasonTag + '] could not obtain a WebGL context for diagnostics');
+            return;
+          }
+          const dbgExt = gl.getExtension('WEBGL_debug_renderer_info');
+          const renderer = dbgExt ? gl.getParameter(dbgExt.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER);
+          const vendor = dbgExt ? gl.getParameter(dbgExt.UNMASKED_VENDOR_WEBGL) : gl.getParameter(gl.VENDOR);
+          console.log('[OnWave][webgl:' + reasonTag + '] renderer=' + renderer + ' vendor=' + vendor + ' version=' + gl.getParameter(gl.VERSION) + ' contextLost=' + gl.isContextLost());
+          const err = gl.getError();
+          if (err !== gl.NO_ERROR) console.warn('[OnWave][webgl:' + reasonTag + '] gl.getError() =', err);
+
+          const pixel = new Uint8Array(4);
+          gl.readPixels(Math.floor(canvas.width / 2), Math.floor(canvas.height / 2), 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
+          console.log('[OnWave][webgl:' + reasonTag + '] center pixel RGBA =', Array.from(pixel).join(','));
+        } catch (e) {
+          console.warn('[OnWave][webgl:' + reasonTag + '] diagnostics threw:', e);
+        }
+      }
+
       // Safe to call more than once, unlike ensureAudioGraph() above --
       // this is what actually recovers from a lost WebGL context, or
       // brings the visualizer up at all if it never managed to the first
@@ -311,6 +344,8 @@
             textureRatio: 1,
           });
           console.log('[OnWave] visualizer created:', !!visualizer);
+          logWebglDiagnostics('on-create');
+          setTimeout(() => logWebglDiagnostics('2s-into-render'), 2000);
 
           // createVisualizer() alone doesn't wire up an audio source --
           // without this, Butterchurn has no bass/mid/treb data internally
