@@ -7,6 +7,15 @@
     <script type="text/javascript" src="//www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/butterchurn@2.6.7/lib/butterchurn.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/butterchurn-presets@2.4.7/lib/butterchurnPresets.min.js"></script>
+    <!-- Reports to the same self-hosted GlitchTip instance the main app uses
+         (see instrumentation-client.ts) -- this DSN points at a LAN IP, so
+         it only reports while the receiving device is on the home network,
+         which covers our own testing even though it won't for a friend
+         casting from elsewhere. This is otherwise the hardest layer to
+         observe: a TV's console isn't visible without chrome://inspect over
+         ADB, so without this, every console.log below only ever helps
+         during a live, supervised debugging session. -->
+    <script src="https://browser.sentry-cdn.com/10.74.0/bundle.min.js" crossorigin="anonymous"></script>
     <style>
       html, body {
         margin: 0;
@@ -63,6 +72,17 @@
     </div>
 
     <script>
+      // Guarded -- the CDN script above can fail to load (blocked network,
+      // offline CDN) without this page's own playback logic depending on
+      // it at all, so every call site below checks window.Sentry itself
+      // rather than assuming init succeeded.
+      if (window.Sentry) {
+        window.Sentry.init({
+          dsn: 'http://f0247031758340f9aaf178c0209920d9@192.168.1.125:8010/1',
+          environment: 'cast-receiver',
+        });
+      }
+
       const audioEl = document.getElementById('media');
       const canvas = document.getElementById('visualizer');
       const titleOverlay = document.getElementById('title-overlay');
@@ -84,6 +104,7 @@
       // a cast session is active.
       function showError(message) {
         console.error('[OnWave]', message);
+        if (window.Sentry) window.Sentry.captureMessage('[cast-receiver] ' + message, 'error');
         stationGenreEl.textContent = message;
         stationGenreEl.style.color = '#ff6b6b';
         titleOverlay.classList.add('visible');
@@ -297,6 +318,7 @@
       // fires at all.
       canvas.addEventListener('webglcontextlost', (e) => {
         console.warn('[OnWave] WebGL context lost');
+        if (window.Sentry) window.Sentry.captureMessage('[cast-receiver] WebGL context lost', 'warning');
         e.preventDefault();
         visualizer = null;
       });

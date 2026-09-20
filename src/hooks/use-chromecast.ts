@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
+import * as Sentry from '@sentry/nextjs';
 import { useToast } from '@/hooks/use-toast';
 import { getProxiedFaviconUrl } from '@/lib/utils';
 
@@ -261,9 +262,22 @@ export function useChromecast(
         // trying to play a 404 HTML page as audio (confirmed live: the
         // Shield accepted the cast but never actually started playback).
         if (proxy_path) castUrl = new URL(`/api${proxy_path}`, window.location.origin).href;
+      } else {
+        // Falls back to the raw URL below, but a mint rejection (e.g. the
+        // resolver couldn't confirm this is a real audio stream) is exactly
+        // the kind of thing that otherwise looks like "casting just doesn't
+        // work" with zero clue why -- surface it instead of swallowing it.
+        const reason = await mintResponse.text().catch(() => '');
+        console.warn('[OnWave cast] mint rejected, casting raw URL instead', { status: mintResponse.status, reason, absoluteStreamUrl });
+        Sentry.captureMessage('Cast stream mint rejected', {
+          level: 'warning',
+          extra: { status: mintResponse.status, reason, absoluteStreamUrl },
+        });
       }
-    } catch {
+    } catch (err) {
       // Network hiccup reaching our own backend -- proceed with the raw URL.
+      console.warn('[OnWave cast] mint request failed, casting raw URL instead', err);
+      Sentry.captureException(err, { extra: { stage: 'mint', absoluteStreamUrl } });
     }
 
     const mediaInfo = new window.chrome.cast.media.MediaInfo(castUrl, codecToContentType(codec));
@@ -285,6 +299,8 @@ export function useChromecast(
 
     if (stalledCastTimeoutRef.current) clearTimeout(stalledCastTimeoutRef.current);
 
+    console.log('[OnWave cast] sending LOAD', { castUrl, stationName, contentType: codecToContentType(codec) });
+
     session.loadMedia(request).then(() => {
       // loadMedia() resolving only means the receiver accepted the request —
       // some receivers (seen with NVIDIA Shield, project_r#39/OnWave#39)
@@ -293,6 +309,11 @@ export function useChromecast(
       // genuinely loaded before treating this as a real success.
       stalledCastTimeoutRef.current = setTimeout(() => {
         if (!remotePlayerRef.current?.isMediaLoaded) {
+          console.warn('[OnWave cast] LOAD accepted but media never reported loaded', { castUrl, stationName, deviceName: deviceNameRef.current });
+          Sentry.captureMessage('Cast accepted but playback never started', {
+            level: 'warning',
+            extra: { castUrl, stationName, deviceName: deviceNameRef.current },
+          });
           toast({
             title: 'Cast connected, but nothing is playing',
             description: `${deviceNameRef.current || 'The cast device'} accepted the connection but never started playback of ${stationName || 'this station'}.`,
@@ -300,10 +321,14 @@ export function useChromecast(
           });
         }
       }, 8000);
-    }).catch(() => {
+    }).catch((err: any) => {
       // Casting session exists but the receiver rejected this stream (format/
       // CORS/etc.) — leave the session open, just surface it so it's not a
       // silent failure.
+      console.error('[OnWave cast] loadMedia() rejected', { castUrl, stationName, err });
+      Sentry.captureException(err instanceof Error ? err : new Error(`loadMedia rejected: ${JSON.stringify(err)}`), {
+        extra: { castUrl, stationName },
+      });
       toast({
         title: 'Cast failed',
         description: `${stationName || 'This station'} couldn't be played on the cast device.`,
