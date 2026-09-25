@@ -46,6 +46,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${sora.variable} ${manrope.variable}`}>
       <head>
+        {/* viewport-fit=cover is required for env(safe-area-inset-*) to
+            resolve to anything other than 0 -- without it, MobileBottomDock's
+            safe-area padding (gesture-nav home indicator) is a no-op, and
+            this file has no `export const viewport` to set it via Next's
+            metadata API since it's a client component ('use client' above),
+            which that API doesn't support. */}
+        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
         <link rel="manifest" href="/manifest.json" />
         <meta name="theme-color" content="#0A0A12" />
         <meta name="mobile-web-app-capable" content="yes" />

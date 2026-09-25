@@ -52,6 +52,21 @@ export function UserAvatar() {
         return;
       }
 
+      // exp is a numeric Unix-seconds timestamp (see internal/auth/handler.go's
+      // time.Now().Add(24*time.Hour).Unix()), not the ISO date string its
+      // declared type suggests. A token past this is functionally logged-out
+      // -- every API call using it gets a 401 regardless -- but nothing here
+      // checked it, so the header kept showing a signed-in identity (email,
+      // avatar, dropdown) off a dead token for up to as long as it stayed in
+      // localStorage. Matches an in-app feedback report: "I'm seeing my
+      // email on the top right but I'm not logged in?"
+      if (typeof decoded.exp === 'number' && decoded.exp * 1000 <= Date.now()) {
+        localStorage.removeItem('token');
+        setCurrentUser(null);
+        setIsLoading(false);
+        return;
+      }
+
       setCurrentUser({ id: decoded.user_id, email: decoded.email });
       // Real name/avatar come from the profile record, not the JWT.
       fetchCurrentUserProfile()

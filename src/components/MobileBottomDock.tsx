@@ -81,7 +81,17 @@ export function MobileBottomDock({ navItems }: MobileBottomDockProps) {
   };
 
   return (
-    <div ref={selfRef} className="sm:hidden fixed inset-x-0 bottom-0 z-40 flex flex-col border-t bg-background">
+    <div
+      ref={selfRef}
+      className="sm:hidden fixed inset-x-0 bottom-0 z-40 flex flex-col border-t bg-background"
+      // Reserves the gesture-nav home-indicator area on phones that have one
+      // (iPhone X+, most modern Android) -- without it, this fixed dock sits
+      // partly behind that system UI instead of above it, and since
+      // useReportHeight measures this element's real (border-box) height,
+      // the reserved space is automatically included in dock.totalHeight,
+      // which is what every scrollable page pads against (see layout.tsx).
+      style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+    >
       {showMenuContent && (
         <nav className="flex justify-around p-2">
           {navItems.map((item) => (
