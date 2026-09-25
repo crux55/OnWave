@@ -18,7 +18,7 @@ import { SafeImage } from '@/components/SafeImage';
 import { StationAvatar } from '@/components/StationAvatar';
 import { useMobileDock } from '@/contexts/MobileDockContext';
 import { useReportHeight } from '@/hooks/use-report-height';
-import { reportStationPlaybackError } from '@/lib/api';
+import { reportStationPlaybackError, resolveStreamUrl } from '@/lib/api';
 
 declare global {
   interface HTMLMediaElement {
@@ -45,6 +45,16 @@ export function RadioPlayer({ station, className }: RadioPlayerProps) {
   // Tracks which streamUrl (if any) has already had a no-CORS retry — reset
   // on every genuinely new station so each one gets its own fresh attempt.
   const retriedWithoutCorsRef = useRef<string | null>(null);
+  // Same one-shot-per-station pattern, for the resolve-and-retry attempt on
+  // a "format not supported" error (see handleAudioError below).
+  const formatRetryRef = useRef<string | null>(null);
+  // Tracks which streamUrl the audio element was last asked to load, as
+  // opposed to reading currentAudio.src back -- a format-retry rewrites
+  // .src to a resolved URL that will never equal the raw streamUrl again,
+  // and comparing against the raw src directly would make the effect below
+  // think a genuinely new load is needed on every subsequent re-render,
+  // undoing the fix by reloading the original (broken) URL.
+  const loadedStreamUrlRef = useRef<string | null>(null);
   // A small pool of always-muted <audio> elements kept warm on nearby queue
   // entries (see PRELOAD_OFFSETS/the sync effect below), keyed by streamUrl
   // — lets a flick/skip to any of them promote an already-buffering element
@@ -118,7 +128,8 @@ export function RadioPlayer({ station, className }: RadioPlayerProps) {
     }
     let currentAudio = audioRef.current;
 
-    if (streamUrl && currentAudio.src !== streamUrl) {
+    if (streamUrl && loadedStreamUrlRef.current !== streamUrl) {
+      loadedStreamUrlRef.current = streamUrl;
       // Keyed by the raw streamUrl (not preload.src, which the DOM always
       // resolves to an absolute URL — a relative streamUrl, e.g. our own
       // stream-proxy routes, would never match that) so lookup is exact.
@@ -178,6 +189,33 @@ export function RadioPlayer({ station, className }: RadioPlayerProps) {
       const MEDIA_ERR_NETWORK = (window.MediaError && window.MediaError.MEDIA_ERR_NETWORK) || 2;
       const MEDIA_ERR_DECODE = (window.MediaError && window.MediaError.MEDIA_ERR_DECODE) || 3;
       const MEDIA_ERR_SRC_NOT_SUPPORTED = (window.MediaError && window.MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED) || 4;
+
+      // A "format not supported" error is very often not a genuinely
+      // undecodable codec -- it's radio-browser (or another directory)
+      // pointing at an .m3u/.pls playlist pointer file instead of a raw
+      // stream, which an <audio> element can't play directly.
+      // resolveStreamUrl (backed by the same internal/resolver already used
+      // for casting and "bring your own station") unwraps that. One retry
+      // with the resolved URL before treating this as a real failure.
+      if (mediaError.code === MEDIA_ERR_SRC_NOT_SUPPORTED && streamUrl && formatRetryRef.current !== streamUrl) {
+        formatRetryRef.current = streamUrl;
+        resolveStreamUrl(streamUrl).then(resolvedUrl => {
+          if (resolvedUrl !== streamUrl) {
+            audioElement.src = resolvedUrl;
+            audioElement.load();
+            audioElement.play().catch(() => {});
+            return;
+          }
+          // Genuinely unresolvable -- surface the original error now.
+          setError('Format not supported.');
+          player.setIsPlaying(false);
+          setIsLoading(false);
+          if (station) {
+            reportStationPlaybackError(station.stationuuid, station.name, 'format_not_supported').catch(() => {});
+          }
+        });
+        return;
+      }
 
       let errorType = 'unknown';
       switch (mediaError.code) {

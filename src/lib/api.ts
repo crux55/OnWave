@@ -1100,6 +1100,42 @@ export async function reportStationPlaybackError(stationUuid: string, stationNam
   });
 }
 
+// In-memory per-tab cache on top of the backend's own (much longer-lived)
+// cache -- a station's URL essentially never changes mid-session, so once
+// resolved once here, replaying it or hitting it again from the preload
+// pool never needs to ask again.
+const resolvedStreamUrlCache = new Map<string, Promise<string>>();
+
+// Resolves a station's raw URL to a directly-playable stream URL. Some
+// directories (radio-browser.info included) publish an .m3u/.pls pointer
+// file instead of a raw stream for some stations -- an <audio> element
+// can't play that directly and reports it as "format not supported" even
+// though the real stream underneath is fine. Backed by the same
+// internal/resolver the cast-proxy mint endpoint and "bring your own
+// station" already use. Never rejects and always resolves to a usable URL:
+// on any failure (network hiccup, rate limit, genuinely unresolvable), it
+// falls back to the original raw url so a caller can just always try
+// whatever this returns rather than needing its own fallback branch.
+export function resolveStreamUrl(url: string): Promise<string> {
+  const cached = resolvedStreamUrlCache.get(url);
+  if (cached) return cached;
+
+  const promise = fetch('/api/webradio/resolve-stream', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ url }),
+  })
+    .then(async response => {
+      if (!response.ok) return url;
+      const result = await response.json();
+      return result.healthy && result.url ? result.url : url;
+    })
+    .catch(() => url);
+
+  resolvedStreamUrlCache.set(url, promise);
+  return promise;
+}
+
 // fetchBadgeLoadout / setBadgeLoadout manage a user's standing preference
 // for which of their held badges to display in chat, and in what order —
 // separate from award/revoke, which is about who holds a badge at all.
