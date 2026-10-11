@@ -380,6 +380,28 @@
             }
             return;
           }
+          // Decisive smoke test, once per station: manually clear the real
+          // context Butterchurn itself created to solid green, independent
+          // of any of its own shaders/presets, and read it straight back.
+          // If this comes back non-green, basic WebGL2-to-screen
+          // compositing itself is broken on this device (a Cast/TV
+          // surface-rendering quirk, nothing to do with Butterchurn's
+          // code); if it comes back green, raw drawing-to-canvas works
+          // fine and the failure is specific to Butterchurn's own shader
+          // programs failing to compile/link (which gl.getError() doesn't
+          // report) on this device's WebGL2 driver.
+          if (reasonTag === 'on-create') {
+            gl.clearColor(0, 1, 0, 1);
+            gl.clear(gl.COLOR_BUFFER_BIT);
+            const smokeTestPixel = new Uint8Array(4);
+            gl.readPixels(Math.floor(canvas.width / 2), Math.floor(canvas.height / 2), 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, smokeTestPixel);
+            const smokeTestRGBA = Array.from(smokeTestPixel).join(',');
+            console.log('[OnWave][webgl:smoke-test] cleared to solid green, readback =', smokeTestRGBA);
+            if (window.Sentry) {
+              window.Sentry.captureMessage('[cast-receiver][webgl:smoke-test]', { level: 'info', extra: { smokeTestRGBA } });
+            }
+          }
+
           const dbgExt = gl.getExtension('WEBGL_debug_renderer_info');
           const renderer = dbgExt ? gl.getParameter(dbgExt.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER);
           const vendor = dbgExt ? gl.getParameter(dbgExt.UNMASKED_VENDOR_WEBGL) : gl.getParameter(gl.VENDOR);
@@ -461,24 +483,19 @@
           canvas.height = window.innerHeight * pixelRatio;
           console.log('[OnWave] canvas size:', canvas.width, 'x', canvas.height, 'innerWidth/Height:', window.innerWidth, window.innerHeight);
 
-          // Experiment: force WebGL1 instead of WebGL2. Confirmed live
-          // (GlitchTip) on this device: a healthy, non-lost WebGL2 context
-          // (NVIDIA Tegra, "WebGL 2.0 (OpenGL ES 3.0 Chromium)"), real audio
-          // reaching the analyser, zero gl.getError(), yet every single
-          // point across a full 3x3 grid sample is identically pure black
-          // -- not a sampling fluke, genuinely nothing drawn anywhere.
-          // WebGL doesn't report shader compile/link failures through
-          // getError() at all (that needs an explicit COMPILE_STATUS/
-          // LINK_STATUS check neither we nor, possibly, Butterchurn's own
-          // code does defensively) -- a GLSL ES 3.00 compiler quirk on this
-          // specific old Tegra driver, incompatible with shaders Butterchurn
-          // otherwise runs fine under desktop WebGL2, would look exactly
-          // like this. A canvas permanently binds to whichever context type
-          // is requested first, so grabbing 'webgl' here (before Butterchurn
-          // gets to request its own, preferred webgl2) forces it onto the
-          // older, far more universally-compatible WebGL1/GLSL-ES-1.00 path
-          // instead.
-          canvas.getContext('webgl');
+          // Reverted a "force WebGL1" experiment that lived here briefly --
+          // confirmed by reading Butterchurn 2.6.7's actual source
+          // (visualizer.js) directly: it unconditionally calls
+          // `canvas.getContext('webgl2', {alpha:false, antialias:false,
+          // depth:false, stencil:false, premultipliedAlpha:false})` with NO
+          // fallback to webgl1 and NO null check on the result. Pre-binding
+          // the canvas to 'webgl' made that call return null (a canvas
+          // permanently binds to whichever type is requested first), and
+          // Butterchurn crashed immediately trying to use it ("cannot read
+          // property createFramebuffer of null", confirmed live) -- strictly
+          // worse than the silent black screen it was meant to fix. Forcing
+          // WebGL1 isn't viable without actually patching/forking the
+          // library.
 
           // The UMD bundle's harmony default export means the plain
           // <script>-tag global is {__esModule: true, default: Butterchurn},
