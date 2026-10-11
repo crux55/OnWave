@@ -340,7 +340,14 @@
         // rather than keep debugging the overlay, use the channel already
         // proven to work.
         try {
-          const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+          // A canvas is permanently bound to whichever context type is
+          // requested FIRST -- every later getContext() call with a
+          // different type returns null. Confirmed live: this returned
+          // null for 'webgl' even though Butterchurn's own
+          // createVisualizer() had just succeeded moments earlier, meaning
+          // it grabbed 'webgl2' here, not 'webgl' -- querying the wrong
+          // type told us nothing about whether the real context is okay.
+          const gl = canvas.getContext('webgl2') || canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
           if (!gl) {
             console.warn('[OnWave][webgl:' + reasonTag + '] could not obtain a WebGL context for diagnostics');
             if (window.Sentry) {
