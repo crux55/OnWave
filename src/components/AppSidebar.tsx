@@ -37,7 +37,7 @@ function SidebarLink({ item, pathname }: { item: SidebarItem; pathname: string }
       title={item.label}
       aria-current={active ? 'page' : undefined}
       className={cn(
-        'group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
+        'group flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium transition-colors',
         'justify-center lg:justify-start',
         active
           ? 'bg-secondary text-foreground'
@@ -56,30 +56,30 @@ export function AppSidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="sticky top-0 hidden h-screen w-16 shrink-0 flex-col border-r border-border bg-card/40 sm:flex lg:w-60">
-      <Link href="/" aria-label="OnWave home" className="flex h-16 items-center justify-center px-2 lg:justify-start lg:px-4">
+    <aside className="sticky top-0 hidden h-screen w-14 shrink-0 flex-col border-r border-border bg-card/40 sm:flex lg:w-56">
+      <Link href="/" aria-label="OnWave home" className="flex h-16 items-center justify-center px-2 lg:justify-start lg:px-3.5">
         <span className="lg:hidden"><AppLogo iconOnly /></span>
         <span className="hidden lg:block"><AppLogo iconOnly={false} /></span>
       </Link>
 
-      <nav className="flex flex-col gap-1 px-2 lg:px-3" aria-label="Main">
+      <nav className="flex flex-col gap-1 px-2 lg:px-2.5" aria-label="Main">
         {MAIN_ITEMS.map((item) => (
           <SidebarLink key={item.href} item={item} pathname={pathname} />
         ))}
       </nav>
 
-      <div className="mx-4 my-4 border-t border-border" />
+      <div className="mx-3 my-4 border-t border-border" />
 
-      <p className="hidden px-6 pb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground lg:block">
+      <p className="hidden px-4 pb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground lg:block">
         Your Library
       </p>
-      <nav className="flex flex-col gap-1 px-2 lg:px-3" aria-label="Library">
+      <nav className="flex flex-col gap-1 px-2 lg:px-2.5" aria-label="Library">
         {LIBRARY_ITEMS.map((item) => (
           <SidebarLink key={item.href} item={item} pathname={pathname} />
         ))}
       </nav>
 
-      <div className="mt-auto flex flex-col gap-1 border-t border-border p-2 lg:p-3">
+      <div className="mt-auto flex flex-col gap-1 border-t border-border p-2 lg:p-2.5">
         <SidebarLink item={{ href: '/about', label: 'About OnWave', icon: Info }} pathname={pathname} />
         <UserAvatar inSidebar />
       </div>

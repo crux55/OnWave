@@ -440,9 +440,9 @@ export function RadioPlayer({ station, className }: RadioPlayerProps) {
       // bottom, unaffected by the dock (which doesn't exist there).
       : cn(
           // left offset matches AppSidebar's own width at each breakpoint
-          // (w-16 icon rail from sm, w-60 full pane from lg) so the pill
+          // (w-14 icon rail from sm, w-56 full pane from lg) so the pill
           // never sits underneath it.
-          "left-2 right-2 sm:left-[4.75rem] sm:right-4 lg:left-[16rem] rounded-full border border-border/60 shadow-[0_0_0_1px_hsl(var(--accent)/0.15),0_12px_32px_-8px_hsl(var(--accent)/0.35),0_12px_32px_-12px_hsl(var(--accent-2)/0.25)]",
+          "left-2 right-2 sm:left-[4.25rem] sm:right-4 lg:left-[15rem] rounded-full border border-border/60 shadow-[0_0_0_1px_hsl(var(--accent)/0.15),0_12px_32px_-8px_hsl(var(--accent)/0.35),0_12px_32px_-12px_hsl(var(--accent-2)/0.25)]",
           mobileDockActive ? "bottom-14" : "hidden",
           "sm:block sm:bottom-0"
         ),

@@ -61,7 +61,7 @@ export function LiveListenerMiniPlayer() {
         // matches AppSidebar's width at each breakpoint so this full-width
         // bar doesn't run underneath it.
         mobileDockActive ? "bottom-14" : "hidden",
-        "sm:flex sm:bottom-0 sm:left-[4.75rem] lg:left-[16rem]"
+        "sm:flex sm:bottom-0 sm:left-[4.25rem] lg:left-[15rem]"
       )}
     >
       <audio ref={audioRef} autoPlay muted={isMuted} />
