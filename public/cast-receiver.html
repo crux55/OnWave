@@ -377,6 +377,7 @@
       //    badly broken the visual half was.
       let audioContext = null;
       let analyser = null;
+      let mediaSource = null;
       let butterchurnLib = null;
       let visualizer = null;
       let presets = null;
@@ -390,9 +391,9 @@
         if (analyser) return analyser; // already created -- can't do this twice
         const AudioContextClass = window.AudioContext || window.webkitAudioContext;
         audioContext = new AudioContextClass();
-        const source = audioContext.createMediaElementSource(audioEl);
+        mediaSource = audioContext.createMediaElementSource(audioEl);
         analyser = audioContext.createAnalyser();
-        source.connect(analyser);
+        mediaSource.connect(analyser);
         analyser.connect(audioContext.destination);
         console.log('[OnWave] audio graph created, AudioContext state:', audioContext.state);
         return analyser;
@@ -678,8 +679,21 @@
           // without this, Butterchurn has no bass/mid/treb data internally
           // and never renders anything, regardless of whether audio itself
           // is genuinely playing.
-          visualizer.connectAudio(currentAnalyser);
-          console.log('[OnWave] connectAudio() called');
+          //
+          // Experiment: connecting from mediaSource directly instead of
+          // from currentAnalyser. Confirmed live (GlitchTip,
+          // visualizer.audio.freqArray read directly): Butterchurn's own
+          // internal analyser nodes get a flat-zero signal on this device
+          // even while OUR separate analyser confirms strong real audio at
+          // the exact same moment -- connectAudio(node) just does
+          // `node.connect(this.audible)` (confirmed in Butterchurn's own
+          // source), so the fan-out from an AnalyserNode to two
+          // destinations (our own destination connection, plus
+          // Butterchurn's) isn't carrying signal on this old Chromium
+          // build. Fanning out from the plain MediaElementAudioSourceNode
+          // instead sidesteps whatever's specific to the analyser node.
+          visualizer.connectAudio(mediaSource);
+          console.log('[OnWave] connectAudio() called (from mediaSource)');
 
           if (!presets) {
             presets = butterchurnPresets.getPresets();
