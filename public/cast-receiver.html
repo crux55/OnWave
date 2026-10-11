@@ -461,6 +461,25 @@
           canvas.height = window.innerHeight * pixelRatio;
           console.log('[OnWave] canvas size:', canvas.width, 'x', canvas.height, 'innerWidth/Height:', window.innerWidth, window.innerHeight);
 
+          // Experiment: force WebGL1 instead of WebGL2. Confirmed live
+          // (GlitchTip) on this device: a healthy, non-lost WebGL2 context
+          // (NVIDIA Tegra, "WebGL 2.0 (OpenGL ES 3.0 Chromium)"), real audio
+          // reaching the analyser, zero gl.getError(), yet every single
+          // point across a full 3x3 grid sample is identically pure black
+          // -- not a sampling fluke, genuinely nothing drawn anywhere.
+          // WebGL doesn't report shader compile/link failures through
+          // getError() at all (that needs an explicit COMPILE_STATUS/
+          // LINK_STATUS check neither we nor, possibly, Butterchurn's own
+          // code does defensively) -- a GLSL ES 3.00 compiler quirk on this
+          // specific old Tegra driver, incompatible with shaders Butterchurn
+          // otherwise runs fine under desktop WebGL2, would look exactly
+          // like this. A canvas permanently binds to whichever context type
+          // is requested first, so grabbing 'webgl' here (before Butterchurn
+          // gets to request its own, preferred webgl2) forces it onto the
+          // older, far more universally-compatible WebGL1/GLSL-ES-1.00 path
+          // instead.
+          canvas.getContext('webgl');
+
           // The UMD bundle's harmony default export means the plain
           // <script>-tag global is {__esModule: true, default: Butterchurn},
           // not Butterchurn itself -- same interop quirk already handled
