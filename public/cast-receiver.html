@@ -410,15 +410,17 @@
       const AUTO_CYCLE_MS = 30000;
 
       function ensureAudioGraph() {
-        if (analyser) return analyser; // already created -- can't do this twice
+        if (mediaSource) return mediaSource; // already created -- can't do this twice
         const AudioContextClass = window.AudioContext || window.webkitAudioContext;
         audioContext = new AudioContextClass();
         mediaSource = audioContext.createMediaElementSource(audioEl);
-        analyser = audioContext.createAnalyser();
-        mediaSource.connect(analyser);
-        analyser.connect(audioContext.destination);
+        // No separate analyser/destination wiring here anymore -- see the
+        // big comment at the connectAudio() call site for why. mediaSource
+        // gets exactly ONE downstream connection (Butterchurn's own node),
+        // and actual sound output is completed through Butterchurn's own
+        // analyser further down that same single chain.
         console.log('[OnWave] audio graph created, AudioContext state:', audioContext.state);
-        return analyser;
+        return mediaSource;
       }
 
       function resumeAudioContextIfNeeded() {
@@ -511,72 +513,26 @@
                   }
                 }
 
-                // Isolation test: our OWN directly-branching analyser (above)
-                // gets real audio every time, while Butterchurn's -- which
-                // routes through its own DelayNode (this.audible) first --
-                // never does, from the exact same upstream source. Wiring
-                // up a throwaway DelayNode the same way, completely outside
-                // Butterchurn's own code, tells us directly whether a
-                // DelayNode's output carries signal AT ALL on this device,
-                // or whether it's specifically something about how
-                // Butterchurn uses one (e.g. fanning its output to two
-                // destinations at once).
-                let delayTestMaxDeviation = null;
-                try {
-                  const testDelay = audioContext.createDelay();
-                  const testAnalyser = audioContext.createAnalyser();
-                  mediaSource.connect(testDelay);
-                  testDelay.connect(testAnalyser);
-                  const testBytes = new Uint8Array(testAnalyser.fftSize);
-                  testAnalyser.getByteTimeDomainData(testBytes);
-                  delayTestMaxDeviation = 0;
-                  for (var di = 0; di < testBytes.length; di++) {
-                    const dev = Math.abs(testBytes[di] - 128);
-                    if (dev > delayTestMaxDeviation) delayTestMaxDeviation = dev;
-                  }
-                  mediaSource.disconnect(testDelay);
-                } catch (e) {
-                  console.warn('[OnWave][webgl:post-render] delay isolation test threw:', e);
-                }
-
-                // The createDelay->GainNode fix made no difference at all
-                // -- even our own isolated test (now effectively a
-                // GainNode) still reads flat silence. Every connection
-                // that's ever shown real data has been the FIRST (and
-                // only) .connect() destination of its upstream node (our
-                // main analyser, directly off mediaSource); every
-                // connection added as a SECOND branch off any node --
-                // through a delay, a gain, anything -- has read flat
-                // silence. This tests that directly: a second analyser
-                // connected straight off mediaSource, no intermediate node
-                // at all, just a second fan-out destination. If this also
-                // reads flat, the bug is fan-out itself (only the first
-                // connect() destination actually delivers data on this
-                // platform), not anything about intermediate node types.
-                let secondFanoutMaxDeviation = null;
-                try {
-                  const testAnalyser2 = audioContext.createAnalyser();
-                  mediaSource.connect(testAnalyser2);
-                  const testBytes2 = new Uint8Array(testAnalyser2.fftSize);
-                  testAnalyser2.getByteTimeDomainData(testBytes2);
-                  secondFanoutMaxDeviation = 0;
-                  for (var di2 = 0; di2 < testBytes2.length; di2++) {
-                    const dev2 = Math.abs(testBytes2[di2] - 128);
-                    if (dev2 > secondFanoutMaxDeviation) secondFanoutMaxDeviation = dev2;
-                  }
-                  mediaSource.disconnect(testAnalyser2);
-                } catch (e) {
-                  console.warn('[OnWave][webgl:post-render] second-fanout isolation test threw:', e);
-                }
+                // The isolation tests that used to run here (a throwaway
+                // DelayNode, then a second analyser connected straight off
+                // mediaSource) already did their job -- they're what found
+                // this bug in the first place. Removed now rather than
+                // left running: they worked by temporarily giving
+                // mediaSource a second/third connection, which is exactly
+                // the thing the real fix above eliminates, so leaving them
+                // in would undermine the very fix they're sitting next to.
+                // butterchurnRawMaxDeviation (above) is the ongoing
+                // signal: non-zero here confirms the fix is actually
+                // working, with no risk of interfering with the graph
+                // since it only reads from a node that already exists in
+                // the production chain.
 
                 console.log(
                   '[OnWave][webgl:post-render] boundFramebufferIsDefault=' + !boundFb + ' pixel=' + pixelRGBA +
                   ' drawCalls=' + drawStats.drawCallCount + ' incompleteFramebufferDraws=' + drawStats.incompleteFramebufferCount +
                   ' floatExtensions=' + floatExtensions.join(',') +
                   ' butterchurnAudioMax=' + butterchurnAudioMax + ' butterchurnFreqArrayLength=' + butterchurnFreqArrayLength +
-                  ' butterchurnRawMaxDeviation=' + butterchurnRawMaxDeviation +
-                  ' delayTestMaxDeviation=' + delayTestMaxDeviation +
-                  ' secondFanoutMaxDeviation=' + secondFanoutMaxDeviation
+                  ' butterchurnRawMaxDeviation=' + butterchurnRawMaxDeviation
                 );
                 if (window.Sentry) {
                   window.Sentry.captureMessage('[cast-receiver][webgl:post-render]', {
@@ -588,11 +544,9 @@
                       incompleteFramebufferCount: drawStats.incompleteFramebufferCount,
                       firstIncompleteStatus: drawStats.firstIncompleteStatus,
                       floatExtensions: floatExtensions.join(','),
-                      secondFanoutMaxDeviation,
                       butterchurnAudioMax,
                       butterchurnFreqArrayLength,
                       butterchurnRawMaxDeviation,
-                      delayTestMaxDeviation,
                     },
                   });
                 }
@@ -748,7 +702,7 @@
             return;
           }
 
-          const currentAnalyser = ensureAudioGraph();
+          ensureAudioGraph();
           resumeAudioContextIfNeeded();
 
           const pixelRatio = window.devicePixelRatio || 1;
@@ -785,25 +739,31 @@
           logWebglDiagnostics('on-create');
           setTimeout(() => logWebglDiagnostics('2s-into-render'), 2000);
 
-          // createVisualizer() alone doesn't wire up an audio source --
-          // without this, Butterchurn has no bass/mid/treb data internally
-          // and never renders anything, regardless of whether audio itself
-          // is genuinely playing.
+          // THE REAL FIX: a strict serial chain, no fan-out anywhere.
+          // Every earlier attempt (our own analyser, Butterchurn's via
+          // connectAudio(analyser), connectAudio(mediaSource) alone, a
+          // throwaway DelayNode, a GainNode swap-in) failed identically:
+          // the ONLY connection that ever delivered real sample data, in
+          // every single test, was the first (and only) .connect()
+          // destination of mediaSource. The moment mediaSource had a
+          // SECOND consumer -- any node, any type -- that second branch
+          // read flat silence, confirmed down to raw getByteTimeDomainData
+          // bytes sitting dead at the unsigned-zero value. This old
+          // Chromium build (Chrome 92 / CrKey) appears to only tick/deliver
+          // samples to a source's first downstream consumer.
           //
-          // Experiment: connecting from mediaSource directly instead of
-          // from currentAnalyser. Confirmed live (GlitchTip,
-          // visualizer.audio.freqArray read directly): Butterchurn's own
-          // internal analyser nodes get a flat-zero signal on this device
-          // even while OUR separate analyser confirms strong real audio at
-          // the exact same moment -- connectAudio(node) just does
-          // `node.connect(this.audible)` (confirmed in Butterchurn's own
-          // source), so the fan-out from an AnalyserNode to two
-          // destinations (our own destination connection, plus
-          // Butterchurn's) isn't carrying signal on this old Chromium
-          // build. Fanning out from the plain MediaElementAudioSourceNode
-          // instead sidesteps whatever's specific to the analyser node.
+          // So mediaSource now gets exactly ONE connection, ever: straight
+          // into Butterchurn's own internal node (this.audible, via
+          // connectAudio). Sound only reaches the speakers because we
+          // complete that SAME chain ourselves below, by connecting
+          // Butterchurn's own (pass-through, signal-preserving) analyser
+          // onward to destination -- mediaSource -> this.audible ->
+          // this.audio.analyser -> destination, a single unbroken line.
+          // We no longer keep a separate analyser of our own at all (it
+          // would just be another dead second branch off mediaSource).
           visualizer.connectAudio(mediaSource);
-          console.log('[OnWave] connectAudio() called (from mediaSource)');
+          visualizer.audio.analyser.connect(audioContext.destination);
+          console.log('[OnWave] connectAudio() called; audio chained mediaSource -> Butterchurn -> destination');
 
           if (!presets) {
             presets = butterchurnPresets.getPresets();
