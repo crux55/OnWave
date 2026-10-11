@@ -90,7 +90,19 @@ docker-compose -f docker-compose.prod.yml --env-file .env.production logs --tail
 echo "Pruning old onwave-frontend/onwave-backend images..."
 docker images --format '{{.Repository}}:{{.Tag}}' | grep '^onwave-frontend:' | grep -v -E ":latest\$|:${FRONTEND_SHA}\$" | xargs -r docker rmi
 docker images --format '{{.Repository}}:{{.Tag}}' | grep '^onwave-backend:' | grep -v -E ":latest\$|:${BACKEND_SHA}\$" | xargs -r docker rmi
-docker image prune -f
+
+# Deliberately NOT running a blanket `docker image prune -f` here anymore --
+# with the legacy (non-BuildKit) builder, a multi-stage Dockerfile's
+# intermediate per-stage layers are untagged (dangling) the moment the
+# build finishes, since only the final stage gets -t'd. A prune right after
+# every single deploy wiped exactly those layers before the *next* deploy
+# ever got a chance to reuse them, which is why npm ci (and the Go module
+# download) re-did full work on every deploy regardless of whether
+# package.json/go.mod had actually changed. Disk isn't tight on this host
+# (46G free at last check) -- keeping that cache around is worth far more
+# than the space it uses. Only genuinely orphaned (not-current-tag) images
+# for our own two repos get removed above; everything else, including
+# build-cache layers, is left alone.
 
 echo "Production deployment complete!"
 echo "App:  https://onwave.andruquinn.com"

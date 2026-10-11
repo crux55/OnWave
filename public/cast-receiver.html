@@ -111,8 +111,30 @@
         titleOverlay.classList.add('visible');
         if (hideTitleTimeout) clearTimeout(hideTitleTimeout);
       }
+      // A backend/nginx restart mid-cast (e.g. a production deploy) drops
+      // the long-lived stream-proxy connection out from under this element,
+      // surfacing as a plain network error -- not a real "this station is
+      // broken" failure. Retrying the exact same src a few times with a
+      // short delay rides through that transparently in the common case
+      // (a deploy's container swap is typically a few seconds), rather
+      // than silently killing audio/video for the rest of the cast session
+      // over what's usually a transient blip. The signed stream-proxy URL
+      // stays valid for 24h, so reusing it verbatim is safe.
+      const MAX_NETWORK_RETRIES = 5;
+      const NETWORK_RETRY_DELAY_MS = 3000;
+      let networkRetryCount = 0;
       audioEl.addEventListener('error', () => {
         const err = audioEl.error;
+        const MEDIA_ERR_NETWORK = (window.MediaError && window.MediaError.MEDIA_ERR_NETWORK) || 2;
+        if (err && err.code === MEDIA_ERR_NETWORK && audioEl.src && networkRetryCount < MAX_NETWORK_RETRIES) {
+          networkRetryCount++;
+          console.warn('[OnWave] network error, retrying (' + networkRetryCount + '/' + MAX_NETWORK_RETRIES + ') in ' + NETWORK_RETRY_DELAY_MS + 'ms');
+          setTimeout(() => {
+            audioEl.load();
+            attemptPlay();
+          }, NETWORK_RETRY_DELAY_MS);
+          return;
+        }
         showError('Stream error' + (err ? ' (code ' + err.code + ')' : ''));
       });
       ['loadstart', 'waiting', 'stalled', 'canplay', 'suspend'].forEach((eventName) => {
@@ -180,6 +202,9 @@
         (loadRequestData) => {
           const media = loadRequestData.media;
           console.log('[OnWave] LOAD received', media);
+          // A genuinely new station gets its own fresh retry budget rather
+          // than inheriting however much a previous station's blip used up.
+          networkRetryCount = 0;
           // The sender builds MediaInfo via the legacy chrome.cast.media.MediaInfo
           // constructor (use-chromecast.ts), which sets contentId, not contentUrl --
           // those are different fields; contentUrl is only populated when a sender
@@ -540,6 +565,11 @@
       // session the moment it fails or its context is lost once.
       audioEl.addEventListener('playing', () => {
         console.log('[OnWave] audio "playing" event fired');
+        // A real resume (not just the initial start) means whatever caused
+        // an earlier retry is over -- a later, unrelated blip deserves its
+        // own full retry budget rather than a shrinking one for the rest
+        // of the session.
+        networkRetryCount = 0;
         if (!visualizer) initOrRecoverVisualizer();
       });
     </script>
