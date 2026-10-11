@@ -153,17 +153,27 @@
       // remaining casting issues -- revert to leaving it disabled (Google's
       // own guidance for a production receiver) once resolved, so real
       // listeners don't see a console overlay on every cast.
-      const castDebugLogger = cast.debug.CastDebugLogger.getInstance();
-      ['log', 'warn', 'error'].forEach((level) => {
-        const original = console[level].bind(console);
-        const loggerMethod = level === 'log' ? 'info' : level;
-        console[level] = (...args) => {
-          original(...args);
-          try {
-            castDebugLogger[loggerMethod]('OnWave', args.map(String).join(' '));
-          } catch {}
-        };
-      });
+      let castDebugLogger = null;
+      try {
+        castDebugLogger = cast.debug && cast.debug.CastDebugLogger ? cast.debug.CastDebugLogger.getInstance() : null;
+        if (!castDebugLogger && window.Sentry) {
+          window.Sentry.captureMessage('[cast-receiver] cast.debug.CastDebugLogger unavailable on this device', 'warning');
+        }
+      } catch (e) {
+        if (window.Sentry) window.Sentry.captureException(e, { extra: { stage: 'CastDebugLogger setup' } });
+      }
+      if (castDebugLogger) {
+        ['log', 'warn', 'error'].forEach((level) => {
+          const original = console[level].bind(console);
+          const loggerMethod = level === 'log' ? 'info' : level;
+          console[level] = (...args) => {
+            original(...args);
+            try {
+              castDebugLogger[loggerMethod]('OnWave', args.map(String).join(' '));
+            } catch {}
+          };
+        });
+      }
 
       playerManager.setMessageInterceptor(
         cast.framework.messages.MessageType.LOAD,
@@ -206,8 +216,10 @@
       // Per Google's documented pattern, enabling has to wait for the
       // receiver context's own READY event rather than firing immediately.
       context.addEventListener(cast.framework.system.EventType.READY, () => {
-        castDebugLogger.setEnabled(true);
-        castDebugLogger.showDebugLogs(true);
+        if (castDebugLogger) {
+          castDebugLogger.setEnabled(true);
+          castDebugLogger.showDebugLogs(true);
+        }
       });
 
       // urn:x-cast: is a hard requirement of the Cast custom-message API --
@@ -318,24 +330,47 @@
       // visibility problem; if it's stuck at black, WebGL itself isn't
       // producing output on this device.
       function logWebglDiagnostics(reasonTag) {
+        // Reports to Sentry/GlitchTip directly rather than relying on
+        // CastDebugLogger's on-screen overlay -- confirmed live on this
+        // Shield that audio plays, and the receiver's showError() path
+        // already successfully reports to GlitchTip (a prior "Stream error"
+        // event came through fine), but the debug overlay itself never
+        // appeared on screen. Likely a firmware-level requirement
+        // (CastDebugLogger needs 1.44+) this specific unit doesn't meet --
+        // rather than keep debugging the overlay, use the channel already
+        // proven to work.
         try {
           const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
           if (!gl) {
             console.warn('[OnWave][webgl:' + reasonTag + '] could not obtain a WebGL context for diagnostics');
+            if (window.Sentry) {
+              window.Sentry.captureMessage('[cast-receiver][webgl:' + reasonTag + '] no WebGL context obtainable', 'warning');
+            }
             return;
           }
           const dbgExt = gl.getExtension('WEBGL_debug_renderer_info');
           const renderer = dbgExt ? gl.getParameter(dbgExt.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER);
           const vendor = dbgExt ? gl.getParameter(dbgExt.UNMASKED_VENDOR_WEBGL) : gl.getParameter(gl.VENDOR);
-          console.log('[OnWave][webgl:' + reasonTag + '] renderer=' + renderer + ' vendor=' + vendor + ' version=' + gl.getParameter(gl.VERSION) + ' contextLost=' + gl.isContextLost());
-          const err = gl.getError();
-          if (err !== gl.NO_ERROR) console.warn('[OnWave][webgl:' + reasonTag + '] gl.getError() =', err);
+          const version = gl.getParameter(gl.VERSION);
+          const contextLost = gl.isContextLost();
+          const glError = gl.getError();
+          console.log('[OnWave][webgl:' + reasonTag + '] renderer=' + renderer + ' vendor=' + vendor + ' version=' + version + ' contextLost=' + contextLost);
+          if (glError !== gl.NO_ERROR) console.warn('[OnWave][webgl:' + reasonTag + '] gl.getError() =', glError);
 
           const pixel = new Uint8Array(4);
           gl.readPixels(Math.floor(canvas.width / 2), Math.floor(canvas.height / 2), 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
-          console.log('[OnWave][webgl:' + reasonTag + '] center pixel RGBA =', Array.from(pixel).join(','));
+          const centerPixelRGBA = Array.from(pixel).join(',');
+          console.log('[OnWave][webgl:' + reasonTag + '] center pixel RGBA =', centerPixelRGBA);
+
+          if (window.Sentry) {
+            window.Sentry.captureMessage('[cast-receiver][webgl:' + reasonTag + ']', {
+              level: 'info',
+              extra: { renderer, vendor, version, contextLost, glError, centerPixelRGBA, canvasWidth: canvas.width, canvasHeight: canvas.height },
+            });
+          }
         } catch (e) {
           console.warn('[OnWave][webgl:' + reasonTag + '] diagnostics threw:', e);
+          if (window.Sentry) window.Sentry.captureException(e, { extra: { stage: 'webgl-diagnostics', reasonTag } });
         }
       }
 
