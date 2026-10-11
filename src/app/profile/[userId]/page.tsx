@@ -4,11 +4,10 @@ import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { jwtDecode as jwt_decode } from 'jwt-decode';
 import { UserCircle2, Loader2, Lock } from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { ClipsList } from '@/components/live/ClipsList';
-import { ProfileHeader } from '@/components/profile/ProfileHeader';
+import { ProfileHero } from '@/components/profile/ProfileHero';
 import { ProfileBioSection } from '@/components/profile/ProfileBioSection';
 import { ProfileBadgesSection } from '@/components/profile/ProfileBadgesSection';
 import { ProfileStationsSection } from '@/components/profile/ProfileStationsSection';
@@ -121,7 +120,7 @@ export default function PublicProfilePage() {
   }
 
   return (
-    <div className="container mx-auto py-8 max-w-2xl">
+    <div className="container mx-auto max-w-5xl py-8">
       {isOwnProfile && isPrivate && (
         <div className="mb-4 flex flex-col gap-3 rounded-lg border border-primary/30 bg-primary/5 p-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-start gap-2">
@@ -136,34 +135,33 @@ export default function PublicProfilePage() {
           </Button>
         </div>
       )}
-      <Card className="shadow-xl">
-        <ProfileHeader
-          avatarUrl={getAvatarUrl(profile.avatar)}
-          name={profile.name || 'OnWave User'}
-          subtitle={profile.location}
-          size="md"
-        />
-        <CardContent className="p-6 md:p-8 space-y-8">
-          <ProfileBioSection bio={profile.bio} emptyText="This user hasn't added a bio yet." />
 
-          {badges.length > 0 && (
-            <>
-              <Separator />
-              <ProfileBadgesSection badges={badges} />
-            </>
-          )}
+      <ProfileHero
+        avatarUrl={getAvatarUrl(profile.avatar)}
+        name={profile.name || 'OnWave User'}
+        meta={profile.location}
+      />
 
-          {stations.length > 0 && (
-            <>
-              <Separator />
-              <ProfileStationsSection stations={stations} />
-            </>
-          )}
+      <div className="space-y-8">
+        <ProfileBioSection bio={profile.bio} emptyText="This user hasn't added a bio yet." />
 
-          <Separator />
-          <ClipsList fetcher={fetchClips} />
-        </CardContent>
-      </Card>
+        {badges.length > 0 && (
+          <>
+            <Separator />
+            <ProfileBadgesSection badges={badges} />
+          </>
+        )}
+
+        {stations.length > 0 && (
+          <>
+            <Separator />
+            <ProfileStationsSection stations={stations} />
+          </>
+        )}
+
+        <Separator />
+        <ClipsList fetcher={fetchClips} />
+      </div>
     </div>
   );
 }

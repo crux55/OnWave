@@ -3,14 +3,13 @@
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { UserCircle2, Edit3, Loader2, ChevronRight } from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { useEffect, useState } from 'react';
 import { fetchCurrentUserProfile, fetchMyBadges, fetchMyStations, markBadgesSeen, type MyBadge, type Station } from '@/lib/api';
 import type { Profile, Token } from '@/lib/types';
 import { jwtDecode as jwt_decode } from 'jwt-decode';
-import { ProfileHeader } from '@/components/profile/ProfileHeader';
+import { ProfileHero } from '@/components/profile/ProfileHero';
 import { ProfileBioSection } from '@/components/profile/ProfileBioSection';
 import { ProfileBadgesSection } from '@/components/profile/ProfileBadgesSection';
 import { ProfileStationsSection } from '@/components/profile/ProfileStationsSection';
@@ -88,31 +87,32 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="container mx-auto py-8 max-w-3xl">
-      <header className="mb-10 text-center">
-        <UserCircle2 className="mx-auto h-20 w-20 text-accent mb-4" />
-        <h1 className="text-5xl font-bold tracking-tight text-foreground">Your Profile</h1>
-        <p className="text-xl text-muted-foreground mt-3">
-          What other OnWave users see when they visit your page.
-        </p>
-      </header>
+    <div className="container mx-auto max-w-5xl py-8">
+      <ProfileHero
+        avatarUrl={getAvatarUrl(userProfile.avatar)}
+        name={userProfile.name || 'No Name Provided'}
+        meta={token?.email || 'No email provided'}
+        actions={
+          <>
+            <Button onClick={() => router.push('/profile/edit')}>
+              <Edit3 className="mr-2 h-4 w-4" /> Edit Profile
+            </Button>
+            <Button variant="outline" asChild>
+              <Link href={`/profile/${userProfile.slug || token?.user_id}`} className="flex items-center gap-2">
+                <UserCircle2 className="h-4 w-4" /> View Public Profile
+                <span className={`rounded-full px-2 py-0.5 text-xs font-normal ${userProfile.is_public ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'}`}>
+                  {userProfile.is_public ? 'Public' : 'Private'}
+                </span>
+                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              </Link>
+            </Button>
+          </>
+        }
+      />
 
-      <Card className="shadow-xl">
-        <ProfileHeader
-          avatarUrl={getAvatarUrl(userProfile.avatar)}
-          name={userProfile.name || 'No Name Provided'}
-          subtitle={token ? (token.email || 'No email provided') : 'No email provided'}
-        />
-        <CardContent className="p-6 md:p-8 space-y-8">
-          <ProfileBioSection
-            bio={userProfile.bio}
-            emptyText="You haven't added a bio yet."
-            action={
-              <Button onClick={() => router.push('/profile/edit')}>
-                <Edit3 className="mr-2 h-4 w-4" /> Edit Profile
-              </Button>
-            }
-          />
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="space-y-8">
+          <ProfileBioSection bio={userProfile.bio} emptyText="You haven't added a bio yet." />
 
           {myBadges.length > 0 && (
             <>
@@ -127,55 +127,31 @@ export default function ProfilePage() {
               <ProfileStationsSection stations={myStations} title="My Stations" />
             </>
           )}
+        </div>
 
-          <Separator />
-
-          <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <h3 className="text-xl font-semibold text-foreground mb-3">Account Details</h3>
-              <div className="space-y-1 text-sm">
-                {token?.is_founding_member && (
-                  <p className="text-muted-foreground">
-                    Status: <span className="text-primary font-medium">Founding Member</span>
-                  </p>
-                )}
-                <p className="text-muted-foreground">
-                  Member since: {token && token.created_at ? new Date(token.created_at).toLocaleDateString() : 'Unknown'}
-                </p>
-                {userProfile.location && (
-                  <p className="text-muted-foreground">Location: {userProfile.location}</p>
-                )}
-                {userProfile.website && (
-                  <p className="text-muted-foreground">
-                    Website: <a href={userProfile.website} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">{userProfile.website}</a>
-                  </p>
-                )}
-                <p className="text-muted-foreground">Favorite Genre: {userProfile.favorite_genre || 'Not set'}</p>
-              </div>
-            </div>
-          </section>
-
-          {token?.user_id && (
-            <>
-              <Separator />
-              <section>
-                <Link
-                  href={`/profile/${userProfile.slug || token.user_id}`}
-                  className="flex items-center justify-between gap-3 p-3 -mx-3 rounded-md hover:bg-muted/30 transition-colors"
-                >
-                  <h3 className="text-xl font-semibold text-foreground flex items-center gap-2">
-                    <UserCircle2 className="h-5 w-5 text-primary" /> View Public Profile
-                    <span className={`text-xs font-normal px-2 py-0.5 rounded-full ${userProfile.is_public ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'}`}>
-                      {userProfile.is_public ? 'Public' : 'Private'}
-                    </span>
-                  </h3>
-                  <ChevronRight className="h-5 w-5 text-muted-foreground" />
-                </Link>
-              </section>
-            </>
-          )}
-        </CardContent>
-      </Card>
+        <div className="space-y-4 rounded-2xl border border-border/60 bg-card/40 p-6">
+          <h3 className="text-lg font-semibold text-foreground">Account Details</h3>
+          <div className="space-y-1 text-sm">
+            {token?.is_founding_member && (
+              <p className="text-muted-foreground">
+                Status: <span className="text-primary font-medium">Founding Member</span>
+              </p>
+            )}
+            <p className="text-muted-foreground">
+              Member since: {token && token.created_at ? new Date(token.created_at).toLocaleDateString() : 'Unknown'}
+            </p>
+            {userProfile.location && (
+              <p className="text-muted-foreground">Location: {userProfile.location}</p>
+            )}
+            {userProfile.website && (
+              <p className="text-muted-foreground">
+                Website: <a href={userProfile.website} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">{userProfile.website}</a>
+              </p>
+            )}
+            <p className="text-muted-foreground">Favorite Genre: {userProfile.favorite_genre || 'Not set'}</p>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
