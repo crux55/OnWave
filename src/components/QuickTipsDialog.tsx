@@ -25,7 +25,7 @@ const TIPS = [
   {
     icon: Award,
     title: 'Earn badges along the way',
-    body: "Follow shows, join chats, go live, and you'll start collecting badges — some just for showing up, some a lot more special. Check your profile to see what you've got.",
+    body: "Follow shows, join chats, and you'll start collecting badges — some just for showing up, some a lot more special. Check your profile to see what you've got.",
   },
 ];
 

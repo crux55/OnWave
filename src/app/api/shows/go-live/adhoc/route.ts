@@ -1,6 +1,11 @@
 import type { NextRequest } from 'next/server';
+import { GO_LIVE_ENABLED } from '@/lib/features';
 
 export async function POST(request: NextRequest) {
+  if (!GO_LIVE_ENABLED) {
+    return Response.json({ error: 'Going live is temporarily unavailable.' }, { status: 403 });
+  }
+
   const apiHost = process.env.API_BASE_URL || 'http://backend:8080';
   const token = request.cookies.get('token')?.value ||
                 request.headers.get('Authorization')?.replace('Bearer ', '');

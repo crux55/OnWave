@@ -13,6 +13,7 @@ import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { GoLiveDialog } from '@/components/live/GoLiveDialog';
+import { GO_LIVE_ENABLED } from '@/lib/features';
 import { ClipsList } from '@/components/live/ClipsList';
 import { fetchStation, fetchMyFollows, followTarget, unfollowTarget, createBadge, awardBadge, revokeBadge, uploadBadgeIcon, inviteStationMember, updateStation, removeStationMember, fetchStationClips, type StationDetail, type Follow, type ScrapedShowSummary } from '@/lib/api';
 import type { Token } from '@/lib/types';
@@ -388,7 +389,7 @@ export default function StationPage() {
                 {isFollowing ? 'Following' : 'Follow'}
               </Button>
 
-              {canManageStation && (
+              {GO_LIVE_ENABLED && canManageStation && (
                 <GoLiveDialog
                   stationId={station.id}
                   scheduledShows={station.shows.filter(s => s.status === 'scheduled')}

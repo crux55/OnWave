@@ -20,6 +20,7 @@ import { NotificationSettings } from '@/components/NotificationSettings';
 import { ConnectionStatus } from '@/components/ConnectionStatus';
 import { useInstallPrompt } from '@/contexts/InstallPromptContext';
 import { GoLiveDialog } from '@/components/live/GoLiveDialog';
+import { GO_LIVE_ENABLED } from '@/lib/features';
 import { BadgeLoadoutSelector } from '@/components/live/BadgeLoadoutSelector';
 import { CreateStationRequestForm } from '@/components/CreateStationRequestForm';
 import {
@@ -424,7 +425,7 @@ function ManagePageInner() {
                 </section>
               )}
 
-              {token?.role === 'dj' && (
+              {GO_LIVE_ENABLED && token?.role === 'dj' && (
                 <GoLiveDialog
                   trigger={
                     <Button className="w-full bg-red-600 hover:bg-red-700 text-white">
@@ -440,7 +441,9 @@ function ManagePageInner() {
                     <Mic2 className="h-5 w-5 text-accent" /> Become a DJ
                   </h3>
                   <p className="text-sm text-muted-foreground">
-                    DJs can create shows and go live independently, with or without a station. Requests are reviewed by an admin.
+                    {GO_LIVE_ENABLED
+                      ? 'DJs can create shows and go live independently, with or without a station. Requests are reviewed by an admin.'
+                      : 'DJs can create shows independently, with or without a station. Requests are reviewed by an admin.'}
                   </p>
                   <Input placeholder="Tell us why you want to DJ (optional)" value={djRequestMessage} onChange={e => setDjRequestMessage(e.target.value)} />
                   <Button size="sm" onClick={handleCreateDJRequest} disabled={isSubmittingDJRequest}>

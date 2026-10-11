@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { Search, Heart, Mic2, Radio, MessagesSquare, Tv, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { QuickTipsDialog } from '@/components/QuickTipsDialog';
+import { GO_LIVE_ENABLED } from '@/lib/features';
 
 const FEATURES = [
   {
@@ -84,7 +85,7 @@ export default function AboutPage() {
           What you can do here
         </h2>
         <div className="grid gap-5 sm:grid-cols-2">
-          {FEATURES.map(({ icon: Icon, title, body }) => (
+          {FEATURES.filter((f) => GO_LIVE_ENABLED || f.title !== 'Go live').map(({ icon: Icon, title, body }) => (
             <div
               key={title}
               className="rounded-2xl border border-border/60 bg-card/60 p-6 transition-colors hover:border-accent/40"
