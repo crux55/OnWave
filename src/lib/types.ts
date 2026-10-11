@@ -148,6 +148,10 @@ export interface PBSShow {
   program_url: string;
   station_name?: string;
   station_slug?: string;
+  // The owning station's IANA timezone (e.g. "Australia/Melbourne",
+  // "America/Los_Angeles") -- start_time/end_time are that station's own
+  // local wall-clock values, not the viewer's.
+  timezone?: string;
   created_at: string;
   updated_at: string;
 }

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import type { PBSShow } from '@/lib/types';
+import { resolveShowInstants } from '@/lib/timezone';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -137,6 +138,17 @@ export const PBSShowCard: React.FC<PBSShowCardProps> = ({ show, onTuneIn, isFoll
 
   const durationLabel = show.duration || formatDuration(show.start_time, show.end_time);
 
+  // start_time/end_time are the owning station's own local wall clock
+  // (e.g. Melbourne time for PBS FM, Pacific for KEXP) -- shown converted
+  // to the viewer's own local time so this agrees with the live/upcoming
+  // badge above (computed server-side, already timezone-correct) instead
+  // of looking unrelated to it.
+  const instants = resolveShowInstants(show);
+  const formatLocalTime = (d: Date) => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  const timeRangeLabel = instants
+    ? `${formatLocalTime(instants.start)} - ${formatLocalTime(instants.end)}`
+    : `${show.start_time} - ${show.end_time}`;
+
   return (
     <Card className="h-full hover:shadow-lg transition-shadow duration-200 relative">
       <CardHeader className="pb-3">
@@ -186,7 +198,7 @@ export const PBSShowCard: React.FC<PBSShowCardProps> = ({ show, onTuneIn, isFoll
 
         <div className="flex items-center text-sm text-muted-foreground">
           <Clock className="h-4 w-4 mr-2" />
-          <span>{show.start_time} - {show.end_time}</span>
+          <span>{timeRangeLabel}</span>
         </div>
 
         {durationLabel && (

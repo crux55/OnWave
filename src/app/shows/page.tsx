@@ -9,6 +9,7 @@ import { InternalShowCard } from '@/components/InternalShowCard';
 import { ShowGuideGrid } from '@/components/ShowGuideGrid';
 import { StationAvatar } from '@/components/StationAvatar';
 import { showStatus } from '@/lib/show-schedule';
+import { resolveShowInstants, localDayKey } from '@/lib/timezone';
 import { useShowFollows, showFollowKey } from '@/hooks/use-show-follows';
 import { Calendar, Radio, ArrowRight } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -46,12 +47,18 @@ export default function ShowsPage() {
   // every day at once would be unreadable) — real calendar dates, not
   // just "today plus N", so the labels/filtering stay correct across a
   // midnight rollover while the tab is open.
+  //
+  // The key is built from the viewer's own local Y/M/D, not
+  // toISOString() (which is always UTC) -- for anyone east of UTC, early
+  // local hours are still "yesterday" in UTC, so the UTC-based key missed
+  // every show.date (which the backend returns as plain calendar dates,
+  // not UTC instants) and "Today" came up empty.
   const dayOptions = useMemo(() => {
     return Array.from({ length: 3 }, (_, i) => {
       const d = new Date();
       d.setDate(d.getDate() + i);
       return {
-        key: d.toISOString().split('T')[0],
+        key: localDayKey(d),
         label: i === 0 ? 'Today' : i === 1 ? 'Tomorrow' : d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
       };
     });
@@ -92,10 +99,19 @@ export default function ShowsPage() {
   // for every hour that's already passed instead of showing the day's
   // real shape. Filtered to the one selected day: a full month at once
   // would be exactly the unreadable flat dump this replaces.
+  //
+  // Bucketed by the VIEWER's own local calendar day (via each show's real
+  // start instant), not the station's raw date string -- a station many
+  // hours away (KEXP in LA, NTS in London) can genuinely fall on a
+  // different calendar day once converted to the viewer's own clock.
   const selectedDayShows = useMemo(() => {
     const dayKey = dayOptions[selectedDayIndex]?.key;
     if (!dayKey) return [];
-    return allShows.filter(show => show.date?.split('T')[0] === dayKey && isStationVisible(show.station_name));
+    return allShows.filter(show => {
+      if (!isStationVisible(show.station_name)) return false;
+      const instants = resolveShowInstants(show);
+      return instants ? localDayKey(instants.start) === dayKey : false;
+    });
   }, [allShows, dayOptions, selectedDayIndex, isStationVisible]);
 
   // "Live now" isn't browsed from here anymore (that's /live's job) — this

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef } from 'react';
 import type { PBSShow } from '@/lib/types';
+import { resolveShowInstants } from '@/lib/timezone';
 import { cn } from '@/lib/utils';
 
 interface ShowGuideGridProps {
@@ -21,17 +22,49 @@ function toMinutes(hhmm: string): number {
   return h * 60 + m;
 }
 
-function blockGeometry(show: PBSShow) {
-  const startMin = toMinutes(show.start_time);
-  let endMin = toMinutes(show.end_time);
-  // Shows that cross midnight (end <= start) get clipped to the end of this
-  // day's row rather than wrapping — the portion after midnight belongs to
-  // the following day's own fetch/row, so nothing is double-counted, this
-  // just means the bar reads a little short for those.
-  if (endMin <= startMin) endMin = 24 * 60;
+function formatLocalTime(d: Date): string {
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
+// start_time/end_time are the owning STATION's own local wall clock (PBS FM
+// is Melbourne time, KEXP is Pacific, NTS is London, ...), but this grid's
+// hour axis and "NOW" line are the viewer's local time -- plotting the raw
+// station-local numbers directly made a station in another timezone's shows
+// land in the wrong column entirely, visibly disagreeing with the NOW line
+// even though their live/upcoming/expired status (computed server-side,
+// already timezone-correct) was right all along.
+function showLayout(show: PBSShow) {
+  const instants = resolveShowInstants(show);
+
+  let startMin: number;
+  let durationMin: number;
+  let startLabel: string;
+  let endLabel: string;
+  if (instants) {
+    startMin = instants.start.getHours() * 60 + instants.start.getMinutes();
+    durationMin = Math.round((instants.end.getTime() - instants.start.getTime()) / 60000);
+    startLabel = formatLocalTime(instants.start);
+    endLabel = formatLocalTime(instants.end);
+  } else {
+    // No date to anchor a real instant to (shouldn't normally happen) --
+    // fall back to the station's raw clock values rather than hiding the
+    // show entirely.
+    startMin = toMinutes(show.start_time);
+    const rawEndMin = toMinutes(show.end_time);
+    durationMin = rawEndMin <= startMin ? 24 * 60 - startMin : rawEndMin - startMin;
+    startLabel = show.start_time;
+    endLabel = show.end_time;
+  }
+
+  // Shows that cross midnight (in the viewer's own local time now, not the
+  // station's) get clipped to the end of this day's row rather than
+  // wrapping — the portion after midnight belongs to the following day's
+  // own fetch/row, so nothing is double-counted, this just means the bar
+  // reads a little short for those.
+  const endMin = Math.min(startMin + durationMin, 24 * 60);
   const left = (startMin / 60) * PX_PER_HOUR;
   const width = Math.max(((endMin - startMin) / 60) * PX_PER_HOUR, MIN_BLOCK_WIDTH);
-  return { left, width };
+  return { left, width, startLabel, endLabel };
 }
 
 // A real broadcast-guide timeline: stations as rows, hours across the top,
@@ -115,7 +148,7 @@ export function ShowGuideGrid({ shows, isToday, onSelectShow }: ShowGuideGridPro
               }}
             >
               {stationShows.map(show => {
-                const { left, width } = blockGeometry(show);
+                const { left, width, startLabel, endLabel } = showLayout(show);
                 const isLive = show.status === 'live';
                 const isExpired = show.status === 'expired';
                 return (
@@ -123,7 +156,7 @@ export function ShowGuideGrid({ shows, isToday, onSelectShow }: ShowGuideGridPro
                     key={show.id}
                     type="button"
                     onClick={() => onSelectShow(show)}
-                    title={`${show.name}${show.dj ? ` — ${show.dj}` : ''} (${show.start_time}–${show.end_time})`}
+                    title={`${show.name}${show.dj ? ` — ${show.dj}` : ''} (${startLabel}–${endLabel})`}
                     className={cn(
                       'absolute top-1.5 bottom-1.5 overflow-hidden rounded-lg border px-2 py-1 text-left transition-colors',
                       isLive && 'border-red-500/60 bg-red-500/20 hover:bg-red-500/30',
@@ -136,7 +169,7 @@ export function ShowGuideGrid({ shows, isToday, onSelectShow }: ShowGuideGridPro
                       'font-mono text-[10px] tabular-nums',
                       isLive ? 'text-red-300' : isExpired ? 'text-muted-foreground' : 'text-accent'
                     )}>
-                      {show.start_time}
+                      {startLabel}
                       {isLive && ' · LIVE'}
                     </div>
                     <div className="truncate text-xs font-semibold text-foreground">{show.name}</div>
