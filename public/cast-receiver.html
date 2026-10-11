@@ -394,6 +394,23 @@
           const centerPixelRGBA = Array.from(pixel).join(',');
           console.log('[OnWave][webgl:' + reasonTag + '] center pixel RGBA =', centerPixelRGBA);
 
+          // One sampled pixel being black is NOT proof nothing is rendering
+          // -- plenty of presets are mostly-dark at the exact center with
+          // motion/color elsewhere. Samples a 3x3 grid across the whole
+          // frame instead: if every single point comes back identical,
+          // that's real evidence of a blank frame; any variation at all
+          // means Butterchurn is drawing something, somewhere.
+          const gridSamples = [];
+          for (const fx of [0.1, 0.5, 0.9]) {
+            for (const fy of [0.1, 0.5, 0.9]) {
+              const gp = new Uint8Array(4);
+              gl.readPixels(Math.floor(canvas.width * fx), Math.floor(canvas.height * fy), 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, gp);
+              gridSamples.push(Array.from(gp).join(','));
+            }
+          }
+          const allIdentical = gridSamples.every((s) => s === gridSamples[0]);
+          console.log('[OnWave][webgl:' + reasonTag + '] grid samples =', gridSamples.join(' | '), 'allIdentical=' + allIdentical);
+
           // A healthy context drawing nothing but black is exactly what a
           // visualizer fed silence looks like -- some old Chromium builds
           // (this is Chrome 92, on a 2021-vintage CrKey receiver) have had
@@ -415,7 +432,7 @@
           if (window.Sentry) {
             window.Sentry.captureMessage('[cast-receiver][webgl:' + reasonTag + ']', {
               level: 'info',
-              extra: { renderer, vendor, version, contextLost, glError, centerPixelRGBA, canvasWidth: canvas.width, canvasHeight: canvas.height, analyserMaxByte, analyserNonZeroBins },
+              extra: { renderer, vendor, version, contextLost, glError, centerPixelRGBA, gridSamples: gridSamples.join(' | '), allIdentical, canvasWidth: canvas.width, canvasHeight: canvas.height, analyserMaxByte, analyserNonZeroBins },
             });
           }
         } catch (e) {
