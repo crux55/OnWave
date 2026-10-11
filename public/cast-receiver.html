@@ -84,6 +84,28 @@
         });
       }
 
+      // THE FIX for the black-screen mystery: confirmed live, via an
+      // isolated test using a throwaway DelayNode + AnalyserNode with zero
+      // Butterchurn code involved, that a DelayNode's output simply
+      // doesn't carry audio signal downstream on this device's WebAudio
+      // implementation (Chrome 92 / CrKey) -- a genuine platform bug, not
+      // anything about our wiring or Butterchurn's logic. Butterchurn's
+      // AudioProcessor always routes incoming audio through exactly one
+      // DelayNode (this.audible = context.createDelay()) at its default
+      // (zero) delayTime, and never changes that delayTime anywhere in its
+      // source -- a GainNode at its default gain (1) is a functionally
+      // identical substitute for a zero-delay passthrough, and isn't
+      // affected by whatever's broken in this platform's DelayNode.
+      // Patching createDelay on the prototype, before Butterchurn's own
+      // AudioProcessor constructor ever calls it, swaps in a GainNode with
+      // no changes to Butterchurn's own code needed at all.
+      if (typeof AudioContext !== 'undefined' || typeof window.webkitAudioContext !== 'undefined') {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        AudioContextClass.prototype.createDelay = function () {
+          return this.createGain();
+        };
+      }
+
       // Confirmed live: basic WebGL2-to-screen compositing works fine on
       // this device (a manual clear-to-green round-tripped correctly),
       // while Butterchurn's own render() calls produce nothing but black
