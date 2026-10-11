@@ -122,6 +122,45 @@
           }
           return result;
         };
+
+        // Shaders compile and link fine, context is healthy, and a manual
+        // clear-to-green round-trips on the real default framebuffer --
+        // yet Butterchurn's own draws produce nothing visible. Butterchurn's
+        // blur/echo effects render through several of its own offscreen
+        // framebuffers using floating-point textures, and the ability to
+        // actually render INTO a float texture (EXT_color_buffer_float) is
+        // a WebGL2 extension, not a spec guarantee -- commonly missing on
+        // older mobile/TV GPU drivers. Drawing into an incomplete
+        // framebuffer is undefined behavior (typically: silently draws
+        // nothing, no error), and nothing here or in Butterchurn
+        // necessarily checks that explicitly. Hooking the actual draw call
+        // entry points tells us both how many draws happen at all, and
+        // whether any of them target an incomplete framebuffer.
+        window.__onwaveDrawStats = { drawCallCount: 0, incompleteFramebufferCount: 0, firstIncompleteStatus: null };
+        const checkDrawTarget = function (gl) {
+          window.__onwaveDrawStats.drawCallCount++;
+          const status = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
+          if (status !== gl.FRAMEBUFFER_COMPLETE) {
+            window.__onwaveDrawStats.incompleteFramebufferCount++;
+            if (window.__onwaveDrawStats.firstIncompleteStatus === null) {
+              window.__onwaveDrawStats.firstIncompleteStatus = status;
+              console.error('[OnWave][shader] draw into incomplete framebuffer, status=' + status);
+              if (window.Sentry) {
+                window.Sentry.captureMessage('[cast-receiver][webgl] incomplete framebuffer on draw', { level: 'error', extra: { status } });
+              }
+            }
+          }
+        };
+        const origDrawArrays = WebGL2RenderingContext.prototype.drawArrays;
+        WebGL2RenderingContext.prototype.drawArrays = function (...args) {
+          checkDrawTarget(this);
+          return origDrawArrays.apply(this, args);
+        };
+        const origDrawElements = WebGL2RenderingContext.prototype.drawElements;
+        WebGL2RenderingContext.prototype.drawElements = function (...args) {
+          checkDrawTarget(this);
+          return origDrawElements.apply(this, args);
+        };
       }
 
       const audioEl = document.getElementById('media');
@@ -398,9 +437,26 @@
                 const p = new Uint8Array(4);
                 gl.readPixels(Math.floor(canvas.width / 2), Math.floor(canvas.height / 2), 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, p);
                 const pixelRGBA = Array.from(p).join(',');
-                console.log('[OnWave][webgl:post-render] boundFramebufferIsDefault=' + !boundFb + ' pixel=' + pixelRGBA);
+                const drawStats = window.__onwaveDrawStats || {};
+                const supportedExtensions = gl.getSupportedExtensions() || [];
+                const floatExtensions = supportedExtensions.filter((e) => /float/i.test(e));
+                console.log(
+                  '[OnWave][webgl:post-render] boundFramebufferIsDefault=' + !boundFb + ' pixel=' + pixelRGBA +
+                  ' drawCalls=' + drawStats.drawCallCount + ' incompleteFramebufferDraws=' + drawStats.incompleteFramebufferCount +
+                  ' floatExtensions=' + floatExtensions.join(',')
+                );
                 if (window.Sentry) {
-                  window.Sentry.captureMessage('[cast-receiver][webgl:post-render]', { level: 'info', extra: { boundFramebufferIsDefault: !boundFb, pixelRGBA } });
+                  window.Sentry.captureMessage('[cast-receiver][webgl:post-render]', {
+                    level: 'info',
+                    extra: {
+                      boundFramebufferIsDefault: !boundFb,
+                      pixelRGBA,
+                      drawCallCount: drawStats.drawCallCount,
+                      incompleteFramebufferCount: drawStats.incompleteFramebufferCount,
+                      firstIncompleteStatus: drawStats.firstIncompleteStatus,
+                      floatExtensions: floatExtensions.join(','),
+                    },
+                  });
                 }
               }
             } catch (e) {
