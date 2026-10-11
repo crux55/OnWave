@@ -5,11 +5,10 @@ import { Loader2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { MOODS, matchMoodFromText, type Mood } from '@/lib/moods';
-import { fetchMoodStations, toPlayerStation } from '@/lib/api';
-import { usePlayer } from '@/contexts/PlayerContext';
+import { MOODS, matchMoodFromText } from '@/lib/moods';
 import { useLikedStations } from '@/hooks/use-liked-stations';
 import { SwipeableStationBrowser } from '@/components/discover/SwipeableStationBrowser';
+import { useMoodRunner } from '@/components/discover/useMoodRunner';
 
 interface MoodPickerProps {
   // asChild-style trigger so callers keep their own button/card look (home
@@ -22,41 +21,23 @@ interface MoodPickerProps {
 // a Mood (lib/moods.ts), which fetches a pooled/shuffled set of stations
 // across that mood's tags and hands them to the same SwipeableStationBrowser
 // already built for Discover's "Browse All" (OnWave#35) — reusing it here is
-// exactly the point, not a second copy of the swipe UI.
+// exactly the point, not a second copy of the swipe UI. The actual fetch ->
+// playQueue -> browser flow lives in useMoodRunner now (shared with
+// Discover's mood tiles, which trigger it without this dialog at all).
 export function MoodPicker({ trigger }: MoodPickerProps) {
-  const player = usePlayer();
   const { isLiked, toggleLike } = useLikedStations();
   const [open, setOpen] = useState(false);
   const [text, setText] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [activeMood, setActiveMood] = useState<Mood | null>(null);
-  const [isBrowserOpen, setIsBrowserOpen] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { runMood, isLoading, activeMood, error, isBrowserOpen, closeBrowser } = useMoodRunner();
 
-  const runMood = async (mood: Mood) => {
-    setActiveMood(mood);
-    setIsLoading(true);
-    setError(null);
-    try {
-      const stations = await fetchMoodStations(mood.tags);
-      if (stations.length === 0) {
-        setError("Couldn't find stations for that vibe — try another.");
-        return;
-      }
-      player.playQueue(stations.map(toPlayerStation));
-      setOpen(false);
-      setIsBrowserOpen(true);
-    } catch {
-      setError('Something went wrong finding stations — try again.');
-    } finally {
-      setIsLoading(false);
-    }
+  const handleMoodClick = async (mood: Parameters<typeof runMood>[0]) => {
+    if (await runMood(mood)) setOpen(false);
   };
 
-  const handleTextSubmit = (e: React.FormEvent) => {
+  const handleTextSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!text.trim() || isLoading) return;
-    runMood(matchMoodFromText(text));
+    if (await runMood(matchMoodFromText(text))) setOpen(false);
   };
 
   return (
@@ -88,7 +69,7 @@ export function MoodPicker({ trigger }: MoodPickerProps) {
               <button
                 key={mood.id}
                 type="button"
-                onClick={() => runMood(mood)}
+                onClick={() => handleMoodClick(mood)}
                 disabled={isLoading}
                 className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card/40 px-3 py-1.5 text-sm font-medium text-foreground transition-colors hover:border-accent disabled:opacity-50"
               >
@@ -110,7 +91,7 @@ export function MoodPicker({ trigger }: MoodPickerProps) {
         <SwipeableStationBrowser
           isLiked={isLiked}
           onToggleLike={toggleLike}
-          onClose={() => setIsBrowserOpen(false)}
+          onClose={closeBrowser}
         />
       )}
     </>

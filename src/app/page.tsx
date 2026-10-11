@@ -1,23 +1,34 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { fetchHomePageSections, fetchDiscoverSection, fetchLikedStations, likedStationToRadioStation, extractPreferredGenres, DISCOVER_GENRES, fetchAllShows } from '@/lib/api';
+import { fetchHomePageSections, fetchDiscoverSection, fetchLikedStations, likedStationToRadioStation, extractPreferredGenres, fetchAllShows } from '@/lib/api';
 import type { RadioStation, InternalShow } from '@/lib/types';
 import { RadioStationCard } from '@/components/RadioStationCard';
 import { InternalShowCard } from '@/components/InternalShowCard';
 import { usePlayer } from '@/contexts/PlayerContext';
 import { useLikedStations } from '@/hooks/use-liked-stations';
-import { RefreshCw, Sparkles, Shuffle, Heart, Play, Flame, Radio, Wand2 } from 'lucide-react';
+import { RefreshCw, Sparkles, Shuffle, Heart, Play, Flame, Radio, Compass, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { SafeImage } from '@/components/SafeImage';
 import { StationAvatar } from '@/components/StationAvatar';
-import { MoodPicker } from '@/components/discover/MoodPicker';
 import { cn, getProxiedFaviconUrl } from '@/lib/utils';
 
 function capitalize(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+// A static read of the local clock at render time -- the rest of this page
+// is already all client-rendered state/effects (liked stations, discover
+// shuffles), so a greeting that's momentarily off by one bucket during
+// hydration is the same harmless, self-correcting mismatch class as
+// everything else here, not a new risk this introduces.
+function getGreeting(): string {
+  const hour = new Date().getHours();
+  if (hour < 12) return 'Good morning';
+  if (hour < 18) return 'Good afternoon';
+  return 'Good evening';
 }
 
 const HOME_CACHE_KEY = 'onwave:home-cache';
@@ -121,6 +132,7 @@ interface StationSectionProps {
   isLoading?: boolean;
   isLiked?: (stationuuid: string) => boolean;
   onToggleLike?: (station: RadioStation) => void;
+  showAllHref?: string;
 }
 
 const StationSection: React.FC<StationSectionProps> = ({
@@ -130,6 +142,7 @@ const StationSection: React.FC<StationSectionProps> = ({
   isLoading = false,
   isLiked,
   onToggleLike,
+  showAllHref,
 }) => {
   const header = (
     <div className="flex items-center justify-between mb-4">
@@ -137,13 +150,20 @@ const StationSection: React.FC<StationSectionProps> = ({
         {Icon && <Icon className="h-5 w-5 text-accent mr-2.5" />}
         <h2 className="font-display text-2xl font-semibold tracking-tight text-foreground">{title}</h2>
       </div>
-      {action}
+      <div className="flex items-center gap-3">
+        {showAllHref && (
+          <Link href={showAllHref} className="text-sm font-medium text-accent hover:underline">
+            Show all
+          </Link>
+        )}
+        {action}
+      </div>
     </div>
   );
 
   if (isLoading) {
     return (
-      <section className="mb-10">
+      <section className="mb-8">
         {header}
         <div className="flex gap-4 overflow-x-hidden">
           {Array.from({ length: 5 }).map((_, i) => (
@@ -156,7 +176,7 @@ const StationSection: React.FC<StationSectionProps> = ({
 
   if (!stations || stations.length === 0) {
     return (
-      <section className="mb-10">
+      <section className="mb-8">
         {header}
         <p className="text-muted-foreground">{emptyMessage}</p>
       </section>
@@ -164,7 +184,7 @@ const StationSection: React.FC<StationSectionProps> = ({
   }
 
   return (
-    <section className="mb-10">
+    <section className="mb-8">
       {header}
       <div className="flex gap-4 overflow-x-auto pb-2 snap-x snap-mandatory [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
         {stations.map(station => (
@@ -345,47 +365,17 @@ export default function HomePage() {
 
   return (
     <div className="container mx-auto">
-      <header className="mb-10 text-center">
-        <h1 className="font-display text-5xl font-bold tracking-tight text-foreground">
-          Tune into something new.
+      <header className="mb-8 flex flex-wrap items-baseline justify-between gap-3">
+        <h1 className="font-display text-3xl font-bold tracking-tight text-foreground">
+          {getGreeting()}.
         </h1>
-        <p className="text-xl text-muted-foreground mt-3 max-w-2xl mx-auto">
-          Curated radio stations, discovered fresh every visit.
-        </p>
+        <Link
+          href="/discover"
+          className="inline-flex items-center gap-1.5 text-sm font-medium text-accent hover:underline"
+        >
+          <Compass className="h-4 w-4" /> Pick a vibe <ArrowRight className="h-3.5 w-3.5" />
+        </Link>
       </header>
-
-      <MoodPicker
-        trigger={
-          <button
-            className="mb-10 flex w-full items-center gap-4 rounded-2xl border border-border/60 bg-card/40 p-5 text-left transition-colors hover:border-accent sm:p-6"
-          >
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-accent/15 text-accent">
-              <Wand2 className="h-5 w-5" />
-            </div>
-            <div className="min-w-0">
-              <p className="font-display text-lg font-semibold text-foreground">What&rsquo;s your vibe?</p>
-              <p className="truncate text-sm text-muted-foreground">
-                Describe a mood — we&rsquo;ll queue up stations to swipe through.
-              </p>
-            </div>
-          </button>
-        }
-      />
-
-      <section className="mb-10">
-        <h2 className="font-display text-2xl font-semibold mb-3 text-foreground">Browse by Genre</h2>
-        <div className="flex flex-wrap gap-2">
-          {DISCOVER_GENRES.map(genre => (
-            <Link
-              key={genre}
-              href={`/search?q=${encodeURIComponent(genre)}`}
-              className="inline-block rounded-full border border-border bg-card/40 px-3 py-1 text-sm font-medium capitalize text-foreground"
-            >
-              {genre}
-            </Link>
-          ))}
-        </div>
-      </section>
 
       {!isLoading && heroStation && (
         <HeroCard station={heroStation} onPlay={handlePlayStation} isLiked={isLiked(heroStation.stationuuid)} onToggleLike={toggleLike} />
@@ -393,7 +383,7 @@ export default function HomePage() {
       {isLoading && <Skeleton className="mb-12 h-[200px] w-full rounded-2xl sm:h-[260px]" />}
 
       {liveShows.length > 0 && (
-        <section className="mb-10">
+        <section className="mb-8">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="font-display text-2xl font-semibold text-foreground flex items-center gap-2">
               <Radio className="h-5 w-5 text-red-500" /> Live Now
@@ -419,6 +409,7 @@ export default function HomePage() {
         isLiked={isLiked}
         onToggleLike={toggleLike}
         emptyMessage="No featured stations available right now."
+        showAllHref={featuredGenre ? `/search?q=${encodeURIComponent(featuredGenre)}` : undefined}
       />
 
       {likedStations.length > 0 ? (
@@ -430,6 +421,7 @@ export default function HomePage() {
           isLoading={isLoading}
           isLiked={isLiked}
           onToggleLike={toggleLike}
+          showAllHref="/liked"
         />
       ) : (
         // No likes yet — this slot shouldn't just be empty. Substitute
