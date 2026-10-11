@@ -378,7 +378,7 @@ export default function HomePage() {
           {DISCOVER_GENRES.map(genre => (
             <Link
               key={genre}
-              href={`/search?search=${encodeURIComponent(genre)}`}
+              href={`/search?q=${encodeURIComponent(genre)}`}
               className="inline-block rounded-full border border-border bg-card/40 px-3 py-1 text-sm font-medium capitalize text-foreground"
             >
               {genre}
