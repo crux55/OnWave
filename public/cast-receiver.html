@@ -400,6 +400,12 @@
       let audioContext = null;
       let analyser = null;
       let mediaSource = null;
+      // True when mediaSource came from captureStream() (see ensureAudioGraph)
+      // rather than createMediaElementSource() -- changes whether the
+      // connectAudio() call site below also needs to wire sound back to
+      // destination itself, since only one of those two APIs silences the
+      // element's own native output as a side effect.
+      let usingCaptureStream = false;
       let butterchurnLib = null;
       let visualizer = null;
       let presets = null;
@@ -413,13 +419,49 @@
         if (mediaSource) return mediaSource; // already created -- can't do this twice
         const AudioContextClass = window.AudioContext || window.webkitAudioContext;
         audioContext = new AudioContextClass();
+
+        // Prefer captureStream() over createMediaElementSource(): both are
+        // meant to tap the same playing audio, but confirmed live (same
+        // origin, zero other consumers, raw getByteTimeDomainData bytes
+        // checked directly) that createMediaElementSource delivers flat
+        // silence to every downstream WebAudio node on this specific
+        // Chrome 92 / CrKey build, while the element itself keeps playing
+        // completely normal audio through its own native decode path --
+        // i.e. the bug is in createMediaElementSource's tap itself, not in
+        // how anything downstream of it is wired (already ruled that out
+        // across many earlier attempts). captureStream() takes a
+        // completely separate internal code path (designed for screen/media
+        // recording, not Web Audio routing) that doesn't share whatever
+        // internal plumbing createMediaElementSource relies on here, so
+        // it's a genuinely different thing to try, not another variation
+        // on the same theory. It also never silences the element's native
+        // output in the first place (createMediaElementSource does, which
+        // is why the old code had to explicitly reconnect Butterchurn's
+        // analyser to destination -- see the connectAudio() call site).
+        if (typeof audioEl.captureStream === 'function') {
+          try {
+            const captured = audioEl.captureStream();
+            if (captured.getAudioTracks().length > 0) {
+              mediaSource = audioContext.createMediaStreamSource(captured);
+              usingCaptureStream = true;
+              console.log('[OnWave] audio graph created via captureStream(), AudioContext state:', audioContext.state);
+              return mediaSource;
+            }
+            console.warn('[OnWave] captureStream() returned no audio tracks, falling back to createMediaElementSource');
+          } catch (e) {
+            console.warn('[OnWave] captureStream() threw, falling back to createMediaElementSource:', e);
+          }
+        } else {
+          console.log('[OnWave] captureStream() not supported on this device, using createMediaElementSource');
+        }
+
         mediaSource = audioContext.createMediaElementSource(audioEl);
         // No separate analyser/destination wiring here anymore -- see the
         // big comment at the connectAudio() call site for why. mediaSource
         // gets exactly ONE downstream connection (Butterchurn's own node),
         // and actual sound output is completed through Butterchurn's own
         // analyser further down that same single chain.
-        console.log('[OnWave] audio graph created, AudioContext state:', audioContext.state);
+        console.log('[OnWave] audio graph created via createMediaElementSource, AudioContext state:', audioContext.state);
         return mediaSource;
       }
 
@@ -528,7 +570,7 @@
                 // the production chain.
 
                 console.log(
-                  '[OnWave][webgl:post-render] boundFramebufferIsDefault=' + !boundFb + ' pixel=' + pixelRGBA +
+                  '[OnWave][webgl:post-render] usingCaptureStream=' + usingCaptureStream + ' boundFramebufferIsDefault=' + !boundFb + ' pixel=' + pixelRGBA +
                   ' drawCalls=' + drawStats.drawCallCount + ' incompleteFramebufferDraws=' + drawStats.incompleteFramebufferCount +
                   ' floatExtensions=' + floatExtensions.join(',') +
                   ' butterchurnAudioMax=' + butterchurnAudioMax + ' butterchurnFreqArrayLength=' + butterchurnFreqArrayLength +
@@ -538,6 +580,7 @@
                   window.Sentry.captureMessage('[cast-receiver][webgl:post-render]', {
                     level: 'info',
                     extra: {
+                      usingCaptureStream,
                       boundFramebufferIsDefault: !boundFb,
                       pixelRGBA,
                       drawCallCount: drawStats.drawCallCount,
@@ -739,31 +782,35 @@
           logWebglDiagnostics('on-create');
           setTimeout(() => logWebglDiagnostics('2s-into-render'), 2000);
 
-          // THE REAL FIX: a strict serial chain, no fan-out anywhere.
-          // Every earlier attempt (our own analyser, Butterchurn's via
-          // connectAudio(analyser), connectAudio(mediaSource) alone, a
-          // throwaway DelayNode, a GainNode swap-in) failed identically:
-          // the ONLY connection that ever delivered real sample data, in
-          // every single test, was the first (and only) .connect()
-          // destination of mediaSource. The moment mediaSource had a
-          // SECOND consumer -- any node, any type -- that second branch
-          // read flat silence, confirmed down to raw getByteTimeDomainData
-          // bytes sitting dead at the unsigned-zero value. This old
-          // Chromium build (Chrome 92 / CrKey) appears to only tick/deliver
-          // samples to a source's first downstream consumer.
+          // mediaSource gets exactly ONE downstream connection, ever:
+          // straight into Butterchurn's own internal node (this.audible,
+          // via connectAudio) -- a leftover precaution from the
+          // single-consumer-only fan-out theory (see git history), kept
+          // because it's still correct, just not the whole story: re-tested
+          // with mediaSource having that one and only connection and
+          // Butterchurn's internal analyser STILL read flat silence
+          // (confirmed via raw getByteTimeDomainData bytes, not just
+          // Butterchurn's own processed output), even though the element
+          // itself kept playing normal audio throughout. So the actual bug
+          // is createMediaElementSource()'s tap itself on this device, not
+          // which or how many consumers sit downstream of it -- which is
+          // why ensureAudioGraph() now prefers captureStream() instead,
+          // a different internal code path for tapping the same audio.
           //
-          // So mediaSource now gets exactly ONE connection, ever: straight
-          // into Butterchurn's own internal node (this.audible, via
-          // connectAudio). Sound only reaches the speakers because we
-          // complete that SAME chain ourselves below, by connecting
+          // createMediaElementSource() silences the element's OWN native
+          // output as a side effect (rerouting it through this graph
+          // instead) -- sound only reaches the speakers because we
+          // complete that same chain ourselves here, connecting
           // Butterchurn's own (pass-through, signal-preserving) analyser
-          // onward to destination -- mediaSource -> this.audible ->
-          // this.audio.analyser -> destination, a single unbroken line.
-          // We no longer keep a separate analyser of our own at all (it
-          // would just be another dead second branch off mediaSource).
+          // onward to destination. captureStream() has no such side effect
+          // -- the element keeps playing natively on its own the whole
+          // time, so reconnecting to destination here would double up the
+          // audio rather than restore it.
           visualizer.connectAudio(mediaSource);
-          visualizer.audio.analyser.connect(audioContext.destination);
-          console.log('[OnWave] connectAudio() called; audio chained mediaSource -> Butterchurn -> destination');
+          if (!usingCaptureStream) {
+            visualizer.audio.analyser.connect(audioContext.destination);
+          }
+          console.log('[OnWave] connectAudio() called (usingCaptureStream=' + usingCaptureStream + ')');
 
           if (!presets) {
             presets = butterchurnPresets.getPresets();
