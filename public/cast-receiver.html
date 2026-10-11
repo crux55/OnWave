@@ -440,10 +440,35 @@
                 const drawStats = window.__onwaveDrawStats || {};
                 const supportedExtensions = gl.getSupportedExtensions() || [];
                 const floatExtensions = supportedExtensions.filter((e) => /float/i.test(e));
+
+                // connectAudio(analyser) does NOT read data from the node
+                // we pass it -- reading its actual source confirmed it just
+                // does `analyser.connect(this.audible)`, routing audio INTO
+                // Butterchurn's own internally-created analyser nodes
+                // (this.audio.analyser/analyserL/analyserR). Every audio
+                // check so far sampled OUR OWN separate analyser -- never
+                // confirmed Butterchurn's own internal one, which is what
+                // its shaders actually react to, is getting anything at
+                // all. visualizer.audio is a real accessible property
+                // (confirmed in its source) populated by its own
+                // sampleAudio() call on every render().
+                let butterchurnAudioMax = null;
+                let butterchurnFreqArrayLength = null;
+                if (visualizer.audio && visualizer.audio.freqArray) {
+                  const freq = visualizer.audio.freqArray;
+                  butterchurnFreqArrayLength = freq.length;
+                  butterchurnAudioMax = 0;
+                  for (var fi = 0; fi < freq.length; fi++) {
+                    const av = Math.abs(freq[fi]);
+                    if (av > butterchurnAudioMax) butterchurnAudioMax = av;
+                  }
+                }
+
                 console.log(
                   '[OnWave][webgl:post-render] boundFramebufferIsDefault=' + !boundFb + ' pixel=' + pixelRGBA +
                   ' drawCalls=' + drawStats.drawCallCount + ' incompleteFramebufferDraws=' + drawStats.incompleteFramebufferCount +
-                  ' floatExtensions=' + floatExtensions.join(',')
+                  ' floatExtensions=' + floatExtensions.join(',') +
+                  ' butterchurnAudioMax=' + butterchurnAudioMax + ' butterchurnFreqArrayLength=' + butterchurnFreqArrayLength
                 );
                 if (window.Sentry) {
                   window.Sentry.captureMessage('[cast-receiver][webgl:post-render]', {
@@ -455,6 +480,8 @@
                       incompleteFramebufferCount: drawStats.incompleteFramebufferCount,
                       firstIncompleteStatus: drawStats.firstIncompleteStatus,
                       floatExtensions: floatExtensions.join(','),
+                      butterchurnAudioMax,
+                      butterchurnFreqArrayLength,
                     },
                   });
                 }
