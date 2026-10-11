@@ -489,12 +489,41 @@
                   }
                 }
 
+                // Isolation test: our OWN directly-branching analyser (above)
+                // gets real audio every time, while Butterchurn's -- which
+                // routes through its own DelayNode (this.audible) first --
+                // never does, from the exact same upstream source. Wiring
+                // up a throwaway DelayNode the same way, completely outside
+                // Butterchurn's own code, tells us directly whether a
+                // DelayNode's output carries signal AT ALL on this device,
+                // or whether it's specifically something about how
+                // Butterchurn uses one (e.g. fanning its output to two
+                // destinations at once).
+                let delayTestMaxDeviation = null;
+                try {
+                  const testDelay = audioContext.createDelay();
+                  const testAnalyser = audioContext.createAnalyser();
+                  mediaSource.connect(testDelay);
+                  testDelay.connect(testAnalyser);
+                  const testBytes = new Uint8Array(testAnalyser.fftSize);
+                  testAnalyser.getByteTimeDomainData(testBytes);
+                  delayTestMaxDeviation = 0;
+                  for (var di = 0; di < testBytes.length; di++) {
+                    const dev = Math.abs(testBytes[di] - 128);
+                    if (dev > delayTestMaxDeviation) delayTestMaxDeviation = dev;
+                  }
+                  mediaSource.disconnect(testDelay);
+                } catch (e) {
+                  console.warn('[OnWave][webgl:post-render] delay isolation test threw:', e);
+                }
+
                 console.log(
                   '[OnWave][webgl:post-render] boundFramebufferIsDefault=' + !boundFb + ' pixel=' + pixelRGBA +
                   ' drawCalls=' + drawStats.drawCallCount + ' incompleteFramebufferDraws=' + drawStats.incompleteFramebufferCount +
                   ' floatExtensions=' + floatExtensions.join(',') +
                   ' butterchurnAudioMax=' + butterchurnAudioMax + ' butterchurnFreqArrayLength=' + butterchurnFreqArrayLength +
-                  ' butterchurnRawMaxDeviation=' + butterchurnRawMaxDeviation
+                  ' butterchurnRawMaxDeviation=' + butterchurnRawMaxDeviation +
+                  ' delayTestMaxDeviation=' + delayTestMaxDeviation
                 );
                 if (window.Sentry) {
                   window.Sentry.captureMessage('[cast-receiver][webgl:post-render]', {
@@ -509,6 +538,7 @@
                       butterchurnAudioMax,
                       butterchurnFreqArrayLength,
                       butterchurnRawMaxDeviation,
+                      delayTestMaxDeviation,
                     },
                   });
                 }
