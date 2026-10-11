@@ -539,13 +539,44 @@
                   console.warn('[OnWave][webgl:post-render] delay isolation test threw:', e);
                 }
 
+                // The createDelay->GainNode fix made no difference at all
+                // -- even our own isolated test (now effectively a
+                // GainNode) still reads flat silence. Every connection
+                // that's ever shown real data has been the FIRST (and
+                // only) .connect() destination of its upstream node (our
+                // main analyser, directly off mediaSource); every
+                // connection added as a SECOND branch off any node --
+                // through a delay, a gain, anything -- has read flat
+                // silence. This tests that directly: a second analyser
+                // connected straight off mediaSource, no intermediate node
+                // at all, just a second fan-out destination. If this also
+                // reads flat, the bug is fan-out itself (only the first
+                // connect() destination actually delivers data on this
+                // platform), not anything about intermediate node types.
+                let secondFanoutMaxDeviation = null;
+                try {
+                  const testAnalyser2 = audioContext.createAnalyser();
+                  mediaSource.connect(testAnalyser2);
+                  const testBytes2 = new Uint8Array(testAnalyser2.fftSize);
+                  testAnalyser2.getByteTimeDomainData(testBytes2);
+                  secondFanoutMaxDeviation = 0;
+                  for (var di2 = 0; di2 < testBytes2.length; di2++) {
+                    const dev2 = Math.abs(testBytes2[di2] - 128);
+                    if (dev2 > secondFanoutMaxDeviation) secondFanoutMaxDeviation = dev2;
+                  }
+                  mediaSource.disconnect(testAnalyser2);
+                } catch (e) {
+                  console.warn('[OnWave][webgl:post-render] second-fanout isolation test threw:', e);
+                }
+
                 console.log(
                   '[OnWave][webgl:post-render] boundFramebufferIsDefault=' + !boundFb + ' pixel=' + pixelRGBA +
                   ' drawCalls=' + drawStats.drawCallCount + ' incompleteFramebufferDraws=' + drawStats.incompleteFramebufferCount +
                   ' floatExtensions=' + floatExtensions.join(',') +
                   ' butterchurnAudioMax=' + butterchurnAudioMax + ' butterchurnFreqArrayLength=' + butterchurnFreqArrayLength +
                   ' butterchurnRawMaxDeviation=' + butterchurnRawMaxDeviation +
-                  ' delayTestMaxDeviation=' + delayTestMaxDeviation
+                  ' delayTestMaxDeviation=' + delayTestMaxDeviation +
+                  ' secondFanoutMaxDeviation=' + secondFanoutMaxDeviation
                 );
                 if (window.Sentry) {
                   window.Sentry.captureMessage('[cast-receiver][webgl:post-render]', {
@@ -557,6 +588,7 @@
                       incompleteFramebufferCount: drawStats.incompleteFramebufferCount,
                       firstIncompleteStatus: drawStats.firstIncompleteStatus,
                       floatExtensions: floatExtensions.join(','),
+                      secondFanoutMaxDeviation,
                       butterchurnAudioMax,
                       butterchurnFreqArrayLength,
                       butterchurnRawMaxDeviation,
