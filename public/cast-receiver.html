@@ -344,6 +344,7 @@
       let presetNames = null;
       let presetCycleIndex = 0;
       let renderLoopActive = false;
+      let hasLoggedPostRenderSample = false;
       const AUTO_CYCLE_MS = 30000;
 
       function ensureAudioGraph() {
@@ -379,6 +380,33 @@
         (function renderLoop() {
           if (!visualizer) { renderLoopActive = false; return; } // torn down (context lost) -- stop cleanly
           visualizer.render();
+          // One-off, right after a real render() call: shaders compile/link
+          // fine and a manual clear-to-green round-trips correctly, yet the
+          // visible canvas is still solid black -- so check what's actually
+          // bound immediately after render() returns, WITHOUT forcing it
+          // back to the default framebuffer first. If Butterchurn's
+          // multi-pass pipeline (blur/echo use several of its own
+          // offscreen framebuffers) never blits its final result back to
+          // the default one, the real colorful content could be sitting in
+          // whatever's bound right here instead of what's on screen.
+          if (!hasLoggedPostRenderSample) {
+            hasLoggedPostRenderSample = true;
+            try {
+              const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
+              if (gl) {
+                const boundFb = gl.getParameter(gl.FRAMEBUFFER_BINDING);
+                const p = new Uint8Array(4);
+                gl.readPixels(Math.floor(canvas.width / 2), Math.floor(canvas.height / 2), 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, p);
+                const pixelRGBA = Array.from(p).join(',');
+                console.log('[OnWave][webgl:post-render] boundFramebufferIsDefault=' + !boundFb + ' pixel=' + pixelRGBA);
+                if (window.Sentry) {
+                  window.Sentry.captureMessage('[cast-receiver][webgl:post-render]', { level: 'info', extra: { boundFramebufferIsDefault: !boundFb, pixelRGBA } });
+                }
+              }
+            } catch (e) {
+              console.warn('[OnWave][webgl:post-render] threw:', e);
+            }
+          }
           requestAnimationFrame(renderLoop);
         })();
       }
