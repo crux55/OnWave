@@ -391,14 +391,25 @@
           // programs failing to compile/link (which gl.getError() doesn't
           // report) on this device's WebGL2 driver.
           if (reasonTag === 'on-create') {
+            // Explicit, since clear()/readPixels() both act on whichever
+            // framebuffer is CURRENTLY BOUND, not necessarily the one that
+            // ends up on screen -- Butterchurn uses several of its own
+            // offscreen framebuffers internally (prevFrameBuffer,
+            // targetFrameBuffer, blur passes, etc. -- confirmed reading its
+            // actual source) for blur/echo effects, and whatever its own
+            // init left bound at this point is not guaranteed to be the
+            // default (on-screen) one. null is the default framebuffer.
+            gl.bindFramebuffer(gl.FRAMEBUFFER, null);
             gl.clearColor(0, 1, 0, 1);
             gl.clear(gl.COLOR_BUFFER_BIT);
+            const smokeTestClearError = gl.getError();
             const smokeTestPixel = new Uint8Array(4);
             gl.readPixels(Math.floor(canvas.width / 2), Math.floor(canvas.height / 2), 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, smokeTestPixel);
+            const smokeTestReadError = gl.getError();
             const smokeTestRGBA = Array.from(smokeTestPixel).join(',');
-            console.log('[OnWave][webgl:smoke-test] cleared to solid green, readback =', smokeTestRGBA);
+            console.log('[OnWave][webgl:smoke-test] cleared to solid green, readback =', smokeTestRGBA, 'clearError=' + smokeTestClearError, 'readError=' + smokeTestReadError);
             if (window.Sentry) {
-              window.Sentry.captureMessage('[cast-receiver][webgl:smoke-test]', { level: 'info', extra: { smokeTestRGBA } });
+              window.Sentry.captureMessage('[cast-receiver][webgl:smoke-test]', { level: 'info', extra: { smokeTestRGBA, smokeTestClearError, smokeTestReadError } });
             }
           }
 
