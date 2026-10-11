@@ -84,6 +84,46 @@
         });
       }
 
+      // Confirmed live: basic WebGL2-to-screen compositing works fine on
+      // this device (a manual clear-to-green round-tripped correctly),
+      // while Butterchurn's own render() calls produce nothing but black
+      // across the whole frame -- real audio, healthy context, zero
+      // gl.getError(). That narrows it to Butterchurn's own shader
+      // programs specifically, and WebGL never reports a shader compile or
+      // program link failure through getError() at all (needs the
+      // dedicated COMPILE_STATUS/LINK_STATUS checks neither this page nor,
+      // possibly, Butterchurn's own code does defensively). Patching the
+      // prototype (not a specific context instance, since Butterchurn
+      // creates its own internally and we never get a handle to it before
+      // it's already in use) catches every compile/link call regardless of
+      // which context it's on, and runs before Butterchurn's first use.
+      if (typeof WebGL2RenderingContext !== 'undefined') {
+        const origCompileShader = WebGL2RenderingContext.prototype.compileShader;
+        WebGL2RenderingContext.prototype.compileShader = function (shader) {
+          const result = origCompileShader.call(this, shader);
+          if (!this.getShaderParameter(shader, this.COMPILE_STATUS)) {
+            const log = this.getShaderInfoLog(shader);
+            console.error('[OnWave][shader] compile failed:', log);
+            if (window.Sentry) {
+              window.Sentry.captureMessage('[cast-receiver][shader] compile failed', { level: 'error', extra: { log } });
+            }
+          }
+          return result;
+        };
+        const origLinkProgram = WebGL2RenderingContext.prototype.linkProgram;
+        WebGL2RenderingContext.prototype.linkProgram = function (program) {
+          const result = origLinkProgram.call(this, program);
+          if (!this.getProgramParameter(program, this.LINK_STATUS)) {
+            const log = this.getProgramInfoLog(program);
+            console.error('[OnWave][shader] link failed:', log);
+            if (window.Sentry) {
+              window.Sentry.captureMessage('[cast-receiver][shader] link failed', { level: 'error', extra: { log } });
+            }
+          }
+          return result;
+        };
+      }
+
       const audioEl = document.getElementById('media');
       const canvas = document.getElementById('visualizer');
       const titleOverlay = document.getElementById('title-overlay');
