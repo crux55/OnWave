@@ -192,12 +192,43 @@
       const stationGenreEl = document.getElementById('station-genre');
 
       let hideTitleTimeout = null;
+      let currentTitle = '';
+      let currentGenre = '';
+      // Set once a device is confirmed to lack WebGL2 (Butterchurn has no
+      // fallback for that -- see canvasSupportsWebGL2 below). With no
+      // visualizer to look at, the title card should stay up permanently
+      // instead of auto-hiding into a blank dark screen.
+      let visualizerUnavailable = false;
       function showTitle(title, genre) {
-        stationNameEl.textContent = title || 'OnWave';
-        stationGenreEl.textContent = genre || '';
+        currentTitle = title || 'OnWave';
+        currentGenre = genre || '';
+        stationNameEl.textContent = currentTitle;
+        stationGenreEl.textContent = currentGenre;
         titleOverlay.classList.add('visible');
         if (hideTitleTimeout) clearTimeout(hideTitleTimeout);
+        if (visualizerUnavailable) return;
         hideTitleTimeout = setTimeout(() => titleOverlay.classList.remove('visible'), 5000);
+      }
+
+      // Butterchurn 2.6.7 unconditionally calls canvas.getContext('webgl2',
+      // {...}) with no null check and no WebGL1 fallback (confirmed by
+      // reading its source) -- on a device that genuinely has no WebGL2
+      // support, that call returns null and Butterchurn crashes immediately
+      // trying to use it ("Cannot read property 'createFramebuffer' of
+      // null", confirmed live on a second cast device after the Shield TV's
+      // own separate silent-audio bug). Checking capability first, with the
+      // EXACT same context attributes Butterchurn itself requests, lets a
+      // real failure be handled gracefully (audio-only) instead of crashing
+      // -- and costs nothing when it succeeds, since a canvas's first
+      // getContext() call for a given type is the one whose attributes
+      // stick; Butterchurn's own subsequent call with matching attributes
+      // just reuses this same context rather than creating a second one.
+      function canvasSupportsWebGL2(testCanvas) {
+        try {
+          return !!testCanvas.getContext('webgl2', { alpha: false, antialias: false, depth: false, stencil: false, premultipliedAlpha: false });
+        } catch (e) {
+          return false;
+        }
       }
 
       // On-screen error text is a fallback for when nobody has DevTools
@@ -738,6 +769,10 @@
       // brings the visualizer up at all if it never managed to the first
       // time.
       function initOrRecoverVisualizer() {
+        // Known permanently unsupported (no WebGL2) -- nothing changes that
+        // on retry, so skip re-checking/re-logging every time something
+        // (context loss recovery, a later LOAD) calls this again.
+        if (visualizerUnavailable) return;
         console.log('[OnWave] initOrRecoverVisualizer() starting');
         try {
           if (typeof butterchurn === 'undefined' || typeof butterchurnPresets === 'undefined') {
@@ -752,6 +787,16 @@
           canvas.width = window.innerWidth * pixelRatio;
           canvas.height = window.innerHeight * pixelRatio;
           console.log('[OnWave] canvas size:', canvas.width, 'x', canvas.height, 'innerWidth/Height:', window.innerWidth, window.innerHeight);
+
+          if (!canvasSupportsWebGL2(canvas)) {
+            console.warn('[OnWave] WebGL2 not supported on this device -- skipping visualizer, audio-only');
+            if (window.Sentry) {
+              window.Sentry.captureMessage('[cast-receiver] WebGL2 unsupported, visualizer skipped (audio-only)', { level: 'info' });
+            }
+            visualizerUnavailable = true;
+            showTitle(currentTitle, currentGenre); // re-pin the title card now that it won't auto-hide
+            return;
+          }
 
           // Reverted a "force WebGL1" experiment that lived here briefly --
           // confirmed by reading Butterchurn 2.6.7's actual source
