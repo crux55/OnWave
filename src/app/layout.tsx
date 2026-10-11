@@ -4,12 +4,13 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Home, Search, UserCircle2, ListMusic, Bell, Radio, CalendarDays } from 'lucide-react';
 import { Sora, Manrope } from 'next/font/google';
-import React from 'react';
+import React, { Suspense } from 'react';
 
 import './globals.css';
 import { AppLogo } from '@/components/AppLogo';
+import { AppSidebar } from '@/components/AppSidebar';
+import { TopBarSearch } from '@/components/TopBarSearch';
 import { UserAvatar } from '@/components/UserAvatar';
-import { Button } from '@/components/ui/button';
 import { RadioPlayer } from '@/components/RadioPlayer';
 import { MaximizedPlayerDialog } from '@/components/MaximizedPlayerDialog';
 import { PlayerProvider, usePlayer } from '@/contexts/PlayerContext';
@@ -98,56 +99,54 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
   const isLiveMiniPlayerVisible = !!listener.room && !!listener.currentShowId && pathname !== `/shows/${listener.currentShowId}`;
 
   return (
-      <div className="flex flex-col min-h-screen">
-      <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b bg-background px-4 sm:px-6">
-        <div className="flex items-center gap-4">
-          <Link href="/" aria-label="OnWave home">
-            <AppLogo iconOnly={false} />
+    <div className="flex min-h-screen">
+      <AppSidebar />
+
+      <div className="flex min-w-0 flex-1 flex-col">
+        <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b bg-background/80 px-4 backdrop-blur sm:px-6">
+          {/* Sidebar is sm+ only (AppSidebar.tsx) -- below that there's no
+              other way to get home or to the account menu, so the top bar
+              carries both on mobile only. */}
+          <Link href="/" aria-label="OnWave home" className="shrink-0 sm:hidden">
+            <AppLogo iconOnly />
           </Link>
-        </div>
-        <nav className="hidden sm:flex items-center gap-1 rounded-full border border-border bg-card/40 p-1">
-          {navItems.map((item) => (
-            <Button
-              key={item.href}
-              variant={pathname === item.href ? 'secondary' : 'ghost'}
-              asChild
-              className="rounded-full text-sm"
-            >
-              <Link href={item.href}>
-                <item.icon className="mr-2 h-4 w-4" />
-                {item.label}
-              </Link>
-            </Button>
-          ))}
-        </nav>
-        <div className="flex items-center gap-4">
-          <UserAvatar />
-        </div>
-      </header>
+          {/* flex-1 goes on TopBarSearch's own className, not a wrapper --
+              Suspense renders no DOM node of its own, so TopBarSearch's
+              <form> is the actual flex item here. */}
+          <Suspense fallback={<div className="h-10 max-w-xl flex-1 rounded-full bg-secondary/40" />}>
+            <TopBarSearch className="max-w-xl flex-1" />
+          </Suspense>
+          <div className="ml-auto shrink-0 sm:hidden">
+            <UserAvatar />
+          </div>
+        </header>
+
+        <main
+          className={cn(
+            "flex-1 overflow-y-auto p-4 md:p-6 lg:p-8",
+            // Desktop only (mutually-exclusive so exactly one `sm:!pb-*`
+            // class is ever present — two conflicting `!important` classes
+            // at the same breakpoint would leave the winner up to Tailwind's
+            // build-order, not this ternary). The fixed player bar overlays
+            // content instead of pushing it, so without this the bottom of
+            // the page is unreachable behind it. Mobile's own bottom-of-screen
+            // UI is a single dock (MobileBottomDock) that reports its true
+            // rendered height below instead of guessing an offset here.
+            isLiveMiniPlayerVisible
+              ? "sm:!pb-16"
+              : player.isPlayerBarOpen && !player.isMaximizedViewOpen && !player.isPlayerMinimized
+                ? "sm:!pb-24"
+                : "sm:!pb-4 md:!pb-6 lg:!pb-8"
+          )}
+          style={{ paddingBottom: dock.totalHeight }}
+        >
+          <div className="mx-auto w-full max-w-7xl">
+            {children}
+          </div>
+        </main>
+      </div>
 
       <MobileBottomDock navItems={navItems} />
-
-      <main
-        className={cn(
-          "flex-1 overflow-y-auto p-4 md:p-6 lg:p-8",
-          // Desktop only (mutually-exclusive so exactly one `sm:!pb-*`
-          // class is ever present — two conflicting `!important` classes
-          // at the same breakpoint would leave the winner up to Tailwind's
-          // build-order, not this ternary). The fixed player bar overlays
-          // content instead of pushing it, so without this the bottom of
-          // the page is unreachable behind it. Mobile's own bottom-of-screen
-          // UI is a single dock (MobileBottomDock) that reports its true
-          // rendered height below instead of guessing an offset here.
-          isLiveMiniPlayerVisible
-            ? "sm:!pb-16"
-            : player.isPlayerBarOpen && !player.isMaximizedViewOpen && !player.isPlayerMinimized
-              ? "sm:!pb-24"
-              : "sm:!pb-4 md:!pb-6 lg:!pb-8"
-        )}
-        style={{ paddingBottom: dock.totalHeight }}
-      >
-        {children}
-      </main>
 
       {/* Radio Player */}
       {player.isPlayerBarOpen && player.currentStation && (
@@ -156,7 +155,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
           className={player.isMaximizedViewOpen ? "invisible pointer-events-none" : undefined}
         />
       )}
-      
+
       {player.isPlayerBarOpen && player.currentStation && player.isMaximizedViewOpen && (
         <MaximizedPlayerDialog station={player.currentStation} />
       )}

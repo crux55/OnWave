@@ -11,6 +11,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { fetchCurrentUserProfile } from '@/lib/api';
 import type { Token } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
 
 interface User {
   id: string;
@@ -19,7 +20,7 @@ interface User {
   photoURL?: string;
 }
 
-export function UserAvatar() {
+export function UserAvatar({ inSidebar = false }: { inSidebar?: boolean } = {}) {
   const router = useRouter();
   const { toast } = useToast();
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -105,13 +106,13 @@ export function UserAvatar() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center gap-3 p-2 h-[56px] w-[150px]">
+      <div className={cn("flex items-center gap-3 p-2 h-[56px]", inSidebar ? "w-full" : "w-[150px]")}>
         <Avatar className="h-10 w-10 border-2 border-accent">
           <AvatarFallback>
             <UserCircle2 className="h-8 w-8 text-muted-foreground animate-pulse" />
           </AvatarFallback>
         </Avatar>
-        <div className="space-y-1">
+        <div className={cn('space-y-1', inSidebar && 'hidden lg:block')}>
             <div className="h-4 w-16 bg-muted rounded animate-pulse"></div>
             <div className="h-3 w-12 bg-muted rounded animate-pulse"></div>
         </div>
@@ -130,7 +131,7 @@ export function UserAvatar() {
                 {currentUser.displayName ? currentUser.displayName.charAt(0).toUpperCase() : <UserCircle2 className="h-8 w-8 text-muted-foreground" />}
               </AvatarFallback>
             </Avatar>
-            <div className="text-left">
+            <div className={cn('text-left min-w-0', inSidebar && 'hidden lg:block')}>
               <p className="text-sm font-semibold text-foreground truncate max-w-[100px] sm:max-w-[150px]">
                 {currentUser.displayName || 'User'}
               </p>
@@ -140,7 +141,7 @@ export function UserAvatar() {
             </div>
           </button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
+        <DropdownMenuContent align={inSidebar ? 'start' : 'end'} side={inSidebar ? 'top' : 'bottom'}>
           <DropdownMenuItem onSelect={() => router.push('/profile')}>
             <UserCircle2 className="mr-2 h-4 w-4" /> View Profile
           </DropdownMenuItem>
@@ -164,7 +165,7 @@ export function UserAvatar() {
           <UserCircle2 className="h-8 w-8 text-muted-foreground" />
         </AvatarFallback>
       </Avatar>
-      <div>
+      <div className={cn(inSidebar && 'hidden lg:block')}>
         <p className="text-sm font-semibold text-foreground">Sign In</p>
         <p className="text-xs text-muted-foreground">Access your account</p>
       </div>
