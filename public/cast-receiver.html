@@ -369,10 +369,28 @@
           const centerPixelRGBA = Array.from(pixel).join(',');
           console.log('[OnWave][webgl:' + reasonTag + '] center pixel RGBA =', centerPixelRGBA);
 
+          // A healthy context drawing nothing but black is exactly what a
+          // visualizer fed silence looks like -- some old Chromium builds
+          // (this is Chrome 92, on a 2021-vintage CrKey receiver) have had
+          // bugs where createMediaElementSource() delivers all-zero sample
+          // data even though the <audio> element itself plays completely
+          // normally through a separate native decode path. Sampling the
+          // analyser directly settles whether that's actually happening
+          // here, independent of what a single sampled pixel shows.
+          let analyserMaxByte = null;
+          let analyserNonZeroBins = null;
+          if (analyser) {
+            const freqData = new Uint8Array(analyser.frequencyBinCount);
+            analyser.getByteFrequencyData(freqData);
+            analyserMaxByte = Math.max(0, ...freqData);
+            analyserNonZeroBins = freqData.reduce((count, v) => count + (v > 0 ? 1 : 0), 0);
+            console.log('[OnWave][webgl:' + reasonTag + '] analyser maxByte=' + analyserMaxByte + ' nonZeroBins=' + analyserNonZeroBins + '/' + freqData.length);
+          }
+
           if (window.Sentry) {
             window.Sentry.captureMessage('[cast-receiver][webgl:' + reasonTag + ']', {
               level: 'info',
-              extra: { renderer, vendor, version, contextLost, glError, centerPixelRGBA, canvasWidth: canvas.width, canvasHeight: canvas.height },
+              extra: { renderer, vendor, version, contextLost, glError, centerPixelRGBA, canvasWidth: canvas.width, canvasHeight: canvas.height, analyserMaxByte, analyserNonZeroBins },
             });
           }
         } catch (e) {
