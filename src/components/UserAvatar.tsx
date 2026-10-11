@@ -20,7 +20,7 @@ interface User {
   photoURL?: string;
 }
 
-export function UserAvatar({ inSidebar = false }: { inSidebar?: boolean } = {}) {
+export function UserAvatar({ inSidebar = false, compact = false }: { inSidebar?: boolean; compact?: boolean } = {}) {
   const router = useRouter();
   const { toast } = useToast();
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -106,16 +106,18 @@ export function UserAvatar({ inSidebar = false }: { inSidebar?: boolean } = {}) 
 
   if (isLoading) {
     return (
-      <div className={cn("flex items-center gap-3 p-2 h-[56px]", inSidebar ? "w-full" : "w-[150px]")}>
+      <div className={cn("flex items-center gap-3 p-2 h-[56px]", compact ? "w-auto" : inSidebar ? "w-full" : "w-[150px]")}>
         <Avatar className="h-10 w-10 border-2 border-accent">
           <AvatarFallback>
             <UserCircle2 className="h-8 w-8 text-muted-foreground animate-pulse" />
           </AvatarFallback>
         </Avatar>
-        <div className={cn('space-y-1', inSidebar && 'hidden lg:block')}>
-            <div className="h-4 w-16 bg-muted rounded animate-pulse"></div>
-            <div className="h-3 w-12 bg-muted rounded animate-pulse"></div>
-        </div>
+        {!compact && (
+          <div className={cn('space-y-1', inSidebar && 'hidden lg:block')}>
+              <div className="h-4 w-16 bg-muted rounded animate-pulse"></div>
+              <div className="h-3 w-12 bg-muted rounded animate-pulse"></div>
+          </div>
+        )}
       </div>
     );
   }
@@ -131,14 +133,16 @@ export function UserAvatar({ inSidebar = false }: { inSidebar?: boolean } = {}) 
                 {currentUser.displayName ? currentUser.displayName.charAt(0).toUpperCase() : <UserCircle2 className="h-8 w-8 text-muted-foreground" />}
               </AvatarFallback>
             </Avatar>
-            <div className={cn('text-left min-w-0', inSidebar && 'hidden lg:block')}>
-              <p className="text-sm font-semibold text-foreground truncate max-w-[100px] sm:max-w-[150px]">
-                {currentUser.displayName || 'User'}
-              </p>
-              <p className="text-xs text-muted-foreground truncate max-w-[100px] sm:max-w-[150px]">
-                {currentUser.email || 'View Profile'}
-              </p>
-            </div>
+            {!compact && (
+              <div className={cn('text-left min-w-0', inSidebar && 'hidden lg:block')}>
+                <p className="text-sm font-semibold text-foreground truncate max-w-[100px] sm:max-w-[150px]">
+                  {currentUser.displayName || 'User'}
+                </p>
+                <p className="text-xs text-muted-foreground truncate max-w-[100px] sm:max-w-[150px]">
+                  {currentUser.email || 'View Profile'}
+                </p>
+              </div>
+            )}
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align={inSidebar ? 'start' : 'end'} side={inSidebar ? 'top' : 'bottom'}>
@@ -165,10 +169,12 @@ export function UserAvatar({ inSidebar = false }: { inSidebar?: boolean } = {}) 
           <UserCircle2 className="h-8 w-8 text-muted-foreground" />
         </AvatarFallback>
       </Avatar>
-      <div className={cn(inSidebar && 'hidden lg:block')}>
-        <p className="text-sm font-semibold text-foreground">Sign In</p>
-        <p className="text-xs text-muted-foreground">Access your account</p>
-      </div>
+      {!compact && (
+        <div className={cn(inSidebar && 'hidden lg:block')}>
+          <p className="text-sm font-semibold text-foreground">Sign In</p>
+          <p className="text-xs text-muted-foreground">Access your account</p>
+        </div>
+      )}
     </Link>
   );
 }

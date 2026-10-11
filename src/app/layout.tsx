@@ -117,7 +117,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
             <TopBarSearch className="max-w-xl flex-1" />
           </Suspense>
           <div className="ml-auto shrink-0 sm:hidden">
-            <UserAvatar />
+            <UserAvatar compact />
           </div>
         </header>
 
