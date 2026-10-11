@@ -465,11 +465,36 @@
                   }
                 }
 
+                // freqArray is Butterchurn's OWN manual FFT of
+                // getByteTimeDomainData() output, not read straight from
+                // the AnalyserNode -- a flat freqArray could mean either
+                // nothing reaches this.analyser at all, or something's off
+                // in that FFT step itself. Reading raw bytes straight off
+                // Butterchurn's own internal AnalyserNode (bypassing all
+                // of its own processing) settles which: getByteTimeDomainData
+                // returns ~128 (the unsigned-byte zero-point) at true
+                // silence, and should visibly deviate from 128 for real audio.
+                let butterchurnRawMaxDeviation = null;
+                if (visualizer.audio && visualizer.audio.analyser) {
+                  try {
+                    const rawBytes = new Uint8Array(visualizer.audio.analyser.fftSize);
+                    visualizer.audio.analyser.getByteTimeDomainData(rawBytes);
+                    butterchurnRawMaxDeviation = 0;
+                    for (var ri = 0; ri < rawBytes.length; ri++) {
+                      const dev = Math.abs(rawBytes[ri] - 128);
+                      if (dev > butterchurnRawMaxDeviation) butterchurnRawMaxDeviation = dev;
+                    }
+                  } catch (e) {
+                    console.warn('[OnWave][webgl:post-render] reading internal analyser threw:', e);
+                  }
+                }
+
                 console.log(
                   '[OnWave][webgl:post-render] boundFramebufferIsDefault=' + !boundFb + ' pixel=' + pixelRGBA +
                   ' drawCalls=' + drawStats.drawCallCount + ' incompleteFramebufferDraws=' + drawStats.incompleteFramebufferCount +
                   ' floatExtensions=' + floatExtensions.join(',') +
-                  ' butterchurnAudioMax=' + butterchurnAudioMax + ' butterchurnFreqArrayLength=' + butterchurnFreqArrayLength
+                  ' butterchurnAudioMax=' + butterchurnAudioMax + ' butterchurnFreqArrayLength=' + butterchurnFreqArrayLength +
+                  ' butterchurnRawMaxDeviation=' + butterchurnRawMaxDeviation
                 );
                 if (window.Sentry) {
                   window.Sentry.captureMessage('[cast-receiver][webgl:post-render]', {
@@ -483,6 +508,7 @@
                       floatExtensions: floatExtensions.join(','),
                       butterchurnAudioMax,
                       butterchurnFreqArrayLength,
+                      butterchurnRawMaxDeviation,
                     },
                   });
                 }
