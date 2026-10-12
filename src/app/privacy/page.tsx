@@ -2,7 +2,7 @@ export default function PrivacyPage() {
   return (
     <div className="mx-auto max-w-3xl px-4 py-10 sm:py-14">
       <h1 className="font-display text-3xl font-bold text-foreground">Privacy Policy</h1>
-      <p className="mt-2 text-sm text-muted-foreground">Last updated September 2026</p>
+      <p className="mt-2 text-sm text-muted-foreground">Last updated October 2026</p>
 
       <div className="mt-8 space-y-8 text-sm leading-relaxed text-muted-foreground [&_h2]:font-display [&_h2]:mb-2 [&_h2]:mt-0 [&_h2]:text-lg [&_h2]:font-semibold [&_h2]:text-foreground [&_p]:mb-3 [&_ul]:mb-3 [&_ul]:list-disc [&_ul]:pl-5 [&_li]:mb-1">
         <section>
@@ -79,7 +79,33 @@ export default function PrivacyPage() {
         </section>
 
         <section>
-          <h2>8. Contact</h2>
+          <h2>8. The Android apps</h2>
+          <p>
+            OnWave's Android apps (phone and TV) use the same account and backend as the website, with a couple of
+            things specific to a native app:
+          </p>
+          <ul>
+            <li>
+              <strong>Microphone permission:</strong> used only to draw the on-device audio visualizer that reacts
+              to whatever station is playing. Audio is never recorded, stored, or sent anywhere — it's read live,
+              in memory, purely to drive the visualization, and discarded immediately.
+            </li>
+            <li>
+              <strong>Data the apps use:</strong> your email, username, saved (liked) stations, and your chosen
+              visualizer preset — the same account data described in Section 1, plus the preset choice, which is
+              stored so your visualizer looks the same across sessions.
+            </li>
+            <li>
+              <strong>Account deletion:</strong> available directly in either app, or from the website at{' '}
+              <a href="https://onwave.andruquinn.com/profile/edit" className="text-primary hover:underline">
+                onwave.andruquinn.com/profile/edit
+              </a>.
+            </li>
+          </ul>
+        </section>
+
+        <section>
+          <h2>9. Contact</h2>
           <p>Questions about this policy, or a data request, can be sent through the feedback button available on every page.</p>
         </section>
       </div>
