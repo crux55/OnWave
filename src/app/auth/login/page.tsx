@@ -48,6 +48,13 @@ function LoginPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const inviteCodeParam = searchParams.get('invite') || '';
+  // Used by /link (TV QR sign-in) to return here after sign-in -- restricted
+  // to a same-site relative path (must start with exactly one "/", not "//",
+  // which browsers treat as protocol-relative to another host) so this
+  // can't be turned into an open redirect via a crafted login link.
+  const redirectParam = searchParams.get('redirect') || '';
+  const postLoginDestination = (dest: string) =>
+    redirectParam.startsWith('/') && !redirectParam.startsWith('//') ? redirectParam : dest;
   const { toast } = useToast();
   const [isLoadingGoogle, setIsLoadingGoogle] = useState(false);
   const [isLoadingEmail, setIsLoadingEmail] = useState(false);
@@ -88,7 +95,7 @@ function LoginPageContent() {
       }
 
       toast({ title: 'Sign In Successful!', description: 'Welcome to OnWave!' });
-      router.push('/profile');
+      router.push(postLoginDestination('/profile'));
     } catch (error: any) {
       toast({
         title: 'Sign In Failed',
@@ -176,7 +183,7 @@ function LoginPageContent() {
         title: 'Sign In Successful!',
         description: `Welcome back, ${data.email}!`,
       });
-      router.push('/profile');
+      router.push(postLoginDestination('/profile'));
     } catch (error: any) {
       toast({
         title: 'Sign In Failed',

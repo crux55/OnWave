@@ -149,6 +149,56 @@ export async function fetchCurrentUserProfile() {
   }
 }
 
+// TV QR sign-in (docs/mobile/TV-QR-SIGN-IN.md, project_r): the /link page's
+// three calls. All three require the approver to already be signed in on
+// the web -- getAuthToken throws before any request goes out if not, since
+// every one of these is a Bearer-JWT endpoint.
+function getAuthToken(): string {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+  if (!token) throw new Error('UNAUTHORIZED');
+  try {
+    return JSON.parse(token).token;
+  } catch {
+    throw new Error('UNAUTHORIZED');
+  }
+}
+
+export interface DeviceLinkInfo {
+  app: string;
+  device_name: string;
+  created_at: string;
+  expires_at: string;
+}
+
+// Throws 'NOT_FOUND' for an unknown, expired, or already-decided code --
+// the backend 404s all three alike, matching the Android app's own
+// device_code polling, which treats "not found" and "expired" the same way.
+export async function fetchDeviceLinkInfo(code: string): Promise<DeviceLinkInfo> {
+  const res = await fetch(`/api/auth/device/${encodeURIComponent(code)}`, {
+    headers: { Authorization: `Bearer ${getAuthToken()}` },
+  });
+  if (res.status === 404) throw new Error('NOT_FOUND');
+  if (!res.ok) throw new Error('Failed to look up this code');
+  return res.json();
+}
+
+async function postDeviceLinkDecision(path: 'approve' | 'deny', userCode: string): Promise<void> {
+  const res = await fetch(`/api/auth/device/${path}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${getAuthToken()}`,
+    },
+    body: JSON.stringify({ user_code: userCode }),
+  });
+  if (res.status === 404) throw new Error('NOT_FOUND');
+  if (res.status === 409) throw new Error('ALREADY_DECIDED');
+  if (!res.ok) throw new Error(`Failed to ${path} this sign-in`);
+}
+
+export const approveDeviceLink = (userCode: string) => postDeviceLinkDecision('approve', userCode);
+export const denyDeviceLink = (userCode: string) => postDeviceLinkDecision('deny', userCode);
+
 export async function updateProfile(fields: {
   name: string;
   location: string;
@@ -481,6 +531,12 @@ export async function createReminder(reminderData: {
   show_date: string;
   show_start_time: string;
   reminder_minutes_before: number;
+  // The owning station's IANA timezone (project_r/docs/mobile/BACKEND-ISSUES.md
+  // #2) -- optional; the backend defaults to Australia/Melbourne when
+  // omitted, same as before this field existed, but every call site that
+  // has a station/show.timezone on hand should pass it through, or
+  // reminders for non-Melbourne stations fire 10+ hours off.
+  timezone?: string;
 }) {
   const token = localStorage.getItem("token");
   
