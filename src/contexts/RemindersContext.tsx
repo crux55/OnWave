@@ -15,6 +15,7 @@ interface RemindersContextType {
     show_date: string;
     show_start_time: string;
     reminder_minutes_before: number;
+    timezone?: string;
   }) => Promise<Reminder>;
   removeReminder: (reminderId: string) => Promise<void>;
   clearError: () => void;
@@ -54,6 +55,7 @@ export const RemindersProvider = ({ children }: { children: ReactNode }) => {
     show_date: string;
     show_start_time: string;
     reminder_minutes_before: number;
+    timezone?: string;
   }) => {
     setError(null);
     

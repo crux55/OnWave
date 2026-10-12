@@ -70,6 +70,7 @@ export const PBSShowCard: React.FC<PBSShowCardProps> = ({ show, onTuneIn, isFoll
         show_date: show.date,
         show_start_time: show.start_time,
         reminder_minutes_before: 15,
+        timezone: show.timezone,
       });
 
       toast({

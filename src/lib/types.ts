@@ -210,6 +210,11 @@ export interface Reminder {
   show_start_time: string;
   reminder_minutes_before: number;
   created_at: string;
+  // The owning station's IANA timezone -- see
+  // project_r/docs/mobile/BACKEND-ISSUES.md #2. Optional since it's a new
+  // field; treat an absent value the same as the backend's own default
+  // (Australia/Melbourne).
+  timezone?: string;
 }
 
 export interface WebSocketNotification {
