@@ -1590,6 +1590,11 @@ export async function grantDJByUsername(username: string): Promise<string> {
 
 export type FeedbackType = 'bug' | 'feature' | 'station_suggestion';
 
+// Where a report came from -- project_r/docs/mobile (platform field).
+// android-phone/android-tv are only ever sent by the native apps; the web
+// client only ever sends the two web- values.
+export type FeedbackPlatform = 'web-desktop' | 'web-mobile' | 'android-phone' | 'android-tv';
+
 export interface FeedbackReport {
   id: string;
   user_id?: string;
@@ -1598,8 +1603,23 @@ export interface FeedbackReport {
   message: string;
   page_url?: string;
   user_agent?: string;
+  platform?: FeedbackPlatform;
   status: 'open' | 'resolved';
   created_at: string;
+}
+
+// matchMedia('(pointer: coarse)') catches touch-primary devices a UA string
+// might miss (and vice versa an unusual mobile browser's UA); either signal
+// alone is enough to call it mobile. Deliberately not viewport width, which
+// a resized desktop window satisfies too easily. The backend falls back to
+// classifying user_agent on its own (the same regex) if this is ever
+// missing or unrecognised, so sending nothing here still degrades fine --
+// this just gives the admin inbox a stronger signal than UA sniffing alone.
+function detectWebPlatform(): FeedbackPlatform {
+  if (typeof window === 'undefined') return 'web-desktop';
+  const coarsePointer = window.matchMedia?.('(pointer: coarse)').matches ?? false;
+  const mobileUA = /Mobi|Android|iPhone|iPad|iPod/.test(navigator.userAgent);
+  return coarsePointer || mobileUA ? 'web-mobile' : 'web-desktop';
 }
 
 // Deliberately usable when logged out — the floating feedback button
@@ -1625,6 +1645,7 @@ export async function submitFeedback(type: FeedbackType, message: string, pageUr
       message,
       page_url: pageUrl,
       user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : undefined,
+      platform: detectWebPlatform(),
     }),
   });
 

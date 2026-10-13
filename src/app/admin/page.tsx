@@ -3,7 +3,8 @@
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { jwtDecode as jwt_decode } from 'jwt-decode';
-import { ShieldCheck, ShieldAlert, Loader2, Check, X, UserPlus, Sparkles, Copy, Bug, Lightbulb, MessageCircle, Radio, Users, AlertTriangle } from 'lucide-react';
+import { ShieldCheck, ShieldAlert, Loader2, Check, X, UserPlus, Sparkles, Copy, Bug, Lightbulb, MessageCircle, Radio, Users, AlertTriangle, Monitor, Smartphone, Tv } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -27,6 +28,7 @@ import {
   type StationRequest,
   type DJRequest,
   type FeedbackReport,
+  type FeedbackPlatform,
   type Badge as BadgeData,
   type AdminUserStats,
   type FailingStation,
@@ -41,6 +43,17 @@ import { Label } from '@/components/ui/label';
 function requesterLabel(names: Record<string, string>, requesterId: string): string {
   return names[requesterId] || `User ${requesterId.slice(0, 8)}`;
 }
+
+// Older reports predate this field entirely (NULL) -- PLATFORM_META has no
+// entry for that case, so those rows just render without a badge rather
+// than an "Unknown" label nobody asked for.
+const PLATFORM_META: Record<FeedbackPlatform, { label: string; icon: typeof Monitor }> = {
+  'web-desktop': { label: 'Desktop', icon: Monitor },
+  'web-mobile': { label: 'Mobile web', icon: Smartphone },
+  'android-phone': { label: 'Android phone', icon: Smartphone },
+  'android-tv': { label: 'Android TV', icon: Tv },
+};
+const PLATFORM_FILTERS = Object.keys(PLATFORM_META) as FeedbackPlatform[];
 
 export default function AdminPage() {
   const router = useRouter();
@@ -57,6 +70,7 @@ export default function AdminPage() {
   const [isGeneratingInvite, setIsGeneratingInvite] = useState(false);
   const [feedbackReports, setFeedbackReports] = useState<FeedbackReport[]>([]);
   const [resolvingId, setResolvingId] = useState<string | null>(null);
+  const [platformFilter, setPlatformFilter] = useState<FeedbackPlatform | null>(null);
   const [badges, setBadges] = useState<BadgeData[]>([]);
   const [togglingSplashId, setTogglingSplashId] = useState<string | null>(null);
   const [userStats, setUserStats] = useState<AdminUserStats | null>(null);
@@ -374,49 +388,93 @@ export default function AdminPage() {
             <h3 className="text-xl font-semibold text-foreground mb-3 flex items-center gap-2">
               <MessageCircle className="h-5 w-5 text-accent" /> Bug Reports, Feature Ideas &amp; Station Suggestions
             </h3>
-            {feedbackReports.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No reports yet.</p>
-            ) : (
-              <div className="space-y-2">
-                {feedbackReports.map(report => (
-                  <div
-                    key={report.id}
-                    className={cn(
-                      'rounded-md border border-border bg-muted/30 p-3',
-                      report.status === 'resolved' && 'opacity-50'
-                    )}
+            <div className="flex flex-wrap items-center gap-2 mb-3">
+              <button
+                type="button"
+                onClick={() => setPlatformFilter(null)}
+                className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-full"
+              >
+                <Badge variant={platformFilter === null ? 'default' : 'outline'} className="cursor-pointer">
+                  All
+                </Badge>
+              </button>
+              {PLATFORM_FILTERS.map(platform => {
+                const { label, icon: Icon } = PLATFORM_META[platform];
+                return (
+                  <button
+                    key={platform}
+                    type="button"
+                    onClick={() => setPlatformFilter(prev => (prev === platform ? null : platform))}
+                    className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-full"
                   >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-                          {report.type === 'bug' ? (
-                            <Bug className="h-3.5 w-3.5 text-destructive" />
-                          ) : report.type === 'station_suggestion' ? (
-                            <Radio className="h-3.5 w-3.5 text-accent" />
-                          ) : (
-                            <Lightbulb className="h-3.5 w-3.5 text-accent" />
+                    <Badge variant={platformFilter === platform ? 'default' : 'outline'} className="cursor-pointer gap-1">
+                      <Icon className="h-3 w-3" /> {label}
+                    </Badge>
+                  </button>
+                );
+              })}
+            </div>
+            {(() => {
+              const visibleReports = platformFilter
+                ? feedbackReports.filter(r => r.platform === platformFilter)
+                : feedbackReports;
+              if (visibleReports.length === 0) {
+                return (
+                  <p className="text-sm text-muted-foreground">
+                    {feedbackReports.length === 0 ? 'No reports yet.' : 'No reports from this platform.'}
+                  </p>
+                );
+              }
+              return (
+                <div className="space-y-2">
+                  {visibleReports.map(report => {
+                    const platformMeta = report.platform ? PLATFORM_META[report.platform] : undefined;
+                    return (
+                      <div
+                        key={report.id}
+                        className={cn(
+                          'rounded-md border border-border bg-muted/30 p-3',
+                          report.status === 'resolved' && 'opacity-50'
+                        )}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                              {report.type === 'bug' ? (
+                                <Bug className="h-3.5 w-3.5 text-destructive" />
+                              ) : report.type === 'station_suggestion' ? (
+                                <Radio className="h-3.5 w-3.5 text-accent" />
+                              ) : (
+                                <Lightbulb className="h-3.5 w-3.5 text-accent" />
+                              )}
+                              {report.username || 'Anonymous'}
+                              {report.page_url && <span className="font-normal text-muted-foreground">— {report.page_url}</span>}
+                              {platformMeta && (
+                                <Badge variant="outline" className="gap-1 font-normal text-muted-foreground">
+                                  <platformMeta.icon className="h-3 w-3" /> {platformMeta.label}
+                                </Badge>
+                              )}
+                            </div>
+                            <p className="text-sm text-muted-foreground mt-1 whitespace-pre-wrap break-words">{report.message}</p>
+                          </div>
+                          {report.status === 'open' && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="flex-shrink-0"
+                              onClick={() => handleResolveFeedback(report.id)}
+                              disabled={resolvingId === report.id}
+                            >
+                              {resolvingId === report.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+                            </Button>
                           )}
-                          {report.username || 'Anonymous'}
-                          {report.page_url && <span className="font-normal text-muted-foreground">— {report.page_url}</span>}
                         </div>
-                        <p className="text-sm text-muted-foreground mt-1 whitespace-pre-wrap break-words">{report.message}</p>
                       </div>
-                      {report.status === 'open' && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="flex-shrink-0"
-                          onClick={() => handleResolveFeedback(report.id)}
-                          disabled={resolvingId === report.id}
-                        >
-                          {resolvingId === report.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+                    );
+                  })}
+                </div>
+              );
+            })()}
           </section>
 
           <Separator />
